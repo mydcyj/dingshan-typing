@@ -1,104 +1,28 @@
 [
-      [
-        [
-          "The little bookstore on Pine Street opens before the rest of the shops.",
-          "I stopped at the bookstore while the rain fell softly outside.",
-          "A bell above the bookstore door rang as I stepped inside."
-        ],
-        [
-          "The shelves were crowded with old maps, cookbooks, and tales of the sea.",
-          "Sunlight fell across the low shelves beside the front window.",
-          "Someone had left a handwritten note beside a stack of used books."
-        ],
-        [
-          "I picked a thin novel and read the first page by the window.",
-          "I went home with a book I had never heard of before.",
-          "By the time I left, I already knew when I would come back."
-        ]
-      ],
-      [
-        [
-          "We started our walk just after sunrise, when the park was still quiet.",
-          "On Sunday morning, we followed the footpath into the park.",
-          "We took the long way through the park while the air was still cool."
-        ],
-        [
-          "A dog ran ahead of us, chasing leaves across the empty path.",
-          "Ducks crossed the pond in a loose line, leaving small waves behind.",
-          "The trees kept the path cool even as the sun climbed higher."
-        ],
-        [
-          "We sat on a wooden bench and watched the park fill up.",
-          "We stopped for a while before turning back toward home.",
-          "By the end of the walk, the streets around the park were waking up."
-        ]
-      ],
-      [
-        [
-          "On Saturday, I carried an empty bag to the neighborhood market.",
-          "The market stalls were already busy when I arrived.",
-          "I walked to the market before the morning rush."
-        ],
-        [
-          "A baker had set fresh bread next to jars of dark honey.",
-          "There were pears in wooden boxes and flowers in blue buckets.",
-          "Two neighbors stood by the fruit stall, talking about the weather."
-        ],
-        [
-          "I bought enough for lunch and walked home along the river.",
-          "My bag felt much heavier on the walk home.",
-          "Before leaving, I chose three ripe peaches to share at home."
-        ]
-      ],
-      [
-        [
-          "The train left the city just as the sun dropped behind the buildings.",
-          "I found a window seat on the evening train and put my bag at my feet.",
-          "The evening train pulled away from the platform a few minutes late."
-        ],
-        [
-          "Soon, the view gave way to fields and small houses with red roofs.",
-          "At every stop, a few more lights appeared in the windows outside.",
-          "For a long stretch, the tracks ran alongside a shallow river."
-        ],
-        [
-          "I watched the view until my stop was announced.",
-          "When I stepped off the train, the air smelled like rain.",
-          "By the time we arrived, I had forgotten to open my book."
-        ]
-      ],
-      [
-        [
-          "The lemon cake was already in the oven when my sister arrived.",
-          "I decided to bake a lemon cake on a quiet afternoon.",
-          "A bowl of bright lemons on the kitchen table gave me an idea."
-        ],
-        [
-          "Soon, the sweet smell of lemon reached every room in the house.",
-          "While the cake baked, I washed the bowls and cleared the table.",
-          "I checked the oven twice before the top turned golden."
-        ],
-        [
-          "We ate the first slices while the cake was still warm.",
-          "I saved a slice for breakfast and shared the rest.",
-          "Once the cake cooled, I dusted the top with a little sugar."
-        ]
-      ],
-      [
-        [
-          "We reached the beach before the first boats left the harbor.",
-          "A strong wind greeted us when we stepped onto the beach.",
-          "We walked along the beach while the tide was low."
-        ],
-        [
-          "Small waves broke over the stones and rolled back into the sea.",
-          "Gulls stood near the water, looking for food in the wet sand.",
-          "A row of footprints curved along the shore and disappeared into the water."
-        ],
-        [
-          "We collected a few shells before heading back up the path.",
-          "We stayed until the wind made our hands too cold.",
-          "On the way home, we stopped to brush the sand from our shoes."
-        ]
-      ]
-    ]
+  [
+    "Many college students use their phones while studying. A quick message seems harmless, but it can interrupt a difficult task and make it harder to concentrate. In my view, students should set clear limits on phone use instead of depending on willpower alone. For example, they can silence notifications before a study session and check messages during a short break. They can also keep the phone out of reach when reading or writing. These simple steps do not require special equipment, and they make progress easier to notice. Once students learn to manage distractions, they can finish their work more efficiently and have more time to relax.",
+    "Volunteering offers college students a chance to learn beyond the classroom. Last semester, a group of students in my community helped older people learn to use mobile payment apps. At first, the volunteers explained the steps too quickly. They soon realized that patient practice was more helpful than a long explanation. They wrote down the basic steps and let each learner try them several times. By the end of the program, many older residents felt more confident using their phones. The students also learned how to communicate with people of different ages. This experience shows that even a small act of service can benefit both the community and the volunteers.",
+    "Reading is often seen as a quiet activity, but it can also bring people together. Our college library recently started a weekly reading group. Members choose a short article and meet to discuss the ideas they find most interesting. The discussions are friendly because everyone is encouraged to explain a different point of view. Some students who rarely spoke in class now share their opinions with confidence. The group also helps members build a regular reading habit. Instead of trying to finish a long book in one night, they read a little each day. This steady effort makes reading both easier and more enjoyable.",
+    "Reducing food waste is a practical way to protect the environment. At a college dining hall, students may take more food than they can finish because they are in a hurry or unsure about the portion size. The dining hall can help by offering smaller servings and allowing students to ask for more. Students can also plan their meals and save suitable leftovers for later. These habits reduce waste without making meals less enjoyable. More importantly, they remind us that the food on our plates requires water, energy, and human labor. If many people make a small change, the result can be significant."
+  ],
+  [
+    "周六早晨，我沿着河边慢慢走。昨夜下过雨，石板缝里积着薄薄的水，树叶被洗得格外亮。桥下有人练习吹笛子，偶尔吹错一个音，便停一会儿，又从头开始。卖早点的阿姨把蒸笼揭开，白汽飘到路灯旁，很快就散了。我买了两个包子，坐在长椅上吃。旁边的小孩蹲着看蚂蚁，问爷爷它们是不是也在赶路。爷爷想了想，说也许是在找早饭。远处的公交车缓缓驶过，车窗映着河面。风从水上吹来，我忽然想起，自己已经很久没有这样安静地坐过了。回去的路上，我特意绕过平时匆忙经过的小巷，看见墙角新开了一丛花。",
+    "社区图书馆换了新的书架。以前藏在角落里的旧杂志被搬到窗边，随手就能翻到。午后，我选了一本讲城市植物的小书，在靠窗的桌前坐下。窗外有工人在修路，机器停下来的时候，可以听见树上几只麻雀争着叫。一位穿蓝色校服的女孩抱着词典进来，把书包放得很轻。她抄了一会儿单词，忽然抬头问管理员，借回去的书能不能续借。管理员笑着点头，又递给她一张写着开放时间的卡片。离开时，我把书翻到夹着书签的那一页。上面介绍了梧桐的叶子，我这才留意到门口那棵梧桐已经换了新叶。",
+    "晚饭后，楼下忽然停了电。电梯屏幕暗下去，走廊里只剩安全出口的绿灯。住在隔壁的叔叔拿来手电，照着台阶，让刚买菜回来的邻居先上楼。孩子们原本在各自家里看动画片，这会儿却聚在一楼，拿着纸笔玩猜词。有人搬来小凳子，还有人端出一盘切好的西瓜。夏天的夜风从大门吹进来，纸上的字被吹得轻轻抖动。半个小时后，灯亮了，大家却没有立刻散开。邻居们聊起上次见面是什么时候，说着说着才发现，虽然每天走过同一条楼道，真正停下来打招呼的机会并不多。那天我回家时，还听见孩子在楼下商量下一轮要猜什么。"
+  ],
+  [
+    "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, world!\\n\");\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    int apples = 3;\n    int oranges = 4;\n    printf(\"Total: %d\\n\", apples + oranges);\n    return 0;\n}",
+    "#include <stdio.h>\n\nint main(void) {\n    for (int i = 1; i <= 3; i++) {\n        printf(\"%d\\n\", i);\n    }\n    return 0;\n}"
+  ],
+  [
+    "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, world!\\n\";\n    return 0;\n}",
+    "#include <iostream>\n#include <string>\n\nint main() {\n    std::string name = \"Ada\";\n    std::cout << \"Hello, \" << name << \"!\\n\";\n    return 0;\n}",
+    "#include <iostream>\n\nint main() {\n    for (int number = 1; number <= 3; ++number) {\n        std::cout << number << '\\n';\n    }\n    return 0;\n}"
+  ],
+  [
+    "message = \"Hello, world!\"\nprint(message)",
+    "for number in range(1, 4):\n    print(number)",
+    "def greet(name):\n    return f\"Hello, {name}!\"\n\nprint(greet(\"Ada\"))"
+  ]
+]

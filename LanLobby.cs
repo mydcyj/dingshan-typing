@@ -145,6 +145,22 @@ namespace EnglishTypingPractice
                 client.DropBall(round);
         }
 
+        internal void SetPreview(SnakeTypingPreview preview)
+        {
+            if (host != null)
+                host.SetPreview(preview);
+            else if (client != null)
+                client.SetPreview(preview);
+        }
+
+        internal void SetSprint(int round, bool held)
+        {
+            if (host != null)
+                host.SetSprint(round, held);
+            else if (client != null)
+                client.SetSprint(round, held);
+        }
+
         internal void HidePanel()
         {
             panel.Visibility = Visibility.Collapsed;

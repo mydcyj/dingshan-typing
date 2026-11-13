@@ -42,6 +42,18 @@ namespace EnglishTypingPractice
 
         internal PlaybackMode Mode { get; set; }
         internal event Action<FileInfo> TrackPlaying;
+        internal bool IsPlaying { get { return playing; } }
+        internal TimeSpan Position { get { return opened ? player.Position : TimeSpan.Zero; } }
+        internal TimeSpan Duration
+        {
+            get { return opened && player.NaturalDuration.HasTimeSpan ? player.NaturalDuration.TimeSpan : TimeSpan.Zero; }
+        }
+
+        internal void Seek(double seconds)
+        {
+            if (Duration > TimeSpan.Zero)
+                player.Position = TimeSpan.FromSeconds(Math.Max(0, Math.Min(Duration.TotalSeconds, seconds)));
+        }
 
         internal void SetVolume(int percent)
         {

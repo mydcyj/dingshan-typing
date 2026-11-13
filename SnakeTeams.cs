@@ -87,11 +87,6 @@ namespace EnglishTypingPractice
                     balls.Add(new TeamBall { Team = team, Cell = FindCell(team, reserved), Carrier = -1 });
         }
 
-        internal bool IsOwnBall(int slot, int cell)
-        {
-            return balls.Any(ball => ball.Cell == cell && ball.Carrier < 0 && ball.Team == Team(slot));
-        }
-
         internal void PickUp(int slot, int cell)
         {
             foreach (var ball in balls)

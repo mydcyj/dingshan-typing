@@ -18,8 +18,8 @@ using Forms = System.Windows.Forms;
 [assembly: TargetFramework(".NETFramework,Version=v4.8")]
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
-[assembly: System.Reflection.AssemblyDescription("英文打字练习与局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("1.9.0.0")]
+[assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
+[assembly: System.Reflection.AssemblyVersion("1.10.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -50,13 +50,17 @@ namespace EnglishTypingPractice
         private readonly Window window;
         private readonly PracticeSettings settings = PracticeSettings.Load();
         private readonly Random random = new Random();
-        private readonly string[][][] topics;
+        private readonly string[][] passages;
         private readonly Stopwatch clock = new Stopwatch();
         private readonly DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         private readonly MusicPlayback music;
+        private readonly DispatcherTimer musicTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         private readonly SnakePractice snake;
         private readonly TypingEffects effects;
         private bool resumePractice;
+        private bool? manualMusic;
+        private bool syncingMusicPosition;
+        private bool draggingMusicPosition;
 
         private readonly CheckBox matchCase;
         private readonly CheckBox includePunctuation;
@@ -73,6 +77,7 @@ namespace EnglishTypingPractice
         private readonly ComboBox musicTrack;
         private readonly Button nextTrack;
         private readonly TextBlock settingsNotice;
+        private readonly ComboBox practiceKind;
 
         private int lastTopic = -1;
         private string original = "";
@@ -86,8 +91,9 @@ namespace EnglishTypingPractice
         {
             this.window = window;
             using (var reader = new StreamReader(typeof(Practice).Assembly.GetManifestResourceStream("Passages.json")))
-                topics = new JavaScriptSerializer().Deserialize<string[][][]>(reader.ReadToEnd());
+                passages = new JavaScriptSerializer().Deserialize<string[][]>(reader.ReadToEnd());
 
+            practiceKind = (ComboBox)window.FindName("PracticeKind");
             matchCase = (CheckBox)window.FindName("MatchCase");
             includePunctuation = (CheckBox)window.FindName("IncludePunctuation");
             playMusic = (CheckBox)window.FindName("PlayMusic");
@@ -119,6 +125,30 @@ namespace EnglishTypingPractice
             snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running), settings, SaveSettings);
             var practicePage = (FrameworkElement)window.FindName("PracticePage");
             var snakePage = (FrameworkElement)window.FindName("SnakePage");
+            var rulesPage = (FrameworkElement)window.FindName("SnakeRules");
+            var closeRules = (Button)window.FindName("CloseSnakeRules");
+            Action returnToSnake = () =>
+            {
+                rulesPage.Visibility = Visibility.Collapsed;
+                snakePage.Visibility = Visibility.Visible;
+                snake.Focus();
+            };
+            ((Button)window.FindName("OpenSnakeRules")).Click += (sender, e) =>
+            {
+                snakePage.Visibility = Visibility.Collapsed;
+                rulesPage.Visibility = Visibility.Visible;
+                ((ScrollViewer)window.FindName("SnakeRulesScroll")).ScrollToTop();
+                closeRules.Focus();
+            };
+            closeRules.Click += (sender, e) => returnToSnake();
+            rulesPage.PreviewKeyDown += (sender, e) =>
+            {
+                if (e.Key == Key.Escape)
+                {
+                    returnToSnake();
+                    e.Handled = true;
+                }
+            };
             ((Button)window.FindName("OpenSnake")).Click += (sender, e) =>
             {
                 resumePractice = clock.IsRunning;
@@ -140,7 +170,7 @@ namespace EnglishTypingPractice
                     clock.Start();
                     timer.Start();
                 }
-                music.SetPlaying(settings.PlayMusic && resumePractice);
+                UpdatePracticeMusic();
                 typed.Focus();
             };
             matchCase.IsChecked = settings.MatchCase;
@@ -154,8 +184,9 @@ namespace EnglishTypingPractice
             playMusic.Click += (sender, e) =>
             {
                 settings.PlayMusic = playMusic.IsChecked == true;
+                manualMusic = null;
                 SaveSettings();
-                music.SetPlaying(settings.PlayMusic && clock.IsRunning);
+                UpdatePracticeMusic();
             };
             ((Button)window.FindName("NewPassage")).Click += (sender, e) =>
             {
@@ -167,6 +198,25 @@ namespace EnglishTypingPractice
                 ResetRound();
                 typed.Focus();
             };
+            practiceKind.SelectionChanged += (sender, e) =>
+            {
+                lastTopic = -1;
+                ChoosePassage();
+                typed.Focus();
+            };
+            typed.PreviewKeyDown += (sender, e) =>
+            {
+                if (IsCode && !typed.IsReadOnly && e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.None)
+                {
+                    if (typed.Text.Replace("\r\n", "\n").Length - typed.SelectedText.Replace("\r\n", "\n").Length <= target.Length - 4)
+                    {
+                        int caret = typed.SelectionStart;
+                        typed.SelectedText = "    ";
+                        typed.CaretIndex = caret + 4;
+                    }
+                    e.Handled = true;
+                }
+            };
             ((Button)window.FindName("ChooseFolder")).Click += ChooseMusicFolder;
             typed.TextChanged += OnTextChanged;
             DataObject.AddPastingHandler(typed, (sender, e) => e.CancelCommand());
@@ -174,12 +224,14 @@ namespace EnglishTypingPractice
             window.Loaded += async (sender, e) =>
             {
                 typed.Focus();
+                musicTimer.Start();
                 if (!string.IsNullOrEmpty(settings.Folder))
                     await LoadMusicFolder();
             };
             window.Closed += (sender, e) =>
             {
                 timer.Stop();
+                musicTimer.Stop();
                 snake.Leave();
                 if (musicTrack.SelectedValue is string)
                     RememberTrack();
@@ -191,12 +243,22 @@ namespace EnglishTypingPractice
 
         private void ChoosePassage()
         {
-            int index = random.Next(lastTopic < 0 ? topics.Length : topics.Length - 1);
+            var choices = passages[practiceKind.SelectedIndex];
+            int index = random.Next(lastTopic < 0 ? choices.Length : choices.Length - 1);
             if (lastTopic >= 0 && index >= lastTopic)
                 index++;
             lastTopic = index;
-            original = string.Join(" ", topics[index].Select(group => group[random.Next(group.Length)]));
+            original = choices[index];
             ResetRound();
+        }
+
+        private bool IsCode { get { return practiceKind.SelectedIndex >= 2; } }
+        private bool IsChinese { get { return practiceKind.SelectedIndex == 1; } }
+        private bool MatchExactCase { get { return IsCode || settings.MatchCase; } }
+
+        private void UpdatePracticeMusic()
+        {
+            music.SetPlaying(manualMusic ?? (settings.PlayMusic && clock.IsRunning));
         }
 
         private void ChangePracticeOptions(object sender, RoutedEventArgs e)
@@ -212,17 +274,37 @@ namespace EnglishTypingPractice
             effects.Reset();
             timer.Stop();
             clock.Reset();
-            music.SetPlaying(false);
+            UpdatePracticeMusic();
             resetting = true;
             typed.Clear();
             typed.IsReadOnly = false;
 
-            target = settings.IncludePunctuation ? original : new string(original.Where(c => !char.IsPunctuation(c)).ToArray());
-            typed.MaxLength = target.Length;
+            matchCase.IsEnabled = !IsCode && !IsChinese;
+            includePunctuation.IsEnabled = !IsCode;
+            typed.AcceptsReturn = IsCode;
+            InputMethod.SetIsInputMethodEnabled(typed, IsChinese);
+            var font = new FontFamily(IsChinese ? "Microsoft YaHei UI" : "Consolas");
+            passage.FontFamily = typed.FontFamily = font;
+            passage.FontSize = typed.FontSize = IsCode ? 18 : 22;
+            typed.Height = IsCode ? 155 : 96;
+            ((TextBlock)window.FindName("PracticeTitle")).Text = IsCode ? "练习代码" : "练习短文";
+            ((TextBlock)window.FindName("PracticeHint")).Text = IsCode
+                ? "照着示例输入，保留大小写、符号和换行。Tab 输入 4 个空格。"
+                : IsChinese ? "用中文输入法照着短文输入，汉字上屏后开始计时。"
+                : "照着四级英语短文输入，敲下第一个字符开始计时。";
+            ((TextBlock)window.FindName("SpeedLabel")).Text = IsChinese ? "速度（字/分）" : "速度 (WPM)";
+            speed.ToolTip = IsChinese ? "每分钟输入的正确汉字数。" : "每 5 个正确字符折算为 1 个词。";
+            target = IsCode || settings.IncludePunctuation ? original : new string(original.Where(c => !char.IsPunctuation(c)).ToArray());
+            typed.MaxLength = target.Length + target.Count(c => c == '\n');
             progress.Maximum = target.Length;
-            letters = target.Select(c => new Run(c.ToString())).ToArray();
+            letters = target.Select(c => new Run(c == '\n' ? "" : c.ToString())).ToArray();
             passage.Inlines.Clear();
-            passage.Inlines.AddRange(letters);
+            for (int i = 0; i < letters.Length; i++)
+            {
+                passage.Inlines.Add(letters[i]);
+                if (target[i] == '\n')
+                    passage.Inlines.Add(new LineBreak());
+            }
 
             roundStatus.Text = "未开始";
             resetting = false;
@@ -240,11 +322,11 @@ namespace EnglishTypingPractice
                 clock.Start();
                 timer.Start();
                 roundStatus.Text = "练习中";
-                music.SetPlaying(settings.PlayMusic);
+                UpdatePracticeMusic();
             }
 
             RefreshProgress();
-            bool complete = typed.Text.Length >= target.Length;
+            bool complete = ReadInput().Length >= target.Length;
             if (settings.TypingFeedback)
                 PlayFeedback(e, complete);
             if (complete)
@@ -253,14 +335,20 @@ namespace EnglishTypingPractice
                 timer.Stop();
                 typed.IsReadOnly = true;
                 roundStatus.Text = "本轮完成";
-                music.SetPlaying(false);
+                UpdatePracticeMusic();
             }
             RefreshClock();
         }
 
         private void PlayFeedback(TextChangedEventArgs e, bool complete)
         {
-            string input = typed.Text;
+            string input = ReadInput();
+            if (IsCode || IsChinese)
+            {
+                if (complete || e.Changes.Any(change => change.AddedLength > 0))
+                    effects.Play(null, null, complete);
+                return;
+            }
             int wordStart = -1;
             int wordEnd = -1;
             bool letterTyped = false;
@@ -274,7 +362,7 @@ namespace EnglishTypingPractice
                     while (start > 0 && IsWordCharacter(start - 1))
                         start--;
                     int length = i - start + 1;
-                    var comparison = settings.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+                    var comparison = MatchExactCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
                     if (string.Compare(input, start, target, start, length, comparison) == 0)
                     {
                         wordStart = start;
@@ -296,13 +384,13 @@ namespace EnglishTypingPractice
 
         private void RefreshProgress()
         {
-            string input = typed.Text;
+            string input = ReadInput();
             correctCount = 0;
             for (int i = 0; i < letters.Length; i++)
             {
                 var letter = letters[i];
                 bool entered = i < input.Length;
-                bool correct = entered && (settings.MatchCase
+                bool correct = entered && (MatchExactCase
                     ? input[i] == target[i]
                     : char.ToUpperInvariant(input[i]) == char.ToUpperInvariant(target[i]));
                 bool incorrect = entered && !correct;
@@ -321,12 +409,24 @@ namespace EnglishTypingPractice
                 : (100.0 * correctCount / input.Length).ToString("0.#", CultureInfo.CurrentCulture) + "%";
         }
 
+        private string ReadInput()
+        {
+            return typed.Text.Replace("\r\n", "\n");
+        }
+
         private void RefreshClock()
         {
             TimeSpan duration = clock.Elapsed;
             elapsed.Text = string.Format("{0}:{1:00}", (int)duration.TotalMinutes, duration.Seconds);
+            int units = correctCount;
+            if (IsChinese)
+            {
+                string input = ReadInput();
+                units = Enumerable.Range(0, Math.Min(input.Length, target.Length))
+                    .Count(i => input[i] == target[i] && target[i] >= '\u3400' && target[i] <= '\u9fff');
+            }
             speed.Text = duration.TotalSeconds >= 1
-                ? Math.Round(correctCount * 12.0 / duration.TotalSeconds).ToString(CultureInfo.CurrentCulture)
+                ? Math.Round(units * (IsChinese ? 60.0 : 12.0) / duration.TotalSeconds).ToString(CultureInfo.CurrentCulture)
                 : "0";
         }
 
@@ -362,6 +462,45 @@ namespace EnglishTypingPractice
             var mode = (ComboBox)window.FindName("MusicMode");
             var volume = (Slider)window.FindName("MusicVolume");
             var volumeLabel = (TextBlock)window.FindName("VolumeLabel");
+            var toggle = (Button)window.FindName("ToggleMusic");
+            var position = (Slider)window.FindName("MusicPosition");
+            var time = (TextBlock)window.FindName("MusicTime");
+            toggle.Click += (sender, e) =>
+            {
+                manualMusic = !music.IsPlaying;
+                UpdatePracticeMusic();
+                toggle.Content = music.IsPlaying ? "暂停" : "播放";
+            };
+            position.AddHandler(System.Windows.Controls.Primitives.Thumb.DragStartedEvent,
+                new System.Windows.Controls.Primitives.DragStartedEventHandler((sender, e) => draggingMusicPosition = true));
+            position.AddHandler(System.Windows.Controls.Primitives.Thumb.DragCompletedEvent,
+                new System.Windows.Controls.Primitives.DragCompletedEventHandler((sender, e) =>
+                {
+                    draggingMusicPosition = false;
+                    if (!e.Canceled)
+                        music.Seek(position.Value);
+                }));
+            position.ValueChanged += (sender, e) =>
+            {
+                if (!syncingMusicPosition && !draggingMusicPosition)
+                    music.Seek(position.Value);
+                time.Text = FormatMusicTime(TimeSpan.FromSeconds(position.Value)) + " / " + FormatMusicTime(music.Duration);
+            };
+            musicTimer.Tick += (sender, e) =>
+            {
+                toggle.IsEnabled = musicTrack.IsEnabled;
+                toggle.Content = music.IsPlaying ? "暂停" : "播放";
+                var duration = music.Duration;
+                position.IsEnabled = duration > TimeSpan.Zero;
+                if (!draggingMusicPosition)
+                {
+                    syncingMusicPosition = true;
+                    position.Maximum = Math.Max(1, duration.TotalSeconds);
+                    position.Value = music.Position.TotalSeconds;
+                    syncingMusicPosition = false;
+                    time.Text = FormatMusicTime(music.Position) + " / " + FormatMusicTime(duration);
+                }
+            };
             mode.SelectedIndex = (int)settings.MusicMode;
             music.Mode = settings.MusicMode;
             volume.Value = settings.MusicVolume;
@@ -403,6 +542,11 @@ namespace EnglishTypingPractice
                     e.Handled = true;
                 }
             };
+        }
+
+        private static string FormatMusicTime(TimeSpan time)
+        {
+            return string.Format("{0}:{1:00}", (int)time.TotalMinutes, time.Seconds);
         }
 
         private void UpdatePlaylist(FileInfo[] files, int selectedIndex)

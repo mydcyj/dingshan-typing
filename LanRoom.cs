@@ -18,6 +18,9 @@ namespace EnglishTypingPractice
         public int Group { get; set; }
         public int Round { get; set; }
         public SnakeRole Role { get; set; }
+        public SnakeTypingPreview Preview { get; set; }
+        public int SprintRound { get; set; }
+        public bool SprintHeld { get; set; }
     }
 
     internal sealed class LanReply
@@ -31,7 +34,7 @@ namespace EnglishTypingPractice
     internal static class LanWire
     {
         internal const int Port = 48631;
-        internal const string Version = "TypingSnake/7";
+        internal const string Version = "TypingSnake/8";
         internal const int StateLimit = 65536;
         internal const int MusicLimit = 64 * 1024 * 1024;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
@@ -194,6 +197,20 @@ namespace EnglishTypingPractice
                     ApplyInput(0, new LanRequest { Kind = charge ? "charge" : "turn", Text = word, Group = group, Round = round });
         }
 
+        internal void SetPreview(SnakeTypingPreview preview)
+        {
+            lock (sync)
+                if (!closed)
+                    match.SetPreview(0, preview, clock.ElapsedMilliseconds);
+        }
+
+        internal void SetSprint(int round, bool held)
+        {
+            lock (sync)
+                if (!closed)
+                    match.SetSprint(0, round, held, clock.ElapsedMilliseconds);
+        }
+
         internal void SetRole(SnakeRole role)
         {
             lock (sync)
@@ -333,6 +350,10 @@ namespace EnglishTypingPractice
 
         private void ApplyInput(int slot, LanRequest request)
         {
+            if (request.Preview != null)
+                match.SetPreview(slot, request.Preview, clock.ElapsedMilliseconds);
+            if (request.SprintRound != 0)
+                match.SetSprint(slot, request.SprintRound, request.SprintHeld, clock.ElapsedMilliseconds);
             if (request.Kind == "role" && Enum.IsDefined(typeof(SnakeRole), request.Role))
                 match.SetRole(slot, request.Role);
             if (request.Kind == "drop")
@@ -424,6 +445,8 @@ namespace EnglishTypingPractice
         private volatile bool closed;
         private LanRequest turn;
         private LanRequest drop;
+        private SnakeTypingPreview preview;
+        private LanRequest sprint;
         private IPEndPoint endpoint;
         private string musicKey;
 
@@ -480,6 +503,16 @@ namespace EnglishTypingPractice
             Interlocked.Exchange(ref turn, new LanRequest { Kind = charge ? "charge" : "turn", Text = word, Group = group, Round = round });
         }
 
+        internal void SetPreview(SnakeTypingPreview value)
+        {
+            Interlocked.Exchange(ref preview, value);
+        }
+
+        internal void SetSprint(int round, bool held)
+        {
+            Interlocked.Exchange(ref sprint, new LanRequest { SprintRound = round, SprintHeld = held });
+        }
+
         internal void SetRole(SnakeRole role)
         {
             Interlocked.Exchange(ref turn, new LanRequest { Kind = "role", Role = role });
@@ -529,10 +562,18 @@ namespace EnglishTypingPractice
         {
             try
             {
-                var poll = new LanRequest { Kind = "poll" };
                 while (!closed)
                 {
-                    LanWire.Write(stream, Interlocked.Exchange(ref turn, null) ?? Interlocked.Exchange(ref drop, null) ?? poll);
+                    var request = Interlocked.Exchange(ref turn, null) ?? Interlocked.Exchange(ref drop, null) ??
+                        new LanRequest { Kind = "poll" };
+                    request.Preview = Interlocked.Exchange(ref preview, null);
+                    var speed = Interlocked.Exchange(ref sprint, null);
+                    if (speed != null)
+                    {
+                        request.SprintRound = speed.SprintRound;
+                        request.SprintHeld = speed.SprintHeld;
+                    }
+                    LanWire.Write(stream, request);
                     var reply = LanWire.Read<LanReply>(stream, LanWire.StateLimit);
                     if (reply == null || !ValidState(reply.State, Slot))
                         break;
@@ -624,6 +665,12 @@ namespace EnglishTypingPractice
                 if (player.Team < -1 || player.Team >= state.TeamCount || player.Carrying < 0 ||
                     player.Carrying > state.TeamBalls.Length || player.RespawnRemaining < 0 ||
                     player.RespawnRemaining > SnakeTeams.RespawnDelay + 1000 || (!teams && player.RespawnRemaining != 0))
+                    return false;
+                if (!SnakeTypingPreview.IsValidText(player.Typing, player.TypingSkill) ||
+                    (player.TypingSkill && !SnakeWords.HasSkill(player.Role)))
+                    return false;
+                if (player.WordCount < 0 || (player.WordCount == 0 ? player.LastWord != null :
+                    !SnakeWords.Contains(player.LastWord) && !SnakeWords.IsSkillWord(player.LastWord, SnakeRole.Hunter)))
                     return false;
                 foreach (int cell in player.Body)
                     if (cell < 0 || cell >= cells)

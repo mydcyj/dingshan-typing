@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace EnglishTypingPractice
@@ -27,6 +28,11 @@ namespace EnglishTypingPractice
         private readonly TextBlock status;
         private readonly TextBlock score;
         private readonly TextBlock scoreLabel;
+        private readonly FrameworkElement wordFlash;
+        private readonly TextBlock flashWord;
+        private readonly TextBlock flashBlue;
+        private readonly TextBlock flashRose;
+        private readonly TextBlock flashMeaning;
         private readonly TextBlock boardSize;
         private readonly TextBlock fruitLegend;
         private readonly TextBlock scoreGuide;
@@ -40,6 +46,7 @@ namespace EnglishTypingPractice
         private bool musicRunning;
         private bool updatingRole;
         private bool updatingMode;
+        private int sprintRound;
 
         internal SnakePractice(Window window, Action<bool> gameRunningChanged, PracticeSettings settings, Action saveSettings)
         {
@@ -54,6 +61,11 @@ namespace EnglishTypingPractice
             status = (TextBlock)window.FindName("SnakeStatus");
             score = (TextBlock)window.FindName("SnakeScore");
             scoreLabel = (TextBlock)window.FindName("SnakeScoreLabel");
+            wordFlash = (FrameworkElement)window.FindName("SnakeWordFlash");
+            flashWord = (TextBlock)window.FindName("SnakeFlashWord");
+            flashBlue = (TextBlock)window.FindName("SnakeFlashBlue");
+            flashRose = (TextBlock)window.FindName("SnakeFlashRose");
+            flashMeaning = (TextBlock)window.FindName("SnakeFlashMeaning");
             directionWords = new[] { "SnakeNorth", "SnakeEast", "SnakeSouth", "SnakeWest" }
                 .Select(name => (TextBlock)window.FindName(name)).ToArray();
             board = new SnakeBoard();
@@ -95,12 +107,15 @@ namespace EnglishTypingPractice
                 else
                     lobby.SetMode(SelectedMode);
             };
-            ((FrameworkElement)window.FindName("SnakePage")).PreviewKeyDown += (sender, e) =>
+            var page = (FrameworkElement)window.FindName("SnakePage");
+            page.PreviewKeyDown += (sender, e) =>
             {
                 if ((e.Key == Key.LeftShift || e.Key == Key.RightShift) && !e.IsRepeat && online != null &&
                     online.Mode == SnakeMode.Teams && online.Phase == MatchPhase.Playing)
                 {
                     lobby.DropBall(online.Round);
+                    sprintRound = online.Round;
+                    lobby.SetSprint(sprintRound, true);
                     e.Handled = true;
                 }
                 else if (e.Key == Key.Space && (command.IsKeyboardFocusWithin || chargeInput.IsKeyboardFocusWithin))
@@ -118,9 +133,25 @@ namespace EnglishTypingPractice
                     e.Handled = true;
                 }
             };
+            window.PreviewKeyUp += (sender, e) =>
+            {
+                if ((e.Key == Key.LeftShift || e.Key == Key.RightShift) &&
+                    !Keyboard.IsKeyDown(Key.LeftShift) && !Keyboard.IsKeyDown(Key.RightShift))
+                    StopSprint();
+            };
+            window.Deactivated += (sender, e) => StopSprint();
+            page.IsVisibleChanged += (sender, e) =>
+            {
+                if (!page.IsVisible)
+                    StopSprint();
+            };
             timer.Tick += Tick;
             command.TextChanged += OnCommandChanged;
             chargeInput.TextChanged += OnChargeChanged;
+            command.TextChanged += (sender, e) => PublishTyping();
+            chargeInput.TextChanged += (sender, e) => PublishTyping();
+            command.GotKeyboardFocus += (sender, e) => PublishTyping();
+            chargeInput.GotKeyboardFocus += (sender, e) => PublishTyping();
             DataObject.AddPastingHandler(command, (sender, e) => e.CancelCommand());
             DataObject.AddPastingHandler(chargeInput, (sender, e) => e.CancelCommand());
             Render();
@@ -134,8 +165,28 @@ namespace EnglishTypingPractice
             command.Focus();
         }
 
+        private void PublishTyping()
+        {
+            if (online == null || soloMatch != null || online.Phase != MatchPhase.Playing)
+                return;
+            var own = online.Players.First(player => player.Slot == ownSlot);
+            if (own.Result != SnakeResult.Running || own.StunRemaining > 0)
+                return;
+            bool skill = chargeInput.IsKeyboardFocusWithin && chargePanel.Visibility == Visibility.Visible;
+            string text = skill ? chargeInput.Text : command.Text;
+            lobby.SetPreview(new SnakeTypingPreview
+            {
+                Round = online.Round,
+                Respawns = own.Respawns,
+                Skill = skill,
+                Text = new string(text.Where(c => c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z').ToArray())
+            });
+        }
+
         internal void Leave()
         {
+            StopSprint();
+            wordFlash.BeginAnimation(UIElement.OpacityProperty, null);
             soloMatch = null;
             lobby.Close();
             online = null;
@@ -182,6 +233,7 @@ namespace EnglishTypingPractice
             {
                 if (game.TryWord(word, game.WordGroup, clock.ElapsedMilliseconds))
                 {
+                    FlashWord(game.LastWord);
                     status.Text = "";
                     Render();
                 }
@@ -190,6 +242,7 @@ namespace EnglishTypingPractice
 
         private void Start()
         {
+            wordFlash.BeginAnimation(UIElement.OpacityProperty, null);
             online = null;
             soloMatch = null;
             command.Clear();
@@ -351,6 +404,7 @@ namespace EnglishTypingPractice
             else if (game.TryCharge(word, game.ChargeGroup, clock.ElapsedMilliseconds))
             {
                 chargeInput.Clear();
+                FlashWord(game.LastWord);
                 Render();
             }
         }
@@ -386,6 +440,8 @@ namespace EnglishTypingPractice
 
         private void LeaveRoom()
         {
+            StopSprint();
+            wordFlash.BeginAnimation(UIElement.OpacityProperty, null);
             if (online == null)
                 return;
             online = null;
@@ -454,6 +510,9 @@ namespace EnglishTypingPractice
                 updatingMode = false;
             }
             var own = state.Players.First(player => player.Slot == slot);
+            if (previous != null && previous.Round == state.Round &&
+                own.WordCount > previous.Players.First(player => player.Slot == slot).WordCount)
+                FlashWord(own.LastWord);
             if (state.Phase == MatchPhase.Playing && rolePicker.SelectedIndex != (int)own.Role)
             {
                 updatingRole = true;
@@ -517,8 +576,9 @@ namespace EnglishTypingPractice
             fruitLegend.Visibility = territory || teams || soloMatch != null ? Visibility.Collapsed : Visibility.Visible;
             int seconds = (state.Remaining + 999) / 1000;
             scoreGuide.Text = teams ? (state.Phase == MatchPhase.Playing
-                ? string.Format("剩余 {0}:{1:00} · 携带 {2} 球 · Shift 放球", seconds / 60, seconds % 60, own.Carrying)
-                : "八分钟 · 回己方区域按 Shift 放球")
+                ? string.Format("剩余 {0}:{1:00} · 携带 {2} 球 · Shift {3}", seconds / 60, seconds % 60,
+                    own.Carrying, own.Carrying == 0 ? "提速" : "放球")
+                : "八分钟 · Shift 放球或提速")
                 : territory
                 ? (state.Phase == MatchPhase.Playing ? string.Format("剩余 {0}:{1:00} · ", seconds / 60, seconds % 60) : "五分钟 · ") +
                     "每分钟提速 20% · 闭合轨迹占地"
@@ -537,6 +597,33 @@ namespace EnglishTypingPractice
                 return;
             musicRunning = running;
             gameRunningChanged(running);
+        }
+
+        private void StopSprint()
+        {
+            if (sprintRound == 0)
+                return;
+            lobby.SetSprint(sprintRound, false);
+            sprintRound = 0;
+        }
+
+        private void FlashWord(string word)
+        {
+            if (string.IsNullOrEmpty(word))
+                return;
+            flashWord.Text = flashBlue.Text = flashRose.Text = word;
+            flashMeaning.Text = SnakeWords.Meaning(word);
+            var fade = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
+            fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(620))));
+            fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1040))));
+            wordFlash.BeginAnimation(UIElement.OpacityProperty, fade);
+            for (int i = 0; i < 2; i++)
+            {
+                var transform = (TranslateTransform)(i == 0 ? flashBlue : flashRose).RenderTransform;
+                transform.BeginAnimation(TranslateTransform.XProperty,
+                    new DoubleAnimation(i == 0 ? -8 : 8, i == 0 ? -2 : 2, TimeSpan.FromMilliseconds(300)));
+            }
         }
     }
 
@@ -724,7 +811,17 @@ namespace EnglishTypingPractice
                 var label = new FormattedText(player.Name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
                     new Typeface("Segoe UI, Microsoft YaHei UI"), 11, Brushes.Black, VisualTreeHelper.GetDpi(this).PixelsPerDip)
                     { MaxTextWidth = Math.Max(1, Math.Min(138, area.Width - 14)), MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
-                double width = label.Width + 12, height = label.Height + 6;
+                FormattedText typing = null;
+                if (!string.IsNullOrEmpty(player.Typing) || player.TypingSkill)
+                {
+                    string text = player.TypingSkill ? "技能 " + (player.Typing == "" ? "…" : player.Typing) : player.Typing;
+                    typing = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                        new Typeface("Consolas, Microsoft YaHei UI"), 11, player.TypingSkill ? ChargeGlow : Head,
+                        VisualTreeHelper.GetDpi(this).PixelsPerDip)
+                        { MaxTextWidth = Math.Max(1, area.Width - 14), MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+                }
+                double width = Math.Max(label.Width, typing == null ? 0 : typing.Width) + 12;
+                double height = label.Height + 6 + (typing == null ? 0 : typing.Height + 1);
                 double x = Math.Max(area.Left + 1, Math.Min(area.Right - width - 1, center.X - width / 2));
                 Rect bubble = Rect.Empty;
                 for (int i = 0; i <= placed.Count; i++)
@@ -743,6 +840,8 @@ namespace EnglishTypingPractice
                     bubble.Y < head.Top ? bubble.Bottom : bubble.Top));
                 drawing.DrawRoundedRectangle(Brushes.White, pen, bubble, 5, 5);
                 drawing.DrawText(label, new Point(bubble.X + 6, bubble.Y + 3));
+                if (typing != null)
+                    drawing.DrawText(typing, new Point(bubble.X + 6, bubble.Y + label.Height + 4));
             }
         }
 

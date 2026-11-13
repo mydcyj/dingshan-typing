@@ -6,6 +6,20 @@ namespace EnglishTypingPractice
 {
     internal enum MatchPhase { Lobby, Playing, Finished }
 
+    internal sealed class SnakeTypingPreview
+    {
+        public int Round { get; set; }
+        public int Respawns { get; set; }
+        public bool Skill { get; set; }
+        public string Text { get; set; }
+
+        internal static bool IsValidText(string text, bool skill)
+        {
+            return text != null && text.Length <= (skill ? 20 : 10) &&
+                text.All(c => c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z');
+        }
+    }
+
     internal sealed class SnakePlayerState
     {
         public int Slot { get; set; }
@@ -22,6 +36,10 @@ namespace EnglishTypingPractice
         public int RespawnRemaining { get; set; }
         public bool Charging { get; set; }
         public int StunRemaining { get; set; }
+        public string Typing { get; set; }
+        public bool TypingSkill { get; set; }
+        public string LastWord { get; set; }
+        public int WordCount { get; set; }
     }
 
     internal sealed class SnakeMatchState
@@ -69,6 +87,7 @@ namespace EnglishTypingPractice
             internal int BurstCell = -1;
             internal long BurstUntil;
             internal long RespawnAt;
+            internal SnakeTypingPreview Preview;
         }
 
         private sealed class Shot
@@ -192,6 +211,7 @@ namespace EnglishTypingPractice
                 player.BurstCell = -1;
                 player.BurstUntil = 0;
                 player.RespawnAt = 0;
+                player.Preview = null;
                 if (teams != null)
                 {
                     int team = teams.Team(slot);
@@ -226,6 +246,17 @@ namespace EnglishTypingPractice
                 return false;
             var player = players[slot];
             return player != null && player.Connected && player.Snake.TryWord(word, group, elapsed);
+        }
+
+        internal void SetPreview(int slot, SnakeTypingPreview preview, long elapsed)
+        {
+            var player = players[slot];
+            if (Phase != MatchPhase.Playing || preview.Round != round || HasEnded(elapsed) || player == null ||
+                !player.Connected || !player.Snake.IsRunning || player.Snake.IsStunned(elapsed) ||
+                preview.Respawns != player.Snake.Respawns || (preview.Skill && !SnakeWords.HasSkill(player.Snake.Role)) ||
+                !SnakeTypingPreview.IsValidText(preview.Text, preview.Skill))
+                return;
+            player.Preview = preview;
         }
 
         internal bool TryCharge(int slot, string word, int group, int roundNumber, long elapsed)
@@ -268,6 +299,14 @@ namespace EnglishTypingPractice
                 return false;
             player.Snake.SetCarrying(teams.Carrying(slot), elapsed);
             return true;
+        }
+
+        internal void SetSprint(int slot, int roundNumber, bool held, long elapsed)
+        {
+            var player = players[slot];
+            if (teams != null && Phase == MatchPhase.Playing && roundNumber == round && !HasEnded(elapsed) &&
+                player != null && player.Connected && player.Snake.IsRunning)
+                player.Snake.SetSprint(held, elapsed);
         }
 
         private bool HasEnded(long elapsed)
@@ -350,11 +389,6 @@ namespace EnglishTypingPractice
                 bool takesLarge = largeCells.Contains(next);
                 if (!snake.CanStep(next, takesLarge || smallFruits.Contains(next), obstacles))
                     continue;
-                if (teams != null && teams.IsOwnBall(Slot(snake), next))
-                {
-                    snake.End(SnakeResult.Obstacle);
-                    continue;
-                }
                 moves.Add(snake, next);
                 if (takesLarge)
                     largeConsumers.Add(snake);
@@ -394,7 +428,10 @@ namespace EnglishTypingPractice
             } while (previous != collisions.Count);
 
             foreach (var rival in stunned)
+            {
                 rival.Stun(now);
+                players[Slot(rival)].Preview = null;
+            }
 
             bool ateLarge = false;
             // Simultaneous arrivals at different cells of the large fruit all collect it.
@@ -445,6 +482,7 @@ namespace EnglishTypingPractice
             int slot = Slot(snake);
             players[slot].RespawnAt = elapsed + SnakeTeams.RespawnDelay;
             teams.Return(slot, ActivePlayers().SelectMany(player => player.Snake.Body));
+            snake.SetSprint(false, elapsed);
             snake.SetCarrying(0, elapsed);
         }
 
@@ -482,7 +520,10 @@ namespace EnglishTypingPractice
                     if (snake.IsCharging(now))
                         foreach (var rival in ActivePlayers().Select(player => player.Snake))
                             if (rival != snake && rival.Body.Contains(next) && snake.HitRival(rival))
+                            {
                                 rival.Stun(now);
+                                players[Slot(rival)].Preview = null;
+                            }
                     snake.MoveTo(next, 0);
                 }
                 var captured = territory.Visit(slot, next);
@@ -619,6 +660,9 @@ namespace EnglishTypingPractice
                 if (player == null || (!player.Connected && player.Snake == null))
                     continue;
                 var snake = player.Snake;
+                var preview = Phase == MatchPhase.Playing && snake != null && snake.IsRunning &&
+                    !snake.IsStunned(now) && player.Preview != null && player.Preview.Respawns == snake.Respawns
+                    ? player.Preview : null;
                 result.Add(new SnakePlayerState
                 {
                     Slot = slot,
@@ -635,6 +679,10 @@ namespace EnglishTypingPractice
                         ? (int)Math.Max(0, player.RespawnAt - now) : 0,
                     Charging = snake != null && snake.IsCharging(now),
                     StunRemaining = snake == null ? 0 : snake.StunRemaining(now),
+                    Typing = preview == null ? "" : preview.Text,
+                    TypingSkill = preview != null && preview.Skill,
+                    LastWord = snake == null ? null : snake.LastWord,
+                    WordCount = snake == null ? 0 : snake.WordCount,
                     Body = snake != null && (snake.IsRunning || snake.Result == SnakeResult.Survived ||
                         snake.Result == SnakeResult.Won || snake.Result == SnakeResult.TimeUp) ? snake.Body.ToArray() : new int[0]
                 });

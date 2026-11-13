@@ -31,6 +31,8 @@ namespace EnglishTypingPractice
         private SnakeMode mode;
         private double speed = 1;
         private double carrySpeed = 1;
+        private bool sprintHeld;
+        private int carried;
 
         internal int Size { get; private set; }
         internal int Score { get; private set; }
@@ -38,6 +40,8 @@ namespace EnglishTypingPractice
         internal int WordGroup { get; private set; }
         internal SnakeRole Role { get; private set; }
         internal int SkillUses { get; private set; }
+        internal string LastWord { get; private set; }
+        internal int WordCount { get; private set; }
         internal int Respawns { get; private set; }
         internal int ExtraMoves { get; private set; }
         internal string ChargeWord { get; private set; }
@@ -80,10 +84,14 @@ namespace EnglishTypingPractice
             Bounds = new SnakeBounds(Size, 0);
             speed = 1;
             carrySpeed = 1;
+            sprintHeld = false;
+            carried = 0;
             Score = 0;
             Fruit = -1;
             Role = role;
             SkillUses = 0;
+            LastWord = null;
+            WordCount = 0;
             spawnX = x;
             spawnY = y;
             spawnDirection = direction;
@@ -125,6 +133,8 @@ namespace EnglishTypingPractice
                 return false;
 
             Score += words[index].Length;
+            LastWord = words[index];
+            WordCount++;
             Direction = direction;
             ExtraMoves = variant * 2;
             DrawWords();
@@ -143,6 +153,8 @@ namespace EnglishTypingPractice
                 nextMoveAt = now + Interval(now);
             }
             Score += ChargeWord.Length;
+            LastWord = ChargeWord;
+            WordCount++;
             SkillUses++;
             ChargeWord = SnakeWords.DrawCharge(random, ChargeWord, Role);
             chargeGroup++;
@@ -188,7 +200,19 @@ namespace EnglishTypingPractice
 
         internal void SetCarrying(int count, long now)
         {
-            double factor = Math.Max(0.1, 1 - count * 0.1);
+            carried = count;
+            UpdateTeamSpeed(now);
+        }
+
+        internal void SetSprint(bool held, long now)
+        {
+            sprintHeld = held;
+            UpdateTeamSpeed(now);
+        }
+
+        private void UpdateTeamSpeed(long now)
+        {
+            double factor = carried == 0 && sprintHeld ? 1.25 : Math.Max(0.1, 1 - carried * 0.1);
             if (factor != carrySpeed && !IsStunned(now) && nextMoveAt > now)
                 nextMoveAt = now + (nextMoveAt - now) * carrySpeed / factor;
             carrySpeed = factor;

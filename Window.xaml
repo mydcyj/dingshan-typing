@@ -71,7 +71,7 @@
         </Grid.ColumnDefinitions>
         <StackPanel>
           <TextBlock Text="鼎山打字通" FontSize="34" FontWeight="Bold" />
-          <TextBlock Text="照着短文输入，敲下第一个字符开始计时。"
+          <TextBlock x:Name="PracticeHint" Text="照着四级英语短文输入，敲下第一个字符开始计时。"
                      Foreground="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
@@ -81,7 +81,15 @@
         </StackPanel>
       </Grid>
 
-      <StackPanel Orientation="Horizontal" Margin="1,15,0,14">
+      <WrapPanel Margin="1,15,0,14">
+        <ComboBox x:Name="PracticeKind" SelectedIndex="0" Width="123" MinHeight="28" Margin="0,0,12,4"
+                  VerticalContentAlignment="Center" AutomationProperties.Name="练习内容">
+          <ComboBoxItem Content="四级英语" />
+          <ComboBoxItem Content="现代中文" />
+          <ComboBoxItem Content="C 语言" />
+          <ComboBoxItem Content="C++" />
+          <ComboBoxItem Content="Python" />
+        </ComboBox>
         <CheckBox x:Name="MatchCase" Content="区分大小写" Margin="0,0,19,0"
                   ToolTip="取消勾选后，字母大小写均可。更改后重练本篇。" />
         <CheckBox x:Name="IncludePunctuation" Content="练习标点"
@@ -89,14 +97,14 @@
         <CheckBox x:Name="TypingFeedback" Content="打击感" Margin="19,0,0,0"
                   ToolTip="开启按键音、单词回响和完成震动。" />
         <Button x:Name="OpenSnake" Content="贪吃蛇模式" Margin="18,0,0,0" Padding="11,4" MinHeight="28" />
-      </StackPanel>
+      </WrapPanel>
 
       <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="10">
         <StackPanel>
           <Border Background="#F4F7FD" CornerRadius="9,9,0,0" Padding="20,15,20,17">
             <StackPanel>
               <DockPanel LastChildFill="False">
-                <TextBlock Text="练习短文" FontWeight="SemiBold" />
+                <TextBlock x:Name="PracticeTitle" Text="练习短文" FontWeight="SemiBold" />
                 <TextBlock x:Name="Count" DockPanel.Dock="Right" FontFamily="Consolas"
                            Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
               </DockPanel>
@@ -145,7 +153,7 @@
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <StackPanel>
-          <TextBlock Text="速度 (WPM)" Style="{StaticResource StatLabel}" />
+          <TextBlock x:Name="SpeedLabel" Text="速度 (WPM)" Style="{StaticResource StatLabel}" />
           <TextBlock x:Name="Speed" Style="{StaticResource StatValue}"
                      ToolTip="每 5 个正确字符折算为 1 个词。" />
         </StackPanel>
@@ -175,6 +183,8 @@
             <TextBlock DockPanel.Dock="Left" Text="曲目" Margin="0,0,8,0" VerticalAlignment="Center" />
             <Button DockPanel.Dock="Right" x:Name="NextTrack" Content="下一首" Margin="8,0,0,0"
                     ToolTip="下一首 (F8)" IsEnabled="False" />
+            <Button DockPanel.Dock="Right" x:Name="ToggleMusic" Content="播放" MinWidth="64" Margin="8,0,0,0"
+                    IsEnabled="False" />
             <ComboBox x:Name="MusicTrack" MinHeight="34" Padding="6,2" VerticalContentAlignment="Center"
                       SelectedValuePath="FullName" IsEnabled="False" MaxDropDownHeight="240"
                       AutomationProperties.Name="曲目" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -187,6 +197,12 @@
                 <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
               </ComboBox.ItemsPanel>
             </ComboBox>
+          </DockPanel>
+          <DockPanel Margin="0,8,0,0">
+            <TextBlock x:Name="MusicTime" DockPanel.Dock="Right" Text="0:00 / 0:00" Margin="10,0,0,0"
+                       FontFamily="Consolas" VerticalAlignment="Center" Foreground="{StaticResource Muted}" />
+            <Slider x:Name="MusicPosition" Minimum="0" Maximum="1" SmallChange="1" LargeChange="5"
+                    IsEnabled="False" IsMoveToPointEnabled="True" AutomationProperties.Name="音乐播放进度" />
           </DockPanel>
           <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
             <TextBlock Text="模式" Margin="0,0,8,0" VerticalAlignment="Center" />
@@ -220,6 +236,8 @@
     <DockPanel Margin="0,0,0,14">
       <Button DockPanel.Dock="Right" x:Name="CloseSnake" Content="返回短文"
               Margin="12,0,0,0" VerticalAlignment="Center" />
+      <Button DockPanel.Dock="Right" x:Name="OpenSnakeRules" Content="玩法规则"
+              Margin="12,0,0,0" VerticalAlignment="Center" />
       <StackPanel>
         <TextBlock Text="贪吃蛇" FontSize="34" FontWeight="Bold" />
         <TextBlock Text="打完方向词就转向，按空格清空当前输入。" Margin="0,3,0,0"
@@ -237,6 +255,31 @@
         <Grid>
           <Border x:Name="SnakeBoardHost" ClipToBounds="True" Background="#F4F8F5" CornerRadius="6"
                   AutomationProperties.Name="贪吃蛇棋盘" />
+          <Border x:Name="SnakeWordFlash" Opacity="0" IsHitTestVisible="False" VerticalAlignment="Top"
+                  HorizontalAlignment="Center" Margin="7,8,7,0" Padding="13,5,13,6"
+                  Background="#F6FFFFFF" CornerRadius="8">
+            <StackPanel>
+              <Grid>
+                <Grid.Resources>
+                  <Style TargetType="TextBlock">
+                    <Setter Property="FontFamily" Value="Consolas" />
+                    <Setter Property="FontSize" Value="30" />
+                    <Setter Property="FontWeight" Value="Bold" />
+                    <Setter Property="TextWrapping" Value="Wrap" />
+                    <Setter Property="TextAlignment" Value="Center" />
+                  </Style>
+                </Grid.Resources>
+                <TextBlock x:Name="SnakeFlashBlue" Foreground="#327AD7" Opacity="0.53">
+                  <TextBlock.RenderTransform><TranslateTransform X="-2" Y="1" /></TextBlock.RenderTransform>
+                </TextBlock>
+                <TextBlock x:Name="SnakeFlashRose" Foreground="#D45E9A" Opacity="0.53">
+                  <TextBlock.RenderTransform><TranslateTransform X="2" Y="-1" /></TextBlock.RenderTransform>
+                </TextBlock>
+                <TextBlock x:Name="SnakeFlashWord" Foreground="#172B47" />
+              </Grid>
+              <TextBlock x:Name="SnakeFlashMeaning" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" />
+            </StackPanel>
+          </Border>
           <Border x:Name="LanPanel" Background="#F4F7FD" BorderBrush="{StaticResource Line}"
                   BorderThickness="1" CornerRadius="6" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -430,6 +473,59 @@
           </StackPanel>
         </ScrollViewer>
       </Grid>
+    </Border>
+  </Grid>
+
+  <Grid x:Name="SnakeRules" Visibility="Collapsed" MaxWidth="850" Margin="28,19,28,20">
+    <Grid.Resources>
+      <Style x:Key="RuleHeading" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Margin" Value="0,14,0,6" />
+      </Style>
+      <Style x:Key="RuleText" TargetType="TextBlock">
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="LineHeight" Value="23" />
+        <Setter Property="Margin" Value="0,0,0,6" />
+      </Style>
+    </Grid.Resources>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <DockPanel Margin="0,0,0,14">
+      <Button DockPanel.Dock="Right" x:Name="CloseSnakeRules" Content="返回棋盘" Margin="12,0,0,0" VerticalAlignment="Center" />
+      <TextBlock Text="玩法规则" FontSize="34" FontWeight="Bold" />
+    </DockPanel>
+    <Border Grid.Row="1" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="10">
+      <ScrollViewer x:Name="SnakeRulesScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="20,5,20,16">
+          <TextBlock Text="快速开局" Style="{StaticResource RuleHeading}" />
+          <TextBlock Style="{StaticResource RuleText}">
+            <Run Text="1. 先选模式和职业。单人直接输入 " /><Run Text="start" FontFamily="Consolas" FontWeight="Bold" /><Run Text="。联机时，房主建房，同一网络的朋友扫描加入，再由房主开局。" />
+          </TextBlock>
+          <TextBlock Style="{StaticResource RuleText}">
+            <Run Text="2. 蛇会一直前进。照着十字面板打完目标方向的英文词，蛇就会转向。× 表示禁止掉头。按空格清空当前输入框。" />
+          </TextBlock>
+          <TextBlock Style="{StaticResource RuleText}">
+            <Run Text="3. 有技能的职业按 Tab 切换输入框。技能短语连写。联机时，蛇头气泡显示昵称和当前正在输入的字母。" />
+          </TextBlock>
+
+          <TextBlock Text="四种玩法" Style="{StaticResource RuleHeading}" />
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="经典　" FontWeight="Bold" /><Run Text="打方向词和吃果都得分。每分钟缩小 5 格边长，圈外视为撞墙。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="障碍赛　" FontWeight="Bold" /><Run Text="开局随机生成四格方块障碍，绕开障碍去吃果。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="圈地战　" FontWeight="Bold" /><Run Text="走回自己的轨迹闭合圈地。对手蛇头被圈住就回出生点。每分钟提速 20%，5 分钟后占地最多者获胜。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="团战　" FontWeight="Bold" /><Run Text="仅限联机，房主选 2–4 队。可穿过己方球，碰到敌队球会捡起。带球回己方区域按 Shift 放下一颗，每带一颗球扣 10% 移速。空手按住 Shift 提速 25%。死亡后等 15 秒复活，8 分钟后按落地球数排名。" /></TextBlock>
+
+          <TextBlock Text="六个职业" Style="{StaticResource RuleHeading}" />
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="平凡者　" FontWeight="Bold" /><Run Text="基础移速，使用 6–7 字母方向词。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="胆怯者　" FontWeight="Bold" /><Run Text="85% 移速，使用 5–6 字母方向词。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="时空者　" FontWeight="Bold" /><Run Text="每个可用方向有 6、8、10 字母词，分别额外前进 0、2、4 格。也可打最长词沿当前方向加速前进。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="无畏者　" FontWeight="Bold" /><Run Text="120% 移速。打完技能词后冲锋 1 秒，穿过对手会使其僵直 3 秒。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="狩猎者　" FontWeight="Bold" /><Run Text="打完技能词后朝前射击，子弹速度为自身移速 3 倍，碰到对手蛇身即命中。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="吟唱者　" FontWeight="Bold" /><Run Text="打完技能词后，瞬间命中以蛇头为中心 5×5 格内的对手蛇头。" /></TextBlock>
+        </StackPanel>
+      </ScrollViewer>
     </Border>
   </Grid>
   </Grid>
