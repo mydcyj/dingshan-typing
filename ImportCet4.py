@@ -7,13 +7,13 @@ from pathlib import Path
 
 def main():
     source = Path(sys.argv[1])
-    target = Path(__file__).with_name("Cet4.tsv")
+    target = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(__file__).with_name("Cet4.tsv")
     data = json.loads(source.read_text(encoding="utf-8-sig"))
     words = {}
     for entry in data["words"]:
         word = entry["word"].lower()
         if not re.fullmatch(r"[a-z]+", word) or not (
-            len(word) in (3, 6, 7, 8, 10) or 11 <= len(word) <= 20
+            len(word) in (3, 4, 5, 6, 7, 8, 10) or 11 <= len(word) <= 20
         ):
             continue
         for translation in entry["translations"]:
@@ -41,7 +41,8 @@ def main():
         count for length, count in counts.items() if length >= 11
     ) < 2:
         raise ValueError("The word list does not cover all roles.")
-    target.write_text("".join(f"{word}\t{meaning}\n" for word, meaning in sorted(words.items())), encoding="utf-8")
+    target.write_text("".join(f"{word}\t{meaning}\n" for word, meaning in sorted(words.items())),
+                      encoding="utf-8", newline="\n")
     print(f"{len(words)} words, by length: {sorted(counts.items())}")
 
 

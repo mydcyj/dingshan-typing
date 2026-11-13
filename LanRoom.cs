@@ -30,7 +30,7 @@ namespace EnglishTypingPractice
     internal static class LanWire
     {
         internal const int Port = 48631;
-        internal const string Version = "TypingSnake/5";
+        internal const string Version = "TypingSnake/6";
         internal const int StateLimit = 65536;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
 
@@ -173,7 +173,7 @@ namespace EnglishTypingPractice
                 if (closed)
                     return;
                 match.Step(clock.ElapsedMilliseconds);
-                if (match.Phase != MatchPhase.Playing)
+                if (match.Phase != MatchPhase.Playing && !match.HasBurst)
                     timer.Change(Timeout.Infinite, Timeout.Infinite);
             }
         }
@@ -422,12 +422,17 @@ namespace EnglishTypingPractice
             foreach (string word in state.Words)
                 if (!SnakeWords.Contains(word))
                     return false;
-            if (state.ChargeWord != null && (!SnakeWords.Contains(state.ChargeWord) || state.ChargeWord.Length < 11))
-                return false;
             foreach (var ranked in state.Rankings)
                 if (ranked == null || ranked.Slot < 0 || ranked.Slot > 3 || !LanWire.IsName(ranked.Name, 20))
                     return false;
             int cells = state.Size * state.Size;
+            if (state.SafeStart < 0 || state.SafeEnd > state.Size || state.SafeEnd - state.SafeStart < 7 ||
+                state.NextMinute < 1 || state.NextMinute > 60000 || state.Shots == null || state.Bursts == null ||
+                state.Shots.Length > cells || state.Bursts.Length > 4)
+                return false;
+            foreach (int cell in System.Linq.Enumerable.Concat(state.Shots, state.Bursts))
+                if (cell < 0 || cell >= cells)
+                    return false;
             bool territory = state.Mode == SnakeMode.Territory && state.Phase != MatchPhase.Lobby;
             if (state.Obstacles == null || state.Obstacles.Length > cells ||
                 state.Remaining < 0 || state.Remaining > SnakeTerritory.Duration ||
@@ -469,6 +474,10 @@ namespace EnglishTypingPractice
                         return false;
                 if (player.Slot == slot && player.Result == SnakeResult.Running &&
                     state.Words.Length != 4 * SnakeWords.Variants(player.Role))
+                    return false;
+                if (player.Slot == slot && state.Phase == MatchPhase.Playing &&
+                    (SnakeWords.HasSkill(player.Role) ? !SnakeWords.IsSkillWord(state.ChargeWord, player.Role) :
+                        state.ChargeWord != null))
                     return false;
             }
             return slots.Contains(slot);

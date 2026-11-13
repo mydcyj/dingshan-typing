@@ -35,7 +35,7 @@ namespace EnglishTypingPractice
         private readonly Action<bool> gameRunningChanged;
         private readonly LanLobby lobby;
         private SnakeMatchState online;
-        private SnakeMatch soloTerritory;
+        private SnakeMatch soloMatch;
         private int ownSlot;
         private bool musicRunning;
         private bool updatingRole;
@@ -67,14 +67,14 @@ namespace EnglishTypingPractice
             {
                 if (updatingRole)
                     return;
-                if (online == null || soloTerritory != null)
+                if (online == null || soloMatch != null)
                 {
-                    if (soloTerritory != null)
-                        soloTerritory.SetRole(0, SelectedRole);
+                    if (soloMatch != null)
+                        soloMatch.SetRole(0, SelectedRole);
                     if (online == null)
                         Render();
                     else
-                        RefreshSoloTerritory();
+                        RefreshSoloMatch();
                 }
                 else
                     lobby.SetRole(SelectedRole);
@@ -83,9 +83,9 @@ namespace EnglishTypingPractice
             {
                 if (updatingMode)
                     return;
-                if (online == null || soloTerritory != null)
+                if (online == null || soloMatch != null)
                 {
-                    soloTerritory = null;
+                    soloMatch = null;
                     online = null;
                     game = new SnakeGame();
                     status.Text = "输入 start 开始单人游戏。";
@@ -96,7 +96,12 @@ namespace EnglishTypingPractice
             };
             ((FrameworkElement)window.FindName("SnakePage")).PreviewKeyDown += (sender, e) =>
             {
-                if (e.Key == Key.Tab && chargePanel.Visibility == Visibility.Visible &&
+                if (e.Key == Key.Space && (command.IsKeyboardFocusWithin || chargeInput.IsKeyboardFocusWithin))
+                {
+                    (chargeInput.IsKeyboardFocusWithin ? chargeInput : command).Clear();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Tab && chargePanel.Visibility == Visibility.Visible &&
                     (command.IsKeyboardFocused || chargeInput.IsKeyboardFocused))
                 {
                     if (chargeInput.IsKeyboardFocused)
@@ -124,7 +129,7 @@ namespace EnglishTypingPractice
 
         internal void Leave()
         {
-            soloTerritory = null;
+            soloMatch = null;
             lobby.Close();
             online = null;
             command.IsReadOnly = false;
@@ -172,15 +177,17 @@ namespace EnglishTypingPractice
 
         private void Start()
         {
+            online = null;
+            soloMatch = null;
             command.Clear();
             chargeInput.Clear();
-            if (SelectedMode == SnakeMode.Territory)
+            if (SelectedMode == SnakeMode.Territory || SelectedRole == SnakeRole.Hunter || SelectedRole == SnakeRole.Bard)
             {
-                soloTerritory = new SnakeMatch("你", SelectedRole);
-                soloTerritory.SetMode(SelectedMode);
-                soloTerritory.Start();
+                soloMatch = new SnakeMatch("你", SelectedRole, solo: true);
+                soloMatch.SetMode(SelectedMode);
+                soloMatch.Start();
                 clock.Restart();
-                RefreshSoloTerritory();
+                RefreshSoloMatch();
                 timer.Start();
                 return;
             }
@@ -195,24 +202,28 @@ namespace EnglishTypingPractice
         private void Tick(object sender, EventArgs e)
         {
             long now = clock.ElapsedMilliseconds;
-            if (soloTerritory != null)
+            if (soloMatch != null)
             {
-                soloTerritory.Step(now);
-                RefreshSoloTerritory();
-                if (soloTerritory.Phase == MatchPhase.Finished)
+                soloMatch.Step(now);
+                RefreshSoloMatch();
+                if (soloMatch.Phase == MatchPhase.Finished && !soloMatch.HasBurst)
                 {
                     timer.Stop();
                     clock.Stop();
                 }
                 return;
             }
-            if (!game.MoveDue(now))
+            int lives = game.Lives;
+            bool changed = game.UpdateSoloClock(now);
+            if (!changed && !game.MoveDue(now))
                 return;
 
-            int lives = game.Lives;
-            game.Step(now);
             if (game.MoveDue(now))
-                game.ScheduleNext(now);
+            {
+                game.Step(now);
+                if (game.MoveDue(now))
+                    game.ScheduleNext(now);
+            }
             if (game.Lives != lives && game.IsRunning)
             {
                 command.Clear();
@@ -239,7 +250,8 @@ namespace EnglishTypingPractice
         private void Render()
         {
             bool territory = SelectedMode == SnakeMode.Territory;
-            boardSize.Text = game.Size + " × " + game.Size + " 格";
+            int side = game.Bounds.End - game.Bounds.Start;
+            boardSize.Text = side + " × " + side + " 格";
             var role = game.IsRunning ? game.Role : SelectedRole;
             ShowWords(game.IsRunning, game.Direction, game.Words, role);
             ShowRole(role, game.IsRunning, game.Lives, game.IsCharging(clock.ElapsedMilliseconds),
@@ -248,12 +260,14 @@ namespace EnglishTypingPractice
             scoreLabel.Text = territory ? "占地格数" : "分数";
             scoreGuide.Text = territory ? "五分钟 · 闭合轨迹占地"
                 : SelectedMode == SnakeMode.Obstacles ? "避开障碍 · 吃果 +10 · 有效输入按字母计分"
-                : "有效输入按字母计分 · 吃果 +10";
+                : (game.IsRunning ? ShrinkGuide(side, (int)(60000 - clock.ElapsedMilliseconds % 60000)) : "每分钟缩小 5 格") +
+                    " · 吃果 +10";
             board.SetBoard(game.Size, territory || game.Fruit < 0 ? new int[0] : new[] { game.Fruit }, -1, 0, new[]
             {
                 new SnakePlayerState { Slot = 0, Result = game.Result, Body = territory ? new int[0] : game.Body.ToArray(),
                     Charging = game.IsRunning && game.IsCharging(clock.ElapsedMilliseconds) }
-            }, SelectedMode == SnakeMode.Obstacles ? game.Obstacles.ToArray() : null);
+            }, SelectedMode == SnakeMode.Obstacles ? game.Obstacles.ToArray() : null,
+                safeStart: game.Bounds.Start, safeEnd: game.Bounds.End);
             score.Text = (territory ? 0 : game.Score).ToString(CultureInfo.CurrentCulture);
         }
 
@@ -291,9 +305,11 @@ namespace EnglishTypingPractice
             switch (role)
             {
                 case SnakeRole.Timewalker: guide = "6 / 8 / 10 字母 · 额外走 0 / 2 / 4 格"; break;
-                case SnakeRole.Timid: guide = "75% 移速 · 3 字母" +
+                case SnakeRole.Timid: guide = "75% 移速 · 3–5 字母" +
                     (SelectedMode == SnakeMode.Territory ? "" : " · " + (running ? lives.ToString() : "2") + " 条命"); break;
                 case SnakeRole.Fearless: guide = "120% 移速 · Tab 切换冲锋输入框"; break;
+                case SnakeRole.Hunter: guide = "Tab 切换射击输入框 · 15–20 字母 · 子弹为自身 3 倍移速"; break;
+                case SnakeRole.Bard: guide = "Tab 切换吟唱输入框 · 15–20 字母 · 瞬间判定周围 5 × 5 格"; break;
                 default: guide = ""; break;
             }
             if (stun > 0)
@@ -301,7 +317,7 @@ namespace EnglishTypingPractice
             else if (charging)
                 guide += " · 冲锋中";
             roleGuide.Text = guide;
-            chargePanel.Visibility = running && role == SnakeRole.Fearless && special != null
+            chargePanel.Visibility = running && SnakeWords.HasSkill(role) && special != null
                 ? Visibility.Visible : Visibility.Collapsed;
             chargeWord.Text = special == null ? "" : special + " " + SnakeWords.Meaning(special);
             chargeInput.IsReadOnly = charging || stun > 0;
@@ -320,10 +336,10 @@ namespace EnglishTypingPractice
                     !word.Equals(online.ChargeWord, StringComparison.OrdinalIgnoreCase))
                     return;
                 chargeInput.Clear();
-                if (soloTerritory == null)
+                if (soloMatch == null)
                     lobby.Turn(word, online.ChargeGroup, online.Round, charge: true);
-                else if (soloTerritory.TryCharge(0, word, online.ChargeGroup, online.Round, clock.ElapsedMilliseconds))
-                    RefreshSoloTerritory();
+                else if (soloMatch.TryCharge(0, word, online.ChargeGroup, online.Round, clock.ElapsedMilliseconds))
+                    RefreshSoloMatch();
             }
             else if (game.TryCharge(word, game.ChargeGroup, clock.ElapsedMilliseconds))
             {
@@ -351,7 +367,7 @@ namespace EnglishTypingPractice
 
         private void EnterRoom()
         {
-            soloTerritory = null;
+            soloMatch = null;
             online = null;
             timer.Stop();
             clock.Stop();
@@ -381,7 +397,7 @@ namespace EnglishTypingPractice
                 if (ownSlot == 0 && command.Text.Equals("start", StringComparison.OrdinalIgnoreCase))
                 {
                     command.Clear();
-                    if (soloTerritory == null)
+                    if (soloMatch == null)
                         lobby.Start();
                     else
                         Start();
@@ -394,16 +410,21 @@ namespace EnglishTypingPractice
                 return;
             SubmitWord(online.Words, own.Role, own.Direction, own.StunRemaining > 0, word =>
             {
-                if (soloTerritory == null)
+                if (soloMatch == null)
                     lobby.Turn(word, online.WordGroup, online.Round);
-                else if (soloTerritory.TryWord(0, word, online.WordGroup, online.Round, clock.ElapsedMilliseconds))
-                    RefreshSoloTerritory();
+                else if (soloMatch.TryWord(0, word, online.WordGroup, online.Round, clock.ElapsedMilliseconds))
+                    RefreshSoloMatch();
             });
         }
 
-        private void RefreshSoloTerritory()
+        private void RefreshSoloMatch()
         {
-            ApplyRoomState(soloTerritory.Snapshot("单人圈地战", 0), 0);
+            ApplyRoomState(soloMatch.Snapshot("单人游戏", 0), 0);
+        }
+
+        private static string ShrinkGuide(int side, int next)
+        {
+            return side <= 7 ? "缩圈已完成" : "下次缩圈 " + ((next + 999) / 1000) + " 秒";
         }
 
         internal static string TerritoryResult(SnakeMatchState state)
@@ -443,7 +464,8 @@ namespace EnglishTypingPractice
                     ? (slot == 0 ? "等待同学加入，输入 start 开局。" : "等待房主输入 start。")
                     : state.Phase == MatchPhase.Finished
                         ? ((own.Result == SnakeResult.Survived ? "你是最后存活的玩家。" : "本局结束。") +
-                            (soloTerritory != null ? "共占领 " + own.Score + " 格。" : "") +
+                            (soloMatch != null ? (state.Mode == SnakeMode.Territory
+                                ? "共占领 " + own.Score + " 格。" : "得分 " + own.Score + "。") : "") +
                             (slot == 0 ? "输入 start 再开一局。" : "等待房主开局。"))
                         : running ? "" : "你已出局，可以继续观战。";
             }
@@ -470,7 +492,7 @@ namespace EnglishTypingPractice
                 {
                     command.Clear();
                     chargeInput.Clear();
-                    status.Text = "撞墙后已回到起点。";
+                    status.Text = "已回到起点。";
                 }
             }
             command.IsReadOnly = state.Phase == MatchPhase.Playing ? !running || own.StunRemaining > 0 : slot != 0;
@@ -481,16 +503,20 @@ namespace EnglishTypingPractice
                 own.Charging, own.StunRemaining, state.ChargeWord);
             score.Text = own.Score.ToString(CultureInfo.CurrentCulture);
             int size = state.Size;
-            boardSize.Text = size + " × " + size + " 格";
+            int side = state.SafeEnd - state.SafeStart;
+            boardSize.Text = side + " × " + side + " 格";
             bool territory = state.Mode == SnakeMode.Territory;
             scoreLabel.Text = territory ? "占地格数" : "分数";
-            fruitLegend.Visibility = territory ? Visibility.Collapsed : Visibility.Visible;
+            fruitLegend.Visibility = territory || soloMatch != null ? Visibility.Collapsed : Visibility.Visible;
             int seconds = (state.Remaining + 999) / 1000;
             scoreGuide.Text = territory
                 ? (state.Phase == MatchPhase.Playing ? string.Format("剩余 {0}:{1:00} · ", seconds / 60, seconds % 60) : "五分钟 · ") +
-                    "闭合轨迹占地"
-                : state.Mode == SnakeMode.Obstacles ? "避开障碍 · 有效输入按字母计分" : "有效输入按字母计分";
-            board.SetBoard(size, state.SmallFruits, state.LargeFruit, slot, state.Players, state.Obstacles, state.Land, state.Trails);
+                    "每分钟提速 20% · 闭合轨迹占地"
+                : state.Mode == SnakeMode.Obstacles ? "避开障碍 · 有效输入按字母计分"
+                : (state.Phase == MatchPhase.Playing ? ShrinkGuide(side, state.NextMinute) : "每分钟缩小 5 格") +
+                    " · 有效输入按字母计分";
+            board.SetBoard(size, state.SmallFruits, state.LargeFruit, slot, state.Players, state.Obstacles, state.Land,
+                state.Trails, state.SafeStart, state.SafeEnd, state.Shots, state.Bursts);
             UpdateMusic(running);
         }
 
@@ -514,6 +540,9 @@ namespace EnglishTypingPractice
         private static readonly Brush FruitHighlight = MakeBrush(255, 240, 183);
         private static readonly Brush ChargeGlow = MakeBrush(26, 154, 165);
         private static readonly Brush StunFill = MakeBrush(105, 117, 132);
+        private static readonly Brush ClosedZone = MakeBrush(128, 139, 149);
+        private static readonly Brush ShotFill = MakeBrush(190, 78, 26);
+        private static readonly Pen BurstOutline = MakeBurstPen();
         private static readonly Brush Obstacle = MakeBrush(71, 77, 91);
         private static readonly Pen ObstacleOutline = MakeObstaclePen();
         private static readonly Pen Grid = MakeGridPen();
@@ -534,9 +563,14 @@ namespace EnglishTypingPractice
         private int[] obstacles;
         private int[] land;
         private int[] trails;
+        private int safeStart;
+        private int safeEnd;
+        private int[] shots;
+        private int[] bursts;
 
         internal void SetBoard(int size, int[] smallFruits, int largeFruit, int ownSlot, SnakePlayerState[] players,
-            int[] obstacles = null, int[] land = null, int[] trails = null)
+            int[] obstacles = null, int[] land = null, int[] trails = null, int safeStart = 0, int safeEnd = 0,
+            int[] shots = null, int[] bursts = null)
         {
             this.size = size;
             this.smallFruits = smallFruits;
@@ -546,6 +580,10 @@ namespace EnglishTypingPractice
             this.obstacles = obstacles;
             this.land = land;
             this.trails = trails;
+            this.safeStart = safeStart;
+            this.safeEnd = safeEnd == 0 ? size : safeEnd;
+            this.shots = shots;
+            this.bursts = bursts;
             InvalidateVisual();
         }
 
@@ -558,6 +596,13 @@ namespace EnglishTypingPractice
             var area = new Rect((ActualWidth - side) / 2, (ActualHeight - side) / 2, side, side);
             drawing.DrawRectangle(Board, null, area);
             double cell = side / size;
+            if (safeEnd > 0 && (safeStart > 0 || safeEnd < size))
+            {
+                drawing.DrawRectangle(ClosedZone, null, area);
+                double safeSide = (safeEnd - safeStart) * cell;
+                drawing.DrawRectangle(Board, null, new Rect(area.X + safeStart * cell, area.Y + safeStart * cell,
+                    safeSide, safeSide));
+            }
             if (land != null)
                 for (int i = 0; i < land.Length; i++)
                     if (land[i] != 0)
@@ -614,6 +659,20 @@ namespace EnglishTypingPractice
                 drawing.DrawRectangle(FruitHighlight, null,
                     new Rect(anchor.X + cell * 0.65, anchor.Y + cell * 0.65, cell * 0.7, cell * 0.7));
             }
+            if (shots != null)
+                foreach (int shot in shots)
+                {
+                    var bounds = CellBounds(shot, area, cell);
+                    drawing.DrawEllipse(ShotFill, null, new Point(bounds.X + cell / 2, bounds.Y + cell / 2), cell * 0.35, cell * 0.35);
+                }
+            if (bursts != null)
+                foreach (int burst in bursts)
+                {
+                    int x = burst % size, y = burst / size;
+                    int left = Math.Max(0, x - 2), top = Math.Max(0, y - 2);
+                    drawing.DrawRectangle(null, BurstOutline, new Rect(area.X + left * cell, area.Y + top * cell,
+                        (Math.Min(size, x + 3) - left) * cell, (Math.Min(size, y + 3) - top) * cell));
+                }
         }
 
         private Rect CellBounds(int position, Rect area, double cell)
@@ -631,6 +690,13 @@ namespace EnglishTypingPractice
         private static Pen MakeObstaclePen()
         {
             var pen = new Pen(MakeBrush(110, 120, 139), 0.8);
+            pen.Freeze();
+            return pen;
+        }
+
+        private static Pen MakeBurstPen()
+        {
+            var pen = new Pen(MakeBrush(214, 37, 52), 2.4);
             pen.Freeze();
             return pen;
         }

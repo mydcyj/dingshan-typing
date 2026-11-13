@@ -1,8 +1,10 @@
-CET-4 vocabulary and Chinese glosses derived from ECDICT.
+CET-4 and CET-6 vocabulary and Chinese glosses derived from ECDICT.
 ECDICT: https://github.com/skywind3000/ECDICT
 CET-4 dataset: https://github.com/grhliu/wordtyper-vocabularies/blob/main/vocabularies/cet4.json
 Dataset version: 2.0.0
-Dataset SHA-256: 568B5203EB6B48BDECF8DEB8D5AD3BC6546B7960C72E9EAFCD877242B6B70105
+CET-4 dataset SHA-256: 568B5203EB6B48BDECF8DEB8D5AD3BC6546B7960C72E9EAFCD877242B6B70105
+CET-6 dataset: https://github.com/grhliu/wordtyper-vocabularies/blob/main/vocabularies/cet6.json
+CET-6 dataset SHA-256: 216DE305C1838B7DD5D473D80E5606838ABDC8D2780509893BF623D37AD60DD5
 This build filters for single alphabetic words of the supported lengths and uses the first Chinese gloss.
 
 MIT License

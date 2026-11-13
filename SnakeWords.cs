@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace EnglishTypingPractice
 {
-    internal enum SnakeRole { Standard, Timewalker, Timid, Fearless }
+    internal enum SnakeRole { Standard, Timewalker, Timid, Fearless, Hunter, Bard }
 
     internal static class SnakeWords
     {
@@ -13,17 +13,31 @@ namespace EnglishTypingPractice
         private static readonly Dictionary<int, string[]> ByLength = Meanings.Keys.GroupBy(word => word.Length)
             .ToDictionary(group => group.Key, group => group.ToArray());
         private static readonly string[] ChargeWords = Meanings.Keys.Where(word => word.Length >= 11).ToArray();
+        private static readonly Dictionary<string, string> SkillPhrases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "environmentalimpact", "环境影响" },
+            { "culturalheritage", "文化遗产" },
+            { "scientificresearch", "科学研究" },
+            { "economicdevelopment", "经济发展" },
+            { "renewableenergy", "可再生能源" },
+            { "sustainablefuture", "可持续发展的未来" },
+            { "technologicalchange", "技术变革" },
+            { "effectivelearning", "有效学习" }
+        };
 
         private static Dictionary<string, string> LoadMeanings()
         {
             var meanings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            using (var reader = new StreamReader(typeof(SnakeWords).Assembly.GetManifestResourceStream("Cet4.tsv")))
+            foreach (string resource in new[] { "Cet4.tsv", "Cet6.tsv" })
+            using (var reader = new StreamReader(typeof(SnakeWords).Assembly.GetManifestResourceStream(resource)))
             {
                 string line;
                 while ((line = reader.ReadLine()) != null)
                 {
                     int tab = line.IndexOf('\t');
-                    meanings.Add(line.Substring(0, tab), line.Substring(tab + 1));
+                    string word = line.Substring(0, tab);
+                    if (!meanings.ContainsKey(word))
+                        meanings.Add(word, line.Substring(tab + 1));
                 }
             }
             return meanings;
@@ -31,7 +45,8 @@ namespace EnglishTypingPractice
 
         internal static string Meaning(string word)
         {
-            return Meanings[word];
+            string meaning;
+            return SkillPhrases.TryGetValue(word, out meaning) ? meaning : Meanings[word];
         }
 
         internal static int Variants(SnakeRole role)
@@ -41,7 +56,7 @@ namespace EnglishTypingPractice
 
         internal static string[] Draw(Random random, SnakeRole role, string[] previous)
         {
-            int length = role == SnakeRole.Timid ? 3 : role == SnakeRole.Timewalker ? 6 : 6 + random.Next(2);
+            int length = role == SnakeRole.Timid ? random.Next(3, 6) : role == SnakeRole.Timewalker ? 6 : 6 + random.Next(2);
             int variants = Variants(role);
             var words = new string[4 * variants];
             for (int variant = 0; variant < variants; variant++)
@@ -59,10 +74,25 @@ namespace EnglishTypingPractice
             return words;
         }
 
-        internal static string DrawCharge(Random random, string previous)
+        internal static bool HasSkill(SnakeRole role)
         {
-            var choices = ChargeWords.Where(word => word != previous).ToArray();
+            return role == SnakeRole.Fearless || role == SnakeRole.Hunter || role == SnakeRole.Bard;
+        }
+
+        internal static string DrawCharge(Random random, string previous, SnakeRole role)
+        {
+            var pool = role == SnakeRole.Fearless ? ChargeWords :
+                SkillPhrases.Keys.Concat(ChargeWords.Where(word => word.Length >= 15 && word.Length <= 20));
+            var choices = pool.Where(word => word != previous).ToArray();
             return choices[random.Next(choices.Length)];
+        }
+
+        internal static bool IsSkillWord(string word, SnakeRole role)
+        {
+            if (word == null || !HasSkill(role))
+                return false;
+            return role == SnakeRole.Fearless ? word.Length >= 11 && Contains(word) :
+                word.Length >= 15 && word.Length <= 20 && (Contains(word) || SkillPhrases.ContainsKey(word));
         }
 
         internal static bool Contains(string word)
@@ -77,6 +107,8 @@ namespace EnglishTypingPractice
                 case SnakeRole.Timewalker: return "时空者";
                 case SnakeRole.Timid: return "胆怯者";
                 case SnakeRole.Fearless: return "无畏者";
+                case SnakeRole.Hunter: return "狩猎者";
+                case SnakeRole.Bard: return "吟唱者";
                 default: return "普通";
             }
         }

@@ -18,6 +18,7 @@ $references = @(
     ("/resource:{0},Window.xaml" -f (Join-Path $PSScriptRoot 'Window.xaml')) `
     ("/resource:{0},Passages.json" -f (Join-Path $PSScriptRoot 'Passages.json')) `
     ("/resource:{0},Cet4.tsv" -f (Join-Path $PSScriptRoot 'Cet4.tsv')) `
+    ("/resource:{0},Cet6.tsv" -f (Join-Path $PSScriptRoot 'Cet6.tsv')) `
     ("/resource:{0},Cet4-LICENSE.txt" -f (Join-Path $PSScriptRoot 'Cet4-LICENSE.txt')) `
     ("/resource:{0},LICENSE" -f (Join-Path $PSScriptRoot 'LICENSE')) `
     (Join-Path $PSScriptRoot 'Program.cs') (Join-Path $PSScriptRoot 'PracticeSettings.cs') `

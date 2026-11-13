@@ -222,7 +222,7 @@
               Margin="12,0,0,0" VerticalAlignment="Center" />
       <StackPanel>
         <TextBlock Text="贪吃蛇" FontSize="34" FontWeight="Bold" />
-        <TextBlock Text="打完方向词就转向，无需回车。" Margin="0,3,0,0"
+        <TextBlock Text="打完方向词就转向，按空格清空当前输入。" Margin="0,3,0,0"
                    Foreground="{StaticResource Muted}" />
       </StackPanel>
     </DockPanel>
@@ -293,6 +293,8 @@
                 <ComboBoxItem Content="时空者" />
                 <ComboBoxItem Content="胆怯者" />
                 <ComboBoxItem Content="无畏者" />
+                <ComboBoxItem Content="狩猎者" />
+                <ComboBoxItem Content="吟唱者" />
               </ComboBox>
             </DockPanel>
             <TextBlock x:Name="SnakeRoleGuide" Foreground="{StaticResource Muted}" FontSize="12"
@@ -383,7 +385,7 @@
               <TextBox x:Name="SnakeChargeInput" MinHeight="31" Padding="6,2" Margin="0,3,0,0"
                        FontFamily="Consolas" FontSize="16" MaxLength="20" SpellCheck.IsEnabled="False"
                        InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
-                       AutomationProperties.Name="无畏冲锋输入框" />
+                       AutomationProperties.Name="职业技能输入框" />
             </StackPanel>
             <TextBlock x:Name="SnakeStatus" Text="输入 start 开始单人游戏。" Margin="0,6,0,0"
                        MinHeight="36" TextWrapping="Wrap" Foreground="{StaticResource Muted}" />

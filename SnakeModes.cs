@@ -6,6 +6,25 @@ namespace EnglishTypingPractice
 {
     internal enum SnakeMode { Classic, Obstacles, Territory }
 
+    internal struct SnakeBounds
+    {
+        internal readonly int Start;
+        internal readonly int End;
+
+        internal SnakeBounds(int size, long elapsed)
+        {
+            int shrink = (int)Math.Min(size - 7, elapsed / 60000 * 5);
+            Start = shrink / 2;
+            End = Start + size - shrink;
+        }
+
+        internal bool Contains(int cell, int size)
+        {
+            return cell >= 0 && cell % size >= Start && cell % size < End &&
+                cell / size >= Start && cell / size < End;
+        }
+    }
+
     internal static class SnakeObstacles
     {
         private static readonly int[][] Shapes =
@@ -90,26 +109,29 @@ namespace EnglishTypingPractice
             trailSnapshot = null;
         }
 
-        internal void Visit(int slot, int cell)
+        internal bool[] Visit(int slot, int cell)
         {
             var path = paths[slot];
             int start = path.IndexOf(cell);
+            bool[] captured = null;
             if (start >= 0)
             {
-                Capture(slot, path, start);
+                captured = Capture(slot, path, start);
                 ClearTrail(slot);
             }
             path.Add(cell);
             trails[cell] |= 1 << slot;
             trailSnapshot = null;
+            return captured;
         }
 
-        private void Capture(int slot, List<int> path, int start)
+        private bool[] Capture(int slot, List<int> path, int start)
         {
             var visited = new bool[land.Length];
+            var captured = new bool[land.Length];
             for (int i = start; i < path.Count; i++)
             {
-                visited[path[i]] = true;
+                visited[path[i]] = captured[path[i]] = true;
                 Claim(slot, path[i]);
             }
 
@@ -132,8 +154,12 @@ namespace EnglishTypingPractice
             }
             for (int cell = 0; cell < land.Length; cell++)
                 if (!visited[cell])
+                {
                     Claim(slot, cell);
+                    captured[cell] = true;
+                }
             landSnapshot = null;
+            return captured;
         }
 
         private void Claim(int slot, int cell)
