@@ -23,6 +23,7 @@ $references = @(
     ("/resource:{0},LICENSE" -f (Join-Path $PSScriptRoot 'LICENSE')) `
     (Join-Path $PSScriptRoot 'Program.cs') (Join-Path $PSScriptRoot 'PracticeSettings.cs') `
     (Join-Path $PSScriptRoot 'TypingEffects.cs') (Join-Path $PSScriptRoot 'SnakeModes.cs') `
+    (Join-Path $PSScriptRoot 'SnakeTeams.cs') (Join-Path $PSScriptRoot 'RoomMusic.cs') `
     (Join-Path $PSScriptRoot 'MusicPlayback.cs') (Join-Path $PSScriptRoot 'SnakeGame.cs') (Join-Path $PSScriptRoot 'SnakeWords.cs') `
     (Join-Path $PSScriptRoot 'SnakePractice.cs') (Join-Path $PSScriptRoot 'SnakeMatch.cs') `
     (Join-Path $PSScriptRoot 'LanRoom.cs') (Join-Path $PSScriptRoot 'LanDiscovery.cs') (Join-Path $PSScriptRoot 'LanLobby.cs')

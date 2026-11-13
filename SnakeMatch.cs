@@ -15,8 +15,11 @@ namespace EnglishTypingPractice
         public SnakeResult Result { get; set; }
         public int[] Body { get; set; }
         public SnakeRole Role { get; set; }
-        public int Lives { get; set; }
+        public int SkillUses { get; set; }
         public int Respawns { get; set; }
+        public int Team { get; set; }
+        public int Carrying { get; set; }
+        public int RespawnRemaining { get; set; }
         public bool Charging { get; set; }
         public int StunRemaining { get; set; }
     }
@@ -37,6 +40,11 @@ namespace EnglishTypingPractice
         public int[] Shots { get; set; }
         public int[] Bursts { get; set; }
         public int NextMinute { get; set; }
+        public RoomMusicState Music { get; set; }
+        public int TeamCount { get; set; }
+        public int NextTeamCount { get; set; }
+        public int[] TeamScores { get; set; }
+        public TeamBall[] TeamBalls { get; set; }
         public int[] SmallFruits { get; set; }
         public int LargeFruit { get; set; }
         public SnakePlayerState[] Players { get; set; }
@@ -60,6 +68,7 @@ namespace EnglishTypingPractice
             internal SnakeRole Role;
             internal int BurstCell = -1;
             internal long BurstUntil;
+            internal long RespawnAt;
         }
 
         private sealed class Shot
@@ -78,6 +87,8 @@ namespace EnglishTypingPractice
         private HashSet<int> obstacles = new HashSet<int>();
         private int[] obstacleCells = new int[0];
         private SnakeTerritory territory;
+        private SnakeTeams teams;
+        private int teamCount = 2;
         private SnakeMode mode;
         private SnakeMode nextMode;
         private int round;
@@ -120,6 +131,12 @@ namespace EnglishTypingPractice
                 nextMode = value;
         }
 
+        internal void SetTeamCount(int count)
+        {
+            if (Phase != MatchPhase.Playing && count >= 2 && count <= 4)
+                teamCount = count;
+        }
+
         internal void RemovePlayer(int slot)
         {
             var player = players[slot];
@@ -132,19 +149,23 @@ namespace EnglishTypingPractice
                 return;
             if (territory != null)
                 territory.ClearTrail(slot);
+            else if (teams != null)
+                teams.Return(slot, ActivePlayers().SelectMany(other => other.Snake.Body));
             else
                 FinishIfDecided();
         }
 
         internal bool Start()
         {
-            if (Phase == MatchPhase.Playing)
+            if (Phase == MatchPhase.Playing || (nextMode == SnakeMode.Teams && (solo || Count < teamCount)))
                 return false;
             round++;
             now = 0;
             participants = Count;
-            size = SnakeGame.BoardSize(participants);
             mode = nextMode;
+            size = mode == SnakeMode.Teams ? SnakeTeams.Size : SnakeGame.BoardSize(participants);
+            teams = mode == SnakeMode.Teams ? new SnakeTeams(teamCount,
+                Enumerable.Range(0, players.Length).Where(slot => players[slot] != null && players[slot].Connected).ToArray(), random) : null;
             bounds = new SnakeBounds(size, 0);
             Phase = MatchPhase.Playing;
             rankings = new SnakePlayerState[0];
@@ -158,6 +179,7 @@ namespace EnglishTypingPractice
             int[] ys = { low, high, low, high };
             SnakeDirection[] directions = { SnakeDirection.East, SnakeDirection.West, SnakeDirection.South, SnakeDirection.North };
             int seat = 0;
+            var teamSeats = new int[4];
             for (int slot = 0; slot < players.Length; slot++)
             {
                 var player = players[slot];
@@ -169,7 +191,14 @@ namespace EnglishTypingPractice
                 player.Snake = new SnakeGame(random);
                 player.BurstCell = -1;
                 player.BurstUntil = 0;
-                if (participants == 1)
+                player.RespawnAt = 0;
+                if (teams != null)
+                {
+                    int team = teams.Team(slot);
+                    int cell = SnakeTeams.Spawn(team, teams.Count, teamSeats[team]++ > 0);
+                    player.Snake.Start(size, cell % size, cell / size, SnakeDirection.North, player.Role, mode);
+                }
+                else if (participants == 1)
                     player.Snake.Start(size, size / 2, size / 2, SnakeDirection.North, player.Role, mode);
                 else
                     player.Snake.Start(size, xs[seat], ys[seat], directions[seat], player.Role, mode);
@@ -180,7 +209,9 @@ namespace EnglishTypingPractice
                 : new HashSet<int>();
             obstacleCells = obstacles.ToArray();
             territory = mode == SnakeMode.Territory ? new SnakeTerritory(size) : null;
-            if (territory == null)
+            if (teams != null)
+                teams.PlaceInitial(ActivePlayers().SelectMany(player => player.Snake.Body));
+            else if (territory == null)
                 FillFruits();
             else
                 for (int slot = 0; slot < players.Length; slot++)
@@ -191,7 +222,7 @@ namespace EnglishTypingPractice
 
         internal bool TryWord(int slot, string word, int group, int roundNumber, long elapsed)
         {
-            if (Phase != MatchPhase.Playing || roundNumber != round || (territory != null && elapsed >= SnakeTerritory.Duration))
+            if (Phase != MatchPhase.Playing || roundNumber != round || HasEnded(elapsed))
                 return false;
             var player = players[slot];
             return player != null && player.Connected && player.Snake.TryWord(word, group, elapsed);
@@ -199,7 +230,7 @@ namespace EnglishTypingPractice
 
         internal bool TryCharge(int slot, string word, int group, int roundNumber, long elapsed)
         {
-            if (Phase != MatchPhase.Playing || roundNumber != round || (territory != null && elapsed >= SnakeTerritory.Duration))
+            if (Phase != MatchPhase.Playing || roundNumber != round || HasEnded(elapsed))
                 return false;
             if (elapsed / 60000 != now / 60000)
                 Step(elapsed);
@@ -216,15 +247,32 @@ namespace EnglishTypingPractice
             {
                 player.BurstCell = head;
                 player.BurstUntil = elapsed + 420;
-                foreach (var rival in ActivePlayers().Where(other => other != player).ToArray())
+                foreach (var rival in ActivePlayers().Where(other => AreRivals(snake, other.Snake)).ToArray())
                 {
                     int rivalHead = rival.Snake.Body.First.Value;
                     if (Math.Abs(rivalHead % size - head % size) <= 2 && Math.Abs(rivalHead / size - head / size) <= 2)
-                        Defeat(rival);
+                        Defeat(rival, elapsed);
                 }
                 SettleCombat();
             }
             return true;
+        }
+
+        internal bool DropBall(int slot, int roundNumber, long elapsed)
+        {
+            if (teams == null || Phase != MatchPhase.Playing || roundNumber != round || HasEnded(elapsed))
+                return false;
+            var player = players[slot];
+            if (player == null || !player.Connected || !player.Snake.IsRunning || player.Snake.IsStunned(elapsed) ||
+                !teams.Drop(slot, player.Snake.Body.First.Value))
+                return false;
+            player.Snake.SetCarrying(teams.Carrying(slot), elapsed);
+            return true;
+        }
+
+        private bool HasEnded(long elapsed)
+        {
+            return territory != null && elapsed >= SnakeTerritory.Duration || teams != null && elapsed >= SnakeTeams.Duration;
         }
 
         internal void Step(long elapsed)
@@ -232,13 +280,15 @@ namespace EnglishTypingPractice
             now = elapsed;
             if (Phase != MatchPhase.Playing)
                 return;
-            if (territory != null && now >= SnakeTerritory.Duration)
+            if (HasEnded(now))
             {
                 foreach (var player in ActivePlayers())
                     player.Snake.End(SnakeResult.TimeUp);
                 Finish();
                 return;
             }
+            if (teams != null)
+                ReviveTeamPlayers();
             var active = ActivePlayers().ToArray();
             if (mode == SnakeMode.Classic)
             {
@@ -300,6 +350,11 @@ namespace EnglishTypingPractice
                 bool takesLarge = largeCells.Contains(next);
                 if (!snake.CanStep(next, takesLarge || smallFruits.Contains(next), obstacles))
                     continue;
+                if (teams != null && teams.IsOwnBall(Slot(snake), next))
+                {
+                    snake.End(SnakeResult.Obstacle);
+                    continue;
+                }
                 moves.Add(snake, next);
                 if (takesLarge)
                     largeConsumers.Add(snake);
@@ -314,7 +369,7 @@ namespace EnglishTypingPractice
             var charging = moves.Where(item => item.Key.IsCharging(now)).ToArray();
             var stunned = new HashSet<SnakeGame>();
             foreach (var move in charging)
-                foreach (var rival in snakes.Where(snake => snake != move.Key &&
+                foreach (var rival in snakes.Where(snake => AreRivals(move.Key, snake) &&
                     (snake.Body.Contains(move.Value) || (moves.ContainsKey(snake) && moves[snake] == move.Value))))
                     if (move.Key.HitRival(rival))
                         stunned.Add(rival);
@@ -356,14 +411,56 @@ namespace EnglishTypingPractice
                     int points = takesLarge ? LargeFruitPoints :
                         smallFruits.Remove(move.Value) ? SnakeGame.SmallFruitPoints : 0;
                     move.Key.MoveTo(move.Value, points);
+                    if (teams != null)
+                    {
+                        int slot = Slot(move.Key);
+                        teams.PickUp(slot, move.Value);
+                        move.Key.SetCarrying(teams.Carrying(slot), now);
+                    }
                 }
             }
             if (ateLarge)
                 largeFruit = -1;
-            RevivePlayers();
-            FinishIfDecided();
-            if (Phase == MatchPhase.Playing)
-                FillFruits();
+            if (teams != null)
+            {
+                foreach (var snake in due.Where(item => !item.IsRunning))
+                    QueueTeamRespawn(snake, now);
+            }
+            else
+                SettleCombat();
+        }
+
+        private int Slot(SnakeGame snake)
+        {
+            return Array.FindIndex(players, player => player != null && player.Snake == snake);
+        }
+
+        private bool AreRivals(SnakeGame first, SnakeGame second)
+        {
+            return first != second && (teams == null || teams.Team(Slot(first)) != teams.Team(Slot(second)));
+        }
+
+        private void QueueTeamRespawn(SnakeGame snake, long elapsed)
+        {
+            int slot = Slot(snake);
+            players[slot].RespawnAt = elapsed + SnakeTeams.RespawnDelay;
+            teams.Return(slot, ActivePlayers().SelectMany(player => player.Snake.Body));
+            snake.SetCarrying(0, elapsed);
+        }
+
+        private void ReviveTeamPlayers()
+        {
+            for (int slot = 0; slot < players.Length; slot++)
+            {
+                var player = players[slot];
+                if (player == null || !player.Connected || player.RespawnAt == 0 || player.RespawnAt > now)
+                    continue;
+                int cell = teams.FindSpawn(slot, player.Snake.SpawnHead, ActivePlayers().SelectMany(other => other.Snake.Body));
+                if (cell < 0)
+                    continue;
+                player.Snake.Respawn(now, cell);
+                player.RespawnAt = 0;
+            }
         }
 
         private void MoveTerritory(SnakeGame[] due)
@@ -373,7 +470,7 @@ namespace EnglishTypingPractice
             {
                 if (snake.IsStunned(now))
                     continue;
-                int slot = Array.FindIndex(players, player => player != null && player.Snake == snake);
+                int slot = Slot(snake);
                 int next = snake.NextCell();
                 if (next < 0)
                 {
@@ -395,7 +492,7 @@ namespace EnglishTypingPractice
             if (captures.Count > 0)
                 foreach (var player in ActivePlayers().ToArray())
                     if (captures.Any(capture => capture.Key != player && capture.Value[player.Snake.Body.First.Value]))
-                        Defeat(player);
+                        Defeat(player, now);
         }
 
         private void RespawnTerritory(int slot)
@@ -406,12 +503,16 @@ namespace EnglishTypingPractice
             territory.Visit(slot, snake.Body.First.Value);
         }
 
-        private void Defeat(Player player)
+        private void Defeat(Player player, long elapsed)
         {
-            if (territory == null)
-                player.Snake.End(SnakeResult.Skill);
-            else
+            if (territory != null)
                 RespawnTerritory(Array.IndexOf(players, player));
+            else
+            {
+                player.Snake.End(SnakeResult.Skill);
+                if (teams != null)
+                    QueueTeamRespawn(player.Snake, elapsed);
+            }
         }
 
         private void AdvanceShots()
@@ -456,18 +557,17 @@ namespace EnglishTypingPractice
 
         private bool HitWithShot(Shot shot)
         {
-            var target = ActivePlayers().FirstOrDefault(player => player.Snake != shot.Owner && player.Snake.Body.Contains(shot.Cell));
+            var target = ActivePlayers().FirstOrDefault(player => AreRivals(shot.Owner, player.Snake) && player.Snake.Body.Contains(shot.Cell));
             if (target == null)
                 return false;
-            Defeat(target);
+            Defeat(target, now);
             return true;
         }
 
         private void SettleCombat()
         {
-            if (territory != null)
+            if (territory != null || teams != null)
                 return;
-            RevivePlayers();
             FinishIfDecided();
             if (Phase == MatchPhase.Playing)
                 FillFruits();
@@ -476,19 +576,25 @@ namespace EnglishTypingPractice
         internal SnakeMatchState Snapshot(string room, int slot)
         {
             var own = players[slot].Snake;
+            int displaySize = Phase == MatchPhase.Lobby ? (nextMode == SnakeMode.Teams ? SnakeTeams.Size : SnakeGame.BoardSize(Count)) : size;
             return new SnakeMatchState
             {
                 Room = room,
                 Phase = Phase,
-                Size = Phase == MatchPhase.Lobby ? SnakeGame.BoardSize(Count) : size,
+                Size = displaySize,
                 Mode = Phase == MatchPhase.Lobby ? nextMode : mode,
                 NextMode = nextMode,
                 Obstacles = obstacleCells,
                 Land = territory == null ? null : territory.Land,
                 Trails = territory == null ? null : territory.Trails,
-                Remaining = territory == null ? 0 : (int)Math.Max(0, SnakeTerritory.Duration - now),
+                Remaining = (int)Math.Max(0, (teams != null ? SnakeTeams.Duration :
+                    territory != null ? SnakeTerritory.Duration : 0) - now),
                 SafeStart = Phase == MatchPhase.Lobby ? 0 : bounds.Start,
-                SafeEnd = Phase == MatchPhase.Lobby ? SnakeGame.BoardSize(Count) : bounds.End,
+                SafeEnd = Phase == MatchPhase.Lobby ? displaySize : bounds.End,
+                TeamCount = teams == null ? 0 : teams.Count,
+                NextTeamCount = teamCount,
+                TeamBalls = teams == null ? new TeamBall[0] : teams.Snapshot(),
+                TeamScores = teams == null ? new int[0] : teams.Scores(),
                 Shots = shots.Select(shot => shot.Cell).ToArray(),
                 Bursts = players.Where(player => player != null && player.BurstUntil > now).Select(player => player.BurstCell).ToArray(),
                 NextMinute = (int)(60000 - now % 60000),
@@ -521,8 +627,12 @@ namespace EnglishTypingPractice
                     Direction = snake == null ? SnakeDirection.North : snake.Direction,
                     Result = snake == null ? SnakeResult.Ready : snake.Result,
                     Role = Phase == MatchPhase.Playing && snake != null ? snake.Role : player.Role,
-                    Lives = snake == null ? (player.Role == SnakeRole.Timid ? 2 : 1) : snake.Lives,
+                    SkillUses = snake == null ? 0 : snake.SkillUses,
                     Respawns = snake == null ? 0 : snake.Respawns,
+                    Team = teams == null || snake == null ? -1 : teams.Team(slot),
+                    Carrying = teams == null || snake == null ? 0 : teams.Carrying(slot),
+                    RespawnRemaining = teams != null && player.Connected && Phase == MatchPhase.Playing
+                        ? (int)Math.Max(0, player.RespawnAt - now) : 0,
                     Charging = snake != null && snake.IsCharging(now),
                     StunRemaining = snake == null ? 0 : snake.StunRemaining(now),
                     Body = snake != null && (snake.IsRunning || snake.Result == SnakeResult.Survived ||
@@ -553,20 +663,6 @@ namespace EnglishTypingPractice
         private IEnumerable<Player> ActivePlayers()
         {
             return players.Where(player => player != null && player.Snake != null && player.Snake.IsRunning);
-        }
-
-        private void RevivePlayers()
-        {
-            foreach (var player in players.Where(item => item != null && item.Connected &&
-                item.Snake != null && !item.Snake.IsRunning && item.Snake.Lives > 1))
-            {
-                var blocked = new HashSet<int>(ActivePlayers().SelectMany(item => item.Snake.Body));
-                blocked.UnionWith(obstacles);
-                blocked.UnionWith(smallFruits);
-                if (largeFruit >= 0)
-                    blocked.UnionWith(SnakeGame.LargeFruitCells(largeFruit, size));
-                player.Snake.TryRevive(blocked, now);
-            }
         }
 
         private void FillFruits()

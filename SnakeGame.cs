@@ -30,13 +30,14 @@ namespace EnglishTypingPractice
         private int chargeGroup;
         private SnakeMode mode;
         private double speed = 1;
+        private double carrySpeed = 1;
 
         internal int Size { get; private set; }
         internal int Score { get; private set; }
         internal int Fruit { get; private set; }
         internal int WordGroup { get; private set; }
         internal SnakeRole Role { get; private set; }
-        internal int Lives { get; private set; }
+        internal int SkillUses { get; private set; }
         internal int Respawns { get; private set; }
         internal int ExtraMoves { get; private set; }
         internal string ChargeWord { get; private set; }
@@ -78,10 +79,11 @@ namespace EnglishTypingPractice
             Size = size;
             Bounds = new SnakeBounds(Size, 0);
             speed = 1;
+            carrySpeed = 1;
             Score = 0;
             Fruit = -1;
             Role = role;
-            Lives = role == SnakeRole.Timid ? 2 : 1;
+            SkillUses = 0;
             spawnX = x;
             spawnY = y;
             spawnDirection = direction;
@@ -141,6 +143,7 @@ namespace EnglishTypingPractice
                 nextMoveAt = now + Interval(now);
             }
             Score += ChargeWord.Length;
+            SkillUses++;
             ChargeWord = SnakeWords.DrawCharge(random, ChargeWord, Role);
             chargeGroup++;
             return true;
@@ -177,10 +180,18 @@ namespace EnglishTypingPractice
         internal double Interval(long now)
         {
             if (Role == SnakeRole.Timid)
-                return MoveInterval / (0.75 * speed);
+                return MoveInterval / (0.85 * speed * carrySpeed);
             if (Role == SnakeRole.Fearless)
-                return (IsCharging(now) ? 110 : MoveInterval / 1.2) / speed;
-            return MoveInterval / speed;
+                return (IsCharging(now) ? 110 : MoveInterval / 1.2) / (speed * carrySpeed);
+            return MoveInterval / (speed * carrySpeed);
+        }
+
+        internal void SetCarrying(int count, long now)
+        {
+            double factor = Math.Max(0.1, 1 - count * 0.1);
+            if (factor != carrySpeed && !IsStunned(now) && nextMoveAt > now)
+                nextMoveAt = now + (nextMoveAt - now) * carrySpeed / factor;
+            carrySpeed = factor;
         }
 
         internal bool UpdateClock(long now)
@@ -211,8 +222,6 @@ namespace EnglishTypingPractice
         {
             if (!UpdateClock(now))
                 return false;
-            if (!IsRunning)
-                TryRevive(new HashSet<int> { Fruit }, now);
             if (IsRunning && !Bounds.Contains(Fruit, Size))
                 PlaceFruit();
             return true;
@@ -235,11 +244,7 @@ namespace EnglishTypingPractice
                 int next = NextCell();
                 bool grows = next >= 0 && next == Fruit;
                 if (!CanStep(next, grows, Obstacles))
-                {
-                    var blocked = new HashSet<int>(Obstacles) { Fruit };
-                    TryRevive(blocked, now);
                     return;
-                }
                 MoveTo(next, grows ? SmallFruitPoints : 0);
                 if (grows)
                     PlaceFruit();
@@ -313,49 +318,15 @@ namespace EnglishTypingPractice
                 Result = result;
         }
 
-        internal bool TryRevive(HashSet<int> blocked, long now)
-        {
-            if (Lives < 2 || (Result != SnakeResult.Wall && Result != SnakeResult.Body &&
-                Result != SnakeResult.Rival && Result != SnakeResult.Obstacle && Result != SnakeResult.Skill))
-                return false;
-            Lives--;
-            int offset = Offset(spawnDirection);
-            int head = -1;
-            int best = int.MaxValue;
-            for (int y = 1; y < Size - 1; y++)
-            {
-                for (int x = 1; x < Size - 1; x++)
-                {
-                    int cell = y * Size + x;
-                    int distance = Math.Abs(x - spawnX) + Math.Abs(y - spawnY);
-                    if (distance >= best || !Bounds.Contains(cell, Size) || !Bounds.Contains(cell - offset, Size) ||
-                        !Bounds.Contains(cell - 2 * offset, Size) || !Bounds.Contains(cell + offset, Size) ||
-                        blocked.Contains(cell) || blocked.Contains(cell - offset) ||
-                        blocked.Contains(cell - 2 * offset) || blocked.Contains(cell + offset) ||
-                        (spawnDirection == SnakeDirection.North && y > Size - 3) ||
-                        (spawnDirection == SnakeDirection.South && y < 2) ||
-                        (spawnDirection == SnakeDirection.East && x < 2) ||
-                        (spawnDirection == SnakeDirection.West && x > Size - 3))
-                        continue;
-                    head = cell;
-                    best = distance;
-                }
-            }
-            if (head < 0)
-                return false;
-            stunUntil = 0;
-            nextMoveAt = now + Interval(now);
-            ResetBody(head, spawnDirection);
-            return true;
-        }
-
-        internal void Respawn(long now)
+        internal void Respawn(long now, int? head = null)
         {
             Respawns++;
             chargeUntil = stunUntil = 0;
             nextMoveAt = now + Interval(now);
-            ResetBody(spawnY * Size + spawnX, spawnDirection);
+            ResetBody(head ?? (spawnY * Size + spawnX), spawnDirection);
         }
+
+        internal int SpawnHead { get { return spawnY * Size + spawnX; } }
 
         internal void Leave()
         {

@@ -283,13 +283,24 @@
                 <ComboBoxItem Content="经典" />
                 <ComboBoxItem Content="障碍赛" />
                 <ComboBoxItem Content="圈地战" />
+                <ComboBoxItem Content="团战" />
+              </ComboBox>
+            </DockPanel>
+            <DockPanel Margin="0,5,0,0">
+              <TextBlock x:Name="LanTeamsLabel" Visibility="Collapsed" Text="队伍数量" VerticalAlignment="Center"
+                         Margin="0,0,9,0" FontWeight="SemiBold" />
+              <ComboBox x:Name="LanTeamCount" Visibility="Collapsed" SelectedIndex="0" MinHeight="27"
+                        AutomationProperties.Name="团战队伍数量">
+                <ComboBoxItem Content="2 队" />
+                <ComboBoxItem Content="3 队" />
+                <ComboBoxItem Content="4 队" />
               </ComboBox>
             </DockPanel>
             <DockPanel Margin="0,8,0,0">
               <TextBlock Text="职业" VerticalAlignment="Center" Margin="0,0,9,0" FontWeight="SemiBold" />
               <ComboBox x:Name="SnakeRole" SelectedIndex="0" MinHeight="27"
                         AutomationProperties.Name="贪吃蛇职业">
-                <ComboBoxItem Content="普通" />
+                <ComboBoxItem Content="平凡者" />
                 <ComboBoxItem Content="时空者" />
                 <ComboBoxItem Content="胆怯者" />
                 <ComboBoxItem Content="无畏者" />
@@ -392,6 +403,29 @@
             <Button x:Name="LanToggle" Content="局域网联机" HorizontalAlignment="Left" Margin="0,4,0,0" />
             <TextBlock x:Name="LanRoster" Margin="0,6,0,6" TextWrapping="Wrap" LineHeight="22"
                        Foreground="{StaticResource Muted}" Visibility="Collapsed" />
+            <Expander x:Name="LanAudioControls" Header="房间音量" Visibility="Collapsed" Margin="0,3,0,8">
+              <StackPanel Margin="0,5,0,0">
+                <TextBlock x:Name="LanMusicStatus" Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" />
+                <DockPanel x:Name="LanMasterControl" Margin="0,4,0,0">
+                  <TextBlock Text="全房音乐" Width="70" VerticalAlignment="Center" />
+                  <TextBlock x:Name="LanMasterLevel" DockPanel.Dock="Right" Width="38" TextAlignment="Right" VerticalAlignment="Center" />
+                  <Slider x:Name="LanMasterVolume" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                          AutomationProperties.Name="全房音乐音量" />
+                </DockPanel>
+                <DockPanel Margin="0,4,0,0">
+                  <TextBlock Text="我的音乐" Width="70" VerticalAlignment="Center" />
+                  <TextBlock x:Name="LanMusicLevel" DockPanel.Dock="Right" Width="38" TextAlignment="Right" VerticalAlignment="Center" />
+                  <Slider x:Name="LanMusicVolume" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                          AutomationProperties.Name="个人背景音乐音量" />
+                </DockPanel>
+                <DockPanel Margin="0,4,0,0">
+                  <TextBlock Text="我的音效" Width="70" VerticalAlignment="Center" />
+                  <TextBlock x:Name="LanEffectsLevel" DockPanel.Dock="Right" Width="38" TextAlignment="Right" VerticalAlignment="Center" />
+                  <Slider x:Name="LanEffectsVolume" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                          AutomationProperties.Name="个人游戏音效音量" />
+                </DockPanel>
+              </StackPanel>
+            </Expander>
             <Button x:Name="LanLeave" Content="离开房间" HorizontalAlignment="Left" Visibility="Collapsed" />
           </StackPanel>
         </ScrollViewer>

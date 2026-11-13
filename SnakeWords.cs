@@ -56,7 +56,7 @@ namespace EnglishTypingPractice
 
         internal static string[] Draw(Random random, SnakeRole role, string[] previous)
         {
-            int length = role == SnakeRole.Timid ? random.Next(3, 6) : role == SnakeRole.Timewalker ? 6 : 6 + random.Next(2);
+            int length = role == SnakeRole.Timid ? random.Next(5, 7) : role == SnakeRole.Timewalker ? 6 : 6 + random.Next(2);
             int variants = Variants(role);
             var words = new string[4 * variants];
             for (int variant = 0; variant < variants; variant++)
@@ -109,7 +109,7 @@ namespace EnglishTypingPractice
                 case SnakeRole.Fearless: return "无畏者";
                 case SnakeRole.Hunter: return "狩猎者";
                 case SnakeRole.Bard: return "吟唱者";
-                default: return "普通";
+                default: return "平凡者";
             }
         }
     }

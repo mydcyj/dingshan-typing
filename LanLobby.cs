@@ -24,6 +24,12 @@ namespace EnglishTypingPractice
         private readonly Button leave;
         private readonly TextBlock roster;
         private readonly TextBox command;
+        private readonly TextBlock snakeStatus;
+        private readonly FrameworkElement audioControls;
+        private readonly FrameworkElement masterControl;
+        private readonly ComboBox teamPicker;
+        private readonly TextBlock teamLabel;
+        private readonly RoomMusic music;
         private readonly Action entered;
         private readonly Action<SnakeMatchState, int> update;
         private readonly Action exited;
@@ -36,9 +42,10 @@ namespace EnglishTypingPractice
         private string localAddress;
         private int action;
         private bool busy;
+        private bool updatingTeams;
 
         internal LanLobby(Window window, Action entered, Action<SnakeMatchState, int> update, Action exited,
-            Func<SnakeRole> selectedRole, Func<SnakeMode> selectedMode)
+            Func<SnakeRole> selectedRole, Func<SnakeMode> selectedMode, PracticeSettings settings, Action saveSettings)
         {
             this.entered = entered;
             this.update = update;
@@ -58,6 +65,35 @@ namespace EnglishTypingPractice
             leave = (Button)window.FindName("LanLeave");
             roster = (TextBlock)window.FindName("LanRoster");
             command = (TextBox)window.FindName("SnakeCommand");
+            snakeStatus = (TextBlock)window.FindName("SnakeStatus");
+            audioControls = (FrameworkElement)window.FindName("LanAudioControls");
+            masterControl = (FrameworkElement)window.FindName("LanMasterControl");
+            teamPicker = (ComboBox)window.FindName("LanTeamCount");
+            teamLabel = (TextBlock)window.FindName("LanTeamsLabel");
+            music = new RoomMusic((TextBlock)window.FindName("LanMusicStatus"), settings);
+            BindVolume(window, "LanMaster", settings.RoomMasterVolume, value =>
+            {
+                settings.RoomMasterVolume = value;
+                if (host != null)
+                    host.SetMusicVolume(value);
+            }, saveSettings);
+            BindVolume(window, "LanMusic", settings.RoomMusicVolume, value =>
+            {
+                settings.RoomMusicVolume = value;
+                music.UpdateVolume();
+            }, saveSettings);
+            BindVolume(window, "LanEffects", settings.RoomEffectsVolume, value =>
+            {
+                settings.RoomEffectsVolume = value;
+                music.ResetEffects();
+            }, saveSettings);
+            teamPicker.SelectionChanged += (sender, e) =>
+            {
+                if (host == null || updatingTeams)
+                    return;
+                host.SetTeamCount(teamPicker.SelectedIndex + 2);
+                RefreshRoom();
+            };
             toggle.Click += (sender, e) =>
             {
                 panel.Visibility = panel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
@@ -81,8 +117,32 @@ namespace EnglishTypingPractice
         {
             if (host == null)
                 return;
-            host.Start();
+            if (!host.Start())
+                snakeStatus.Text = "团战人数至少要达到队伍数。";
             RefreshRoom();
+        }
+
+        private static void BindVolume(Window window, string name, int initial, Action<int> change, Action save)
+        {
+            var slider = (Slider)window.FindName(name + "Volume");
+            var label = (TextBlock)window.FindName(name + "Level");
+            slider.Value = initial;
+            label.Text = initial + "%";
+            slider.ValueChanged += (sender, e) =>
+            {
+                int value = (int)e.NewValue;
+                label.Text = value + "%";
+                change(value);
+                save();
+            };
+        }
+
+        internal void DropBall(int round)
+        {
+            if (host != null)
+                host.DropBall(round);
+            else if (client != null)
+                client.DropBall(round);
         }
 
         internal void HidePanel()
@@ -122,7 +182,7 @@ namespace EnglishTypingPractice
             RefreshRoom();
         }
 
-        private void CreateRoom()
+        private async void CreateRoom()
         {
             string player = name.Text.Trim();
             string room = roomName.Text.Trim();
@@ -139,6 +199,7 @@ namespace EnglishTypingPractice
             {
                 host = new LanHost(room, player, role: selectedRole());
                 host.SetMode(selectedMode());
+                host.SetTeamCount(teamPicker.SelectedIndex + 2);
             }
             catch (SocketException)
             {
@@ -148,6 +209,7 @@ namespace EnglishTypingPractice
             try { localAddress = LanDiscovery.LocalAddresses().Select(ip => ip.ToString()).FirstOrDefault(); }
             catch (System.Net.NetworkInformation.NetworkInformationException) { }
             OpenRoom();
+            await music.Host(host);
         }
 
         private async Task Scan()
@@ -257,15 +319,30 @@ namespace EnglishTypingPractice
             if (ReferenceEquals(state, latest))
                 return;
             int slot = host != null ? 0 : client.Slot;
+            bool teamMode = state.NextMode == SnakeMode.Teams;
+            teamPicker.Visibility = teamMode && host != null ? Visibility.Visible : Visibility.Collapsed;
+            teamPicker.IsEnabled = state.Phase != MatchPhase.Playing;
+            teamLabel.Visibility = teamMode ? Visibility.Visible : Visibility.Collapsed;
+            teamLabel.Text = host != null ? "队伍数量" : "房主设置 " + state.NextTeamCount + " 队";
+            updatingTeams = true;
+            teamPicker.SelectedIndex = state.NextTeamCount - 2;
+            updatingTeams = false;
             if (latest == null || latest.Phase != state.Phase || latest.Round != state.Round || latest.Mode != state.Mode ||
-                !latest.Players.Select(PlayerLine).SequenceEqual(state.Players.Select(PlayerLine)))
+                !latest.Players.Select(PlayerLine).SequenceEqual(state.Players.Select(PlayerLine)) ||
+                !latest.TeamScores.SequenceEqual(state.TeamScores))
                 RenderRoster(state, slot);
+            music.Refresh(state, latest, client, slot);
             latest = state;
             update(state, slot);
         }
 
         private void RenderRoster(SnakeMatchState state, int slot)
         {
+            if (state.TeamCount > 0)
+            {
+                RenderTeams(state, slot);
+                return;
+            }
             bool territory = state.Mode == SnakeMode.Territory;
             string unit = territory ? " 格" : " 分";
             if (state.Phase == MatchPhase.Finished)
@@ -295,9 +372,29 @@ namespace EnglishTypingPractice
             }
         }
 
+        private void RenderTeams(SnakeMatchState state, int slot)
+        {
+            int best = state.TeamScores.Max();
+            var winners = Enumerable.Range(0, state.TeamCount).Where(team => state.TeamScores[team] == best).ToArray();
+            roster.Text = state.Phase != MatchPhase.Finished ? state.Room :
+                winners.Length == 1 ? SnakeBoard.TeamName(winners[0]) + "获胜" :
+                "并列第一 · " + string.Join("、", winners.Select(SnakeBoard.TeamName));
+            for (int team = 0; team < state.TeamCount; team++)
+            {
+                roster.Inlines.Add(new System.Windows.Documents.LineBreak());
+                roster.Inlines.Add(new System.Windows.Documents.Run("● " + SnakeBoard.TeamName(team))
+                    { Foreground = SnakeBoard.PlayerColor(team, 0, true) });
+                roster.Inlines.Add(" " + state.TeamScores[team] + " 球");
+                foreach (var player in state.Players.Where(player => player.Team == team))
+                    roster.Inlines.Add(" · " + PlayerLabel(player, slot) +
+                        (player.Result == SnakeResult.Left ? "（离开）" : player.Carrying > 0 ? " ＋" + player.Carrying : ""));
+            }
+        }
+
         private static string PlayerLine(SnakePlayerState player)
         {
-            return player.Slot + " " + player.Name + " " + player.Score + " " + player.Result + " " + player.Role;
+            return player.Slot + " " + player.Name + " " + player.Score + " " + player.Result + " " + player.Role +
+                " " + player.Team + " " + player.Carrying;
         }
 
         private static string PlayerLabel(SnakePlayerState player, int slot)
@@ -309,6 +406,7 @@ namespace EnglishTypingPractice
         {
             action++;
             timer.Stop();
+            music.Close();
             if (host != null)
                 host.Dispose();
             if (client != null)
@@ -338,6 +436,10 @@ namespace EnglishTypingPractice
             command.IsEnabled = !busy;
             leave.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
             roster.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
+            audioControls.Visibility = roster.Visibility;
+            masterControl.Visibility = host == null ? Visibility.Collapsed : Visibility.Visible;
+            if (!connected)
+                teamLabel.Visibility = teamPicker.Visibility = Visibility.Collapsed;
         }
     }
 }

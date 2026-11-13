@@ -25,13 +25,15 @@ namespace EnglishTypingPractice
         public string Error { get; set; }
         public int Slot { get; set; }
         public SnakeMatchState State { get; set; }
+        public string MusicKey { get; set; }
     }
 
     internal static class LanWire
     {
         internal const int Port = 48631;
-        internal const string Version = "TypingSnake/6";
+        internal const string Version = "TypingSnake/7";
         internal const int StateLimit = 65536;
+        internal const int MusicLimit = 64 * 1024 * 1024;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
 
         internal static byte[] Encode<T>(T value)
@@ -103,6 +105,12 @@ namespace EnglishTypingPractice
         private readonly UdpClient discovery;
         private readonly Timer timer;
         private readonly Stopwatch clock = new Stopwatch();
+        private readonly Stopwatch musicClock = new Stopwatch();
+        private readonly HashSet<string> musicKeys = new HashSet<string>();
+        private FileInfo musicFile;
+        private int musicTrack;
+        private long musicLength;
+        private int musicVolume = 65;
         private bool closed;
 
         internal LanHost(string room, string name, int port = LanWire.Port, IPAddress address = null, SnakeRole role = SnakeRole.Standard)
@@ -132,17 +140,51 @@ namespace EnglishTypingPractice
         internal SnakeMatchState Snapshot()
         {
             lock (sync)
-                return match.Snapshot(room, 0);
+                return Snapshot(0);
         }
 
-        internal void Start()
+        private SnakeMatchState Snapshot(int slot)
+        {
+            var state = match.Snapshot(room, slot);
+            state.Music = new RoomMusicState { Volume = musicVolume };
+            if (musicFile != null && state.Phase == MatchPhase.Playing)
+            {
+                state.Music.Track = musicTrack;
+                state.Music.Title = musicFile.Name.Length <= 120 ? musicFile.Name : musicFile.Name.Substring(0, 120);
+                state.Music.Extension = musicFile.Extension;
+                state.Music.Length = musicLength;
+                state.Music.Position = musicClock.ElapsedMilliseconds;
+            }
+            return state;
+        }
+
+        internal void SetMusic(FileInfo file)
         {
             lock (sync)
-                if (!closed && match.Start())
-                {
-                    clock.Restart();
-                    timer.Change(0, 15);
-                }
+            {
+                musicLength = file == null ? 0 : file.Length;
+                musicFile = file;
+                musicTrack++;
+                musicClock.Restart();
+            }
+        }
+
+        internal void SetMusicVolume(int percent)
+        {
+            lock (sync)
+                musicVolume = percent;
+        }
+
+        internal bool Start()
+        {
+            lock (sync)
+            {
+                if (closed || !match.Start())
+                    return false;
+                clock.Restart();
+                timer.Change(0, 15);
+                return true;
+            }
         }
 
         internal void Turn(string word, int group, int round, bool charge = false)
@@ -164,6 +206,20 @@ namespace EnglishTypingPractice
             lock (sync)
                 if (!closed)
                     match.SetMode(mode);
+        }
+
+        internal void SetTeamCount(int count)
+        {
+            lock (sync)
+                if (!closed)
+                    match.SetTeamCount(count);
+        }
+
+        internal void DropBall(int round)
+        {
+            lock (sync)
+                if (!closed)
+                    match.DropBall(0, round, clock.ElapsedMilliseconds);
         }
 
         private void Step(object state)
@@ -206,12 +262,18 @@ namespace EnglishTypingPractice
         private void ServeClient(TcpClient client)
         {
             int slot = -1;
+            string musicKey = null;
             try
             {
                 client.NoDelay = true;
                 var stream = client.GetStream();
                 stream.ReadTimeout = stream.WriteTimeout = 5000;
                 var hello = LanWire.Read<LanRequest>(stream, 512);
+                if (hello != null && hello.Kind == "music")
+                {
+                    SendMusic(stream, hello);
+                    return;
+                }
                 if (hello == null || hello.Kind != LanWire.Version || !LanWire.IsName(hello.Text, 20) ||
                     !Enum.IsDefined(typeof(SnakeRole), hello.Role))
                     return;
@@ -223,6 +285,12 @@ namespace EnglishTypingPractice
                         return;
                     slot = match.AddPlayer(hello.Text, hello.Role);
                     reply = slot < 0 ? new LanReply { Error = "房间已满或本局正在进行。" } : Reply(slot);
+                    if (slot >= 0)
+                    {
+                        musicKey = Guid.NewGuid().ToString("N");
+                        musicKeys.Add(musicKey);
+                        reply.MusicKey = musicKey;
+                    }
                 }
                 LanWire.Write(stream, reply);
                 if (slot < 0)
@@ -232,7 +300,7 @@ namespace EnglishTypingPractice
                 {
                     var request = LanWire.Read<LanRequest>(stream, 512);
                     if (request == null || (request.Kind != "poll" && request.Kind != "turn" &&
-                        request.Kind != "charge" && request.Kind != "role"))
+                        request.Kind != "charge" && request.Kind != "role" && request.Kind != "drop"))
                         return;
                     lock (sync)
                     {
@@ -253,7 +321,10 @@ namespace EnglishTypingPractice
                 lock (sync)
                 {
                     if (slot >= 0)
+                    {
                         match.RemovePlayer(slot);
+                        musicKeys.Remove(musicKey);
+                    }
                     clients.Remove(client);
                 }
                 client.Close();
@@ -264,6 +335,8 @@ namespace EnglishTypingPractice
         {
             if (request.Kind == "role" && Enum.IsDefined(typeof(SnakeRole), request.Role))
                 match.SetRole(slot, request.Role);
+            if (request.Kind == "drop")
+                match.DropBall(slot, request.Round, clock.ElapsedMilliseconds);
             if (request.Text == null || request.Text.Length > 20)
                 return;
             if (request.Kind == "turn")
@@ -274,7 +347,27 @@ namespace EnglishTypingPractice
 
         private LanReply Reply(int slot)
         {
-            return new LanReply { Slot = slot, State = match.Snapshot(room, slot) };
+            return new LanReply { Slot = slot, State = Snapshot(slot) };
+        }
+
+        private void SendMusic(NetworkStream stream, LanRequest request)
+        {
+            FileInfo file;
+            long length;
+            lock (sync)
+            {
+                if (closed || !musicKeys.Contains(request.Text) || request.Group != musicTrack ||
+                    match.Phase != MatchPhase.Playing || musicFile == null)
+                    return;
+                file = musicFile;
+                length = musicLength;
+            }
+            using (var source = file.OpenRead())
+            {
+                if (source.Length != length || length <= 0 || length > LanWire.MusicLimit)
+                    return;
+                source.CopyTo(stream);
+            }
         }
 
         private void ReplyToScans()
@@ -330,6 +423,9 @@ namespace EnglishTypingPractice
         private volatile SnakeMatchState state;
         private volatile bool closed;
         private LanRequest turn;
+        private LanRequest drop;
+        private IPEndPoint endpoint;
+        private string musicKey;
 
         internal int Slot { get; private set; }
         internal SnakeMatchState State { get { return state; } }
@@ -346,6 +442,7 @@ namespace EnglishTypingPractice
                     return "连接超时，请确认同学仍在房间里。";
                 }
                 await connect.ConfigureAwait(false);
+                endpoint = new IPEndPoint(address, port);
                 return await Task.Run(() => JoinRoom(name, role)).ConfigureAwait(false);
             }
             catch (Exception error)
@@ -367,8 +464,11 @@ namespace EnglishTypingPractice
                 Dispose();
                 return reply.Error;
             }
-            if (reply == null || reply.Slot < 1 || reply.Slot > 3 || !ValidState(reply.State, reply.Slot))
+            Guid key;
+            if (reply == null || reply.Slot < 1 || reply.Slot > 3 || !ValidState(reply.State, reply.Slot) ||
+                !Guid.TryParseExact(reply.MusicKey, "N", out key))
                 throw new InvalidDataException("Invalid LAN room reply.");
+            musicKey = reply.MusicKey;
             Slot = reply.Slot;
             state = reply.State;
             Task.Run(() => Poll(stream));
@@ -385,6 +485,46 @@ namespace EnglishTypingPractice
             Interlocked.Exchange(ref turn, new LanRequest { Kind = "role", Role = role });
         }
 
+        internal void DropBall(int round)
+        {
+            Interlocked.Exchange(ref drop, new LanRequest { Kind = "drop", Round = round });
+        }
+
+        internal async Task DownloadMusic(RoomMusicState music, string path, CancellationToken cancellation)
+        {
+            using (var transfer = new TcpClient(AddressFamily.InterNetwork))
+            using (cancellation.Register(transfer.Close))
+            {
+                var connect = transfer.ConnectAsync(endpoint.Address, endpoint.Port);
+                if (await Task.WhenAny(connect, Task.Delay(4000, cancellation)).ConfigureAwait(false) != connect)
+                    throw new IOException("Music connection timed out.");
+                await connect.ConfigureAwait(false);
+                using (var stream = transfer.GetStream())
+                using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    stream.WriteTimeout = 4000;
+                    LanWire.Write(stream, new LanRequest { Kind = "music", Group = music.Track, Text = musicKey });
+                    byte[] buffer = new byte[32768];
+                    long remaining = music.Length;
+                    while (remaining > 0)
+                    {
+                        var read = stream.ReadAsync(buffer, 0, (int)Math.Min(remaining, buffer.Length), cancellation);
+                        using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
+                        {
+                            if (await Task.WhenAny(read, Task.Delay(5000, deadline.Token)).ConfigureAwait(false) != read)
+                                throw new IOException("Music transfer timed out.");
+                            deadline.Cancel();
+                        }
+                        int count = await read.ConfigureAwait(false);
+                        if (count == 0)
+                            throw new EndOfStreamException();
+                        file.Write(buffer, 0, count);
+                        remaining -= count;
+                    }
+                }
+            }
+        }
+
         private void Poll(NetworkStream stream)
         {
             try
@@ -392,7 +532,7 @@ namespace EnglishTypingPractice
                 var poll = new LanRequest { Kind = "poll" };
                 while (!closed)
                 {
-                    LanWire.Write(stream, Interlocked.Exchange(ref turn, null) ?? poll);
+                    LanWire.Write(stream, Interlocked.Exchange(ref turn, null) ?? Interlocked.Exchange(ref drop, null) ?? poll);
                     var reply = LanWire.Read<LanReply>(stream, LanWire.StateLimit);
                     if (reply == null || !ValidState(reply.State, Slot))
                         break;
@@ -412,11 +552,13 @@ namespace EnglishTypingPractice
 
         private static bool ValidState(SnakeMatchState state, int slot)
         {
-            if (state == null || !LanWire.IsName(state.Room, 24) || state.Size < 32 || state.Size > 80 ||
-                (state.Size - 32) % 16 != 0 || !Enum.IsDefined(typeof(MatchPhase), state.Phase) ||
+            if (state == null || !LanWire.IsName(state.Room, 24) ||
+                (state.Mode == SnakeMode.Teams ? state.Size != SnakeTeams.Size : state.Size < 32 ||
+                    state.Size > 80 || (state.Size - 32) % 16 != 0) || !Enum.IsDefined(typeof(MatchPhase), state.Phase) ||
                 !Enum.IsDefined(typeof(SnakeMode), state.Mode) || !Enum.IsDefined(typeof(SnakeMode), state.NextMode) ||
                 state.Players == null || state.Players.Length == 0 || state.Players.Length > 4 ||
                 state.Rankings == null || state.Rankings.Length > 4 ||
+                state.Music == null || !state.Music.IsValid ||
                 state.Words == null || (state.Words.Length != 0 && state.Words.Length != 4 && state.Words.Length != 12))
                 return false;
             foreach (string word in state.Words)
@@ -426,6 +568,16 @@ namespace EnglishTypingPractice
                 if (ranked == null || ranked.Slot < 0 || ranked.Slot > 3 || !LanWire.IsName(ranked.Name, 20))
                     return false;
             int cells = state.Size * state.Size;
+            bool teams = state.Mode == SnakeMode.Teams && state.Phase != MatchPhase.Lobby;
+            if (state.NextTeamCount < 2 || state.NextTeamCount > 4 || state.TeamBalls == null || state.TeamScores == null ||
+                (teams ? state.TeamCount < 2 || state.TeamCount > 4 || state.TeamScores.Length != state.TeamCount ||
+                    state.TeamBalls.Length != state.TeamCount * 5 :
+                    state.TeamCount != 0 || state.TeamScores.Length != 0 || state.TeamBalls.Length != 0))
+                return false;
+            foreach (var ball in state.TeamBalls)
+                if (ball == null || ball.Team < 0 || ball.Team >= state.TeamCount || ball.Carrier < -1 || ball.Carrier > 3 ||
+                    (ball.Carrier == -1 ? ball.Cell < 0 || ball.Cell >= cells : ball.Cell != -1))
+                    return false;
             if (state.SafeStart < 0 || state.SafeEnd > state.Size || state.SafeEnd - state.SafeStart < 7 ||
                 state.NextMinute < 1 || state.NextMinute > 60000 || state.Shots == null || state.Bursts == null ||
                 state.Shots.Length > cells || state.Bursts.Length > 4)
@@ -435,10 +587,10 @@ namespace EnglishTypingPractice
                     return false;
             bool territory = state.Mode == SnakeMode.Territory && state.Phase != MatchPhase.Lobby;
             if (state.Obstacles == null || state.Obstacles.Length > cells ||
-                state.Remaining < 0 || state.Remaining > SnakeTerritory.Duration ||
+                state.Remaining < 0 || state.Remaining > (teams ? SnakeTeams.Duration : SnakeTerritory.Duration) ||
                 (territory ? state.Land == null || state.Trails == null ||
                     state.Land.Length != cells || state.Trails.Length != cells
-                    : state.Land != null || state.Trails != null || state.Remaining != 0))
+                    : state.Land != null || state.Trails != null || (!teams && state.Remaining != 0)))
                 return false;
             if (territory)
                 for (int i = 0; i < cells; i++)
@@ -468,6 +620,10 @@ namespace EnglishTypingPractice
                     !Enum.IsDefined(typeof(SnakeResult), player.Result) ||
                     !Enum.IsDefined(typeof(SnakeDirection), player.Direction) ||
                     !Enum.IsDefined(typeof(SnakeRole), player.Role))
+                    return false;
+                if (player.Team < -1 || player.Team >= state.TeamCount || player.Carrying < 0 ||
+                    player.Carrying > state.TeamBalls.Length || player.RespawnRemaining < 0 ||
+                    player.RespawnRemaining > SnakeTeams.RespawnDelay + 1000 || (!teams && player.RespawnRemaining != 0))
                     return false;
                 foreach (int cell in player.Body)
                     if (cell < 0 || cell >= cells)

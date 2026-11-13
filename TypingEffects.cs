@@ -133,7 +133,7 @@ namespace EnglishTypingPractice
             return motion;
         }
 
-        private static MemoryStream CreateSound(int level)
+        internal static MemoryStream CreateSound(int level, double volume = 1)
         {
             const int sampleRate = 22050;
             int count = sampleRate * (level == 0 ? 36 : level == 1 ? 170 : 410) / 1000;
@@ -160,7 +160,7 @@ namespace EnglishTypingPractice
                     sample += Tone(time, 370, 0.035) * 0.31 + Tone(time - 0.023, 587, 0.035) * 0.23;
                 if (level > 1)
                     sample += Tone(time - 0.055, 740, 0.071) * 0.29 + Tone(time - 0.108, 988, 0.09) * 0.23;
-                writer.Write((short)(sample * short.MaxValue));
+                writer.Write((short)(sample * volume * short.MaxValue));
             }
             writer.Flush();
             stream.Position = 0;

@@ -19,7 +19,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("英文打字练习与局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("1.8.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.9.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -116,7 +116,7 @@ namespace EnglishTypingPractice
             };
 
             music = new MusicPlayback(text => musicStatus.Text = text, UpdatePlaylist);
-            snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running));
+            snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running), settings, SaveSettings);
             var practicePage = (FrameworkElement)window.FindName("PracticePage");
             var snakePage = (FrameworkElement)window.FindName("SnakePage");
             ((Button)window.FindName("OpenSnake")).Click += (sender, e) =>

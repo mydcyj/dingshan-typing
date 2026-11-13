@@ -41,6 +41,7 @@ namespace EnglishTypingPractice
         }
 
         internal PlaybackMode Mode { get; set; }
+        internal event Action<FileInfo> TrackPlaying;
 
         internal void SetVolume(int percent)
         {
@@ -93,7 +94,12 @@ namespace EnglishTypingPractice
                 OpenTrack();
         }
 
-        private static FileInfo[] FindAudioFiles(DirectoryInfo root)
+        internal static bool IsAudioExtension(string extension)
+        {
+            return extension != null && AudioExtensions.Contains(extension);
+        }
+
+        internal static FileInfo[] FindAudioFiles(DirectoryInfo root)
         {
             var files = new List<FileInfo>();
             var pending = new Stack<DirectoryInfo>();
@@ -151,6 +157,12 @@ namespace EnglishTypingPractice
             }
         }
 
+        internal void StopAndRewind()
+        {
+            SetPlaying(false);
+            ClosePlayer();
+        }
+
         private void OpenTrack()
         {
             player = new MediaPlayer { Volume = volume };
@@ -175,6 +187,8 @@ namespace EnglishTypingPractice
         {
             player.Play();
             showStatus("正在播放 " + tracks[trackIndex].Name);
+            if (TrackPlaying != null)
+                TrackPlaying(tracks[trackIndex]);
         }
 
         private void OnMediaOpened(object sender, EventArgs e)

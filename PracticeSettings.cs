@@ -16,6 +16,9 @@ namespace EnglishTypingPractice
             IncludePunctuation = true;
             PlayMusic = true;
             MusicVolume = 35;
+            RoomMasterVolume = 65;
+            RoomMusicVolume = 65;
+            RoomEffectsVolume = 50;
         }
 
         public bool MatchCase { get; set; }
@@ -26,6 +29,9 @@ namespace EnglishTypingPractice
         public PlaybackMode MusicMode { get; set; }
         public int MusicVolume { get; set; }
         public string MusicTrack { get; set; }
+        public int RoomMasterVolume { get; set; }
+        public int RoomMusicVolume { get; set; }
+        public int RoomEffectsVolume { get; set; }
 
         internal static PracticeSettings Load()
         {
@@ -36,6 +42,9 @@ namespace EnglishTypingPractice
                 if (!Enum.IsDefined(typeof(PlaybackMode), settings.MusicMode))
                     settings.MusicMode = PlaybackMode.Sequential;
                 settings.MusicVolume = Math.Max(0, Math.Min(100, settings.MusicVolume));
+                settings.RoomMasterVolume = Math.Max(0, Math.Min(100, settings.RoomMasterVolume));
+                settings.RoomMusicVolume = Math.Max(0, Math.Min(100, settings.RoomMusicVolume));
+                settings.RoomEffectsVolume = Math.Max(0, Math.Min(100, settings.RoomEffectsVolume));
                 return settings;
             }
             catch (Exception ex)
