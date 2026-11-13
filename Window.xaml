@@ -301,43 +301,59 @@
               <Grid.Resources>
                 <Style x:Key="DirectionWord" TargetType="TextBlock">
                   <Setter Property="FontFamily" Value="Consolas" />
-                  <Setter Property="FontSize" Value="14" />
+                  <Setter Property="FontSize" Value="13" />
                   <Setter Property="FontWeight" Value="Bold" />
-                  <Setter Property="HorizontalAlignment" Value="Left" />
                   <Setter Property="TextWrapping" Value="Wrap" />
                 </Style>
                 <Style x:Key="DirectionName" TargetType="TextBlock">
-                  <Setter Property="FontSize" Value="12" />
+                  <Setter Property="FontSize" Value="13" />
+                  <Setter Property="FontWeight" Value="SemiBold" />
                   <Setter Property="Foreground" Value="{StaticResource Muted}" />
-                  <Setter Property="VerticalAlignment" Value="Top" />
-                  <Setter Property="Margin" Value="2,3,8,0" />
+                  <Setter Property="Margin" Value="0,0,0,3" />
+                </Style>
+                <Style x:Key="DirectionCard" TargetType="Border">
+                  <Setter Property="Background" Value="#F4F7FD" />
+                  <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+                  <Setter Property="BorderThickness" Value="1" />
+                  <Setter Property="CornerRadius" Value="5" />
+                  <Setter Property="Padding" Value="7,4" />
+                  <Setter Property="Margin" Value="3" />
                 </Style>
               </Grid.Resources>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
-              <TextBlock Text="北" Style="{StaticResource DirectionName}" />
-              <Border Grid.Column="1" CornerRadius="4" Padding="5,1,4,2">
-                <TextBlock x:Name="SnakeNorth" Style="{StaticResource DirectionWord}" />
+              <Border Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource DirectionCard}">
+                <StackPanel>
+                  <TextBlock Text="↑ 上" Style="{StaticResource DirectionName}" />
+                  <TextBlock x:Name="SnakeNorth" Style="{StaticResource DirectionWord}" />
+                </StackPanel>
               </Border>
-              <TextBlock Grid.Row="1" Text="东" Style="{StaticResource DirectionName}" />
-              <Border Grid.Row="1" Grid.Column="1" CornerRadius="4" Padding="5,1,4,2">
-                <TextBlock x:Name="SnakeEast" Style="{StaticResource DirectionWord}" />
+              <Border Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource DirectionCard}">
+                <StackPanel>
+                  <TextBlock Text="← 左" Style="{StaticResource DirectionName}" />
+                  <TextBlock x:Name="SnakeWest" Style="{StaticResource DirectionWord}" />
+                </StackPanel>
               </Border>
-              <TextBlock Grid.Row="2" Text="南" Style="{StaticResource DirectionName}" />
-              <Border Grid.Row="2" Grid.Column="1" CornerRadius="4" Padding="5,1,4,2">
-                <TextBlock x:Name="SnakeSouth" Style="{StaticResource DirectionWord}" />
+              <Border Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Style="{StaticResource DirectionCard}">
+                <StackPanel>
+                  <TextBlock Text="右 →" Style="{StaticResource DirectionName}" />
+                  <TextBlock x:Name="SnakeEast" Style="{StaticResource DirectionWord}" />
+                </StackPanel>
               </Border>
-              <TextBlock Grid.Row="3" Text="西" Style="{StaticResource DirectionName}" />
-              <Border Grid.Row="3" Grid.Column="1" CornerRadius="4" Padding="5,1,4,2">
-                <TextBlock x:Name="SnakeWest" Style="{StaticResource DirectionWord}" />
+              <Border Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource DirectionCard}">
+                <StackPanel>
+                  <TextBlock Text="↓ 下" Style="{StaticResource DirectionName}" />
+                  <TextBlock x:Name="SnakeSouth" Style="{StaticResource DirectionWord}" />
+                </StackPanel>
               </Border>
             </Grid>
 

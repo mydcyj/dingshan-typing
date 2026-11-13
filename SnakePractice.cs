@@ -217,7 +217,11 @@ namespace EnglishTypingPractice
                     }).Where(line => line != null));
                 label.Foreground = opposite || !running ? Brushes.SlateGray : SnakeBoard.Head;
                 label.ToolTip = current ? "当前方向" : opposite ? "禁止掉头" : null;
-                ((Border)label.Parent).Background = current ? SnakeBoard.Current : Brushes.Transparent;
+                var card = (Border)((StackPanel)label.Parent).Parent;
+                if (current)
+                    card.Background = SnakeBoard.Current;
+                else
+                    card.ClearValue(Border.BackgroundProperty);
             }
         }
 
