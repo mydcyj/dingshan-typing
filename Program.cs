@@ -19,7 +19,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("英文打字练习与局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("1.6.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.7.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -55,6 +55,7 @@ namespace EnglishTypingPractice
         private readonly DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         private readonly MusicPlayback music;
         private readonly SnakePractice snake;
+        private readonly TypingEffects effects;
         private bool resumePractice;
 
         private readonly CheckBox matchCase;
@@ -102,6 +103,17 @@ namespace EnglishTypingPractice
             musicTrack = (ComboBox)window.FindName("MusicTrack");
             nextTrack = (Button)window.FindName("NextTrack");
             settingsNotice = (TextBlock)window.FindName("SettingsNotice");
+            var feedback = (CheckBox)window.FindName("TypingFeedback");
+            feedback.IsChecked = settings.TypingFeedback;
+            effects = new TypingEffects(window, passage, (Canvas)window.FindName("WordEcho"));
+            feedback.Click += (sender, e) =>
+            {
+                settings.TypingFeedback = feedback.IsChecked == true;
+                if (!settings.TypingFeedback)
+                    effects.Reset();
+                SaveSettings();
+                typed.Focus();
+            };
 
             music = new MusicPlayback(text => musicStatus.Text = text, UpdatePlaylist);
             snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running));
@@ -110,6 +122,7 @@ namespace EnglishTypingPractice
             ((Button)window.FindName("OpenSnake")).Click += (sender, e) =>
             {
                 resumePractice = clock.IsRunning;
+                effects.Reset();
                 clock.Stop();
                 timer.Stop();
                 music.SetPlaying(false);
@@ -171,6 +184,7 @@ namespace EnglishTypingPractice
                 if (musicTrack.SelectedValue is string)
                     RememberTrack();
                 music.Dispose();
+                effects.Dispose();
             };
             ChoosePassage();
         }
@@ -195,6 +209,7 @@ namespace EnglishTypingPractice
 
         private void ResetRound()
         {
+            effects.Reset();
             timer.Stop();
             clock.Reset();
             music.SetPlaying(false);
@@ -229,7 +244,10 @@ namespace EnglishTypingPractice
             }
 
             RefreshProgress();
-            if (typed.Text.Length >= target.Length)
+            bool complete = typed.Text.Length >= target.Length;
+            if (settings.TypingFeedback)
+                PlayFeedback(e, complete);
+            if (complete)
             {
                 clock.Stop();
                 timer.Stop();
@@ -238,6 +256,42 @@ namespace EnglishTypingPractice
                 music.SetPlaying(false);
             }
             RefreshClock();
+        }
+
+        private void PlayFeedback(TextChangedEventArgs e, bool complete)
+        {
+            string input = typed.Text;
+            int wordStart = -1;
+            int wordEnd = -1;
+            bool letterTyped = false;
+            foreach (var change in e.Changes)
+                for (int i = change.Offset; i < Math.Min(input.Length, change.Offset + change.AddedLength); i++)
+                {
+                    letterTyped |= char.IsLetter(input[i]);
+                    if (!char.IsLetter(target[i]) || (i + 1 < target.Length && IsWordCharacter(i + 1)))
+                        continue;
+                    int start = i;
+                    while (start > 0 && IsWordCharacter(start - 1))
+                        start--;
+                    int length = i - start + 1;
+                    var comparison = settings.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+                    if (string.Compare(input, start, target, start, length, comparison) == 0)
+                    {
+                        wordStart = start;
+                        wordEnd = i;
+                    }
+                }
+            if (letterTyped || complete)
+                effects.Play(wordStart < 0 ? null : letters[wordStart],
+                    wordStart < 0 ? null : target.Substring(wordStart, wordEnd - wordStart + 1), complete);
+        }
+
+        private bool IsWordCharacter(int index)
+        {
+            char character = target[index];
+            return char.IsLetter(character) || ((character == '\'' || character == '’' || character == '-') &&
+                index > 0 && index + 1 < target.Length &&
+                char.IsLetter(target[index - 1]) && char.IsLetter(target[index + 1]));
         }
 
         private void RefreshProgress()

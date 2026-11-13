@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace EnglishTypingPractice
 {
     internal enum SnakeDirection { North, East, South, West }
-    internal enum SnakeResult { Ready, Running, Wall, Body, Won, Left, Rival, Survived }
+    internal enum SnakeResult { Ready, Running, Wall, Body, Won, Left, Rival, Survived, Obstacle, TimeUp }
 
     internal sealed class SnakeGame
     {
@@ -35,6 +35,7 @@ namespace EnglishTypingPractice
         internal int WordGroup { get; private set; }
         internal SnakeRole Role { get; private set; }
         internal int Lives { get; private set; }
+        internal int Respawns { get; private set; }
         internal int ExtraMoves { get; private set; }
         internal string ChargeWord { get; private set; }
         internal int ChargeGroup { get { return chargeGroup; } }
@@ -45,12 +46,14 @@ namespace EnglishTypingPractice
         internal bool TurnPending { get { return Direction != movement || ExtraMoves > 0; } }
         internal bool IsRunning { get { return Result == SnakeResult.Running; } }
         internal LinkedList<int> Body { get { return body; } }
+        internal HashSet<int> Obstacles { get; private set; }
 
         internal SnakeGame(Random random = null)
         {
             this.random = random ?? new Random();
             Size = BaseSize;
             Fruit = -1;
+            Obstacles = new HashSet<int>();
         }
 
         internal static int BoardSize(int players)
@@ -58,9 +61,10 @@ namespace EnglishTypingPractice
             return BaseSize + 16 * (players - 1);
         }
 
-        internal void Start(SnakeRole role)
+        internal void Start(SnakeRole role, SnakeMode mode = SnakeMode.Classic)
         {
             Start(BaseSize, BaseSize / 2, BaseSize / 2, SnakeDirection.North, role);
+            Obstacles = mode == SnakeMode.Obstacles ? SnakeObstacles.Create(Size, Body, random) : new HashSet<int>();
             PlaceFruit();
         }
 
@@ -163,7 +167,7 @@ namespace EnglishTypingPractice
         private double Interval(long now)
         {
             if (Role == SnakeRole.Timid)
-                return MoveInterval * 2;
+                return MoveInterval / 0.75;
             if (Role == SnakeRole.Fearless)
                 return IsCharging(now) ? 110 : MoveInterval / 1.2;
             return MoveInterval;
@@ -185,9 +189,10 @@ namespace EnglishTypingPractice
             {
                 int next = NextCell();
                 bool grows = next >= 0 && next == Fruit;
-                if (!CanStep(next, grows))
+                if (!CanStep(next, grows, Obstacles))
                 {
-                    TryRevive(new HashSet<int> { Fruit }, now);
+                    var blocked = new HashSet<int>(Obstacles) { Fruit };
+                    TryRevive(blocked, now);
                     return;
                 }
                 MoveTo(next, grows ? SmallFruitPoints : 0);
@@ -209,7 +214,7 @@ namespace EnglishTypingPractice
             return next;
         }
 
-        internal bool CanStep(int next, bool grows)
+        internal bool CanStep(int next, bool grows, HashSet<int> obstacles = null)
         {
             if (next < 0)
             {
@@ -219,6 +224,11 @@ namespace EnglishTypingPractice
             if (occupied.Contains(next) && (grows || next != body.Last.Value))
             {
                 Result = SnakeResult.Body;
+                return false;
+            }
+            if (obstacles != null && obstacles.Contains(next))
+            {
+                Result = SnakeResult.Obstacle;
                 return false;
             }
             return true;
@@ -257,7 +267,8 @@ namespace EnglishTypingPractice
 
         internal bool TryRevive(HashSet<int> blocked, long now)
         {
-            if (Lives < 2 || (Result != SnakeResult.Wall && Result != SnakeResult.Body && Result != SnakeResult.Rival))
+            if (Lives < 2 || (Result != SnakeResult.Wall && Result != SnakeResult.Body &&
+                Result != SnakeResult.Rival && Result != SnakeResult.Obstacle))
                 return false;
             Lives--;
             int offset = Offset(spawnDirection);
@@ -288,6 +299,14 @@ namespace EnglishTypingPractice
             return true;
         }
 
+        internal void Respawn(long now)
+        {
+            Respawns++;
+            chargeUntil = stunUntil = 0;
+            nextMoveAt = now + Interval(now);
+            ResetBody(spawnY * Size + spawnX, spawnDirection);
+        }
+
         internal void Leave()
         {
             End(SnakeResult.Left);
@@ -301,7 +320,9 @@ namespace EnglishTypingPractice
 
         private void PlaceFruit()
         {
-            Fruit = FindFruit(Size, occupied, random);
+            var blocked = new HashSet<int>(occupied);
+            blocked.UnionWith(Obstacles);
+            Fruit = FindFruit(Size, blocked, random);
             if (Fruit < 0)
                 Result = SnakeResult.Won;
         }

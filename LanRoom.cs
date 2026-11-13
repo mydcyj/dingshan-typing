@@ -30,7 +30,7 @@ namespace EnglishTypingPractice
     internal static class LanWire
     {
         internal const int Port = 48631;
-        internal const string Version = "TypingSnake/4";
+        internal const string Version = "TypingSnake/5";
         internal const int StateLimit = 65536;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
 
@@ -157,6 +157,13 @@ namespace EnglishTypingPractice
             lock (sync)
                 if (!closed)
                     match.SetRole(0, role);
+        }
+
+        internal void SetMode(SnakeMode mode)
+        {
+            lock (sync)
+                if (!closed)
+                    match.SetMode(mode);
         }
 
         private void Step(object state)
@@ -407,6 +414,7 @@ namespace EnglishTypingPractice
         {
             if (state == null || !LanWire.IsName(state.Room, 24) || state.Size < 32 || state.Size > 80 ||
                 (state.Size - 32) % 16 != 0 || !Enum.IsDefined(typeof(MatchPhase), state.Phase) ||
+                !Enum.IsDefined(typeof(SnakeMode), state.Mode) || !Enum.IsDefined(typeof(SnakeMode), state.NextMode) ||
                 state.Players == null || state.Players.Length == 0 || state.Players.Length > 4 ||
                 state.Rankings == null || state.Rankings.Length > 4 ||
                 state.Words == null || (state.Words.Length != 0 && state.Words.Length != 4 && state.Words.Length != 12))
@@ -420,6 +428,20 @@ namespace EnglishTypingPractice
                 if (ranked == null || ranked.Slot < 0 || ranked.Slot > 3 || !LanWire.IsName(ranked.Name, 20))
                     return false;
             int cells = state.Size * state.Size;
+            bool territory = state.Mode == SnakeMode.Territory && state.Phase != MatchPhase.Lobby;
+            if (state.Obstacles == null || state.Obstacles.Length > cells ||
+                state.Remaining < 0 || state.Remaining > SnakeTerritory.Duration ||
+                (territory ? state.Land == null || state.Trails == null ||
+                    state.Land.Length != cells || state.Trails.Length != cells
+                    : state.Land != null || state.Trails != null || state.Remaining != 0))
+                return false;
+            if (territory)
+                for (int i = 0; i < cells; i++)
+                    if (state.Land[i] < 0 || state.Land[i] > 4 || state.Trails[i] < 0 || state.Trails[i] > 15)
+                        return false;
+            foreach (int cell in state.Obstacles)
+                if (cell < 0 || cell >= cells)
+                    return false;
             if (state.SmallFruits == null || state.SmallFruits.Length > 4 ||
                 state.LargeFruit < -1 || state.LargeFruit >= cells)
                 return false;

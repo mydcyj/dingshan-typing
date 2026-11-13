@@ -14,17 +14,19 @@ namespace EnglishTypingPractice
     {
         private static readonly SnakeDirection[] Directions =
             (SnakeDirection[])Enum.GetValues(typeof(SnakeDirection));
-        private readonly SnakeGame game = new SnakeGame();
+        private SnakeGame game = new SnakeGame();
         private readonly DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
         private readonly Stopwatch clock = new Stopwatch();
         private readonly TextBox command;
         private readonly ComboBox rolePicker;
+        private readonly ComboBox modePicker;
         private readonly TextBlock roleGuide;
         private readonly FrameworkElement chargePanel;
         private readonly TextBlock chargeWord;
         private readonly TextBox chargeInput;
         private readonly TextBlock status;
         private readonly TextBlock score;
+        private readonly TextBlock scoreLabel;
         private readonly TextBlock boardSize;
         private readonly TextBlock fruitLegend;
         private readonly TextBlock scoreGuide;
@@ -33,21 +35,25 @@ namespace EnglishTypingPractice
         private readonly Action<bool> gameRunningChanged;
         private readonly LanLobby lobby;
         private SnakeMatchState online;
+        private SnakeMatch soloTerritory;
         private int ownSlot;
         private bool musicRunning;
         private bool updatingRole;
+        private bool updatingMode;
 
         internal SnakePractice(Window window, Action<bool> gameRunningChanged)
         {
             this.gameRunningChanged = gameRunningChanged;
             command = (TextBox)window.FindName("SnakeCommand");
             rolePicker = (ComboBox)window.FindName("SnakeRole");
+            modePicker = (ComboBox)window.FindName("SnakeMode");
             roleGuide = (TextBlock)window.FindName("SnakeRoleGuide");
             chargePanel = (FrameworkElement)window.FindName("SnakeChargePanel");
             chargeWord = (TextBlock)window.FindName("SnakeChargeWord");
             chargeInput = (TextBox)window.FindName("SnakeChargeInput");
             status = (TextBlock)window.FindName("SnakeStatus");
             score = (TextBlock)window.FindName("SnakeScore");
+            scoreLabel = (TextBlock)window.FindName("SnakeScoreLabel");
             directionWords = new[] { "SnakeNorth", "SnakeEast", "SnakeSouth", "SnakeWest" }
                 .Select(name => (TextBlock)window.FindName(name)).ToArray();
             board = new SnakeBoard();
@@ -56,15 +62,37 @@ namespace EnglishTypingPractice
             boardSize = (TextBlock)window.FindName("SnakeBoardSize");
             fruitLegend = (TextBlock)window.FindName("SnakeFruitLegend");
             scoreGuide = (TextBlock)window.FindName("SnakeScoreGuide");
-            lobby = new LanLobby(window, EnterRoom, ApplyRoomState, LeaveRoom, () => SelectedRole);
+            lobby = new LanLobby(window, EnterRoom, ApplyRoomState, LeaveRoom, () => SelectedRole, () => SelectedMode);
             rolePicker.SelectionChanged += (sender, e) =>
             {
                 if (updatingRole)
                     return;
-                if (online == null)
-                    Render();
+                if (online == null || soloTerritory != null)
+                {
+                    if (soloTerritory != null)
+                        soloTerritory.SetRole(0, SelectedRole);
+                    if (online == null)
+                        Render();
+                    else
+                        RefreshSoloTerritory();
+                }
                 else
                     lobby.SetRole(SelectedRole);
+            };
+            modePicker.SelectionChanged += (sender, e) =>
+            {
+                if (updatingMode)
+                    return;
+                if (online == null || soloTerritory != null)
+                {
+                    soloTerritory = null;
+                    online = null;
+                    game = new SnakeGame();
+                    status.Text = "输入 start 开始单人游戏。";
+                    Render();
+                }
+                else
+                    lobby.SetMode(SelectedMode);
             };
             ((FrameworkElement)window.FindName("SnakePage")).PreviewKeyDown += (sender, e) =>
             {
@@ -87,6 +115,7 @@ namespace EnglishTypingPractice
         }
 
         private SnakeRole SelectedRole { get { return (SnakeRole)rolePicker.SelectedIndex; } }
+        private SnakeMode SelectedMode { get { return (SnakeMode)modePicker.SelectedIndex; } }
 
         internal void Focus()
         {
@@ -95,7 +124,10 @@ namespace EnglishTypingPractice
 
         internal void Leave()
         {
+            soloTerritory = null;
             lobby.Close();
+            online = null;
+            command.IsReadOnly = false;
             timer.Stop();
             clock.Stop();
             game.Leave();
@@ -142,7 +174,17 @@ namespace EnglishTypingPractice
         {
             command.Clear();
             chargeInput.Clear();
-            game.Start(SelectedRole);
+            if (SelectedMode == SnakeMode.Territory)
+            {
+                soloTerritory = new SnakeMatch("你", SelectedRole);
+                soloTerritory.SetMode(SelectedMode);
+                soloTerritory.Start();
+                clock.Restart();
+                RefreshSoloTerritory();
+                timer.Start();
+                return;
+            }
+            game.Start(SelectedRole, SelectedMode);
             clock.Restart();
             status.Text = "";
             Render();
@@ -153,6 +195,17 @@ namespace EnglishTypingPractice
         private void Tick(object sender, EventArgs e)
         {
             long now = clock.ElapsedMilliseconds;
+            if (soloTerritory != null)
+            {
+                soloTerritory.Step(now);
+                RefreshSoloTerritory();
+                if (soloTerritory.Phase == MatchPhase.Finished)
+                {
+                    timer.Stop();
+                    clock.Stop();
+                }
+                return;
+            }
             if (!game.MoveDue(now))
                 return;
 
@@ -172,7 +225,8 @@ namespace EnglishTypingPractice
                 command.Clear();
                 chargeInput.Clear();
                 status.Text = (game.Result == SnakeResult.Won ? "棋盘已填满，通关！"
-                    : game.Result == SnakeResult.Body ? "撞到蛇身。" : "撞到墙了。")
+                    : game.Result == SnakeResult.Body ? "撞到蛇身。"
+                    : game.Result == SnakeResult.Obstacle ? "撞到障碍物。" : "撞到墙了。")
                     + "得分 " + game.Score + "。输入 start 再来一局。";
                 Render();
                 UpdateMusic(false);
@@ -184,19 +238,23 @@ namespace EnglishTypingPractice
 
         private void Render()
         {
+            bool territory = SelectedMode == SnakeMode.Territory;
             boardSize.Text = game.Size + " × " + game.Size + " 格";
             var role = game.IsRunning ? game.Role : SelectedRole;
             ShowWords(game.IsRunning, game.Direction, game.Words, role);
             ShowRole(role, game.IsRunning, game.Lives, game.IsCharging(clock.ElapsedMilliseconds),
                 0, game.ChargeWord);
             fruitLegend.Visibility = Visibility.Collapsed;
-            scoreGuide.Text = "有效输入按字母计分 · 吃果 +10";
-            board.SetBoard(game.Size, game.Fruit < 0 ? new int[0] : new[] { game.Fruit }, -1, 0, new[]
+            scoreLabel.Text = territory ? "占地格数" : "分数";
+            scoreGuide.Text = territory ? "五分钟 · 闭合轨迹占地"
+                : SelectedMode == SnakeMode.Obstacles ? "避开障碍 · 吃果 +10 · 有效输入按字母计分"
+                : "有效输入按字母计分 · 吃果 +10";
+            board.SetBoard(game.Size, territory || game.Fruit < 0 ? new int[0] : new[] { game.Fruit }, -1, 0, new[]
             {
-                new SnakePlayerState { Slot = 0, Result = game.Result, Body = game.Body.ToArray(),
+                new SnakePlayerState { Slot = 0, Result = game.Result, Body = territory ? new int[0] : game.Body.ToArray(),
                     Charging = game.IsRunning && game.IsCharging(clock.ElapsedMilliseconds) }
-            });
-            score.Text = game.Score.ToString(CultureInfo.CurrentCulture);
+            }, SelectedMode == SnakeMode.Obstacles ? game.Obstacles.ToArray() : null);
+            score.Text = (territory ? 0 : game.Score).ToString(CultureInfo.CurrentCulture);
         }
 
         private void ShowWords(bool running, SnakeDirection movement, string[] words, SnakeRole role)
@@ -228,11 +286,13 @@ namespace EnglishTypingPractice
         private void ShowRole(SnakeRole role, bool running, int lives, bool charging, int stun, string special)
         {
             rolePicker.IsEnabled = !running && (online == null || online.Phase != MatchPhase.Playing);
+            modePicker.IsEnabled = rolePicker.IsEnabled && (online == null || ownSlot == 0);
             string guide;
             switch (role)
             {
                 case SnakeRole.Timewalker: guide = "6 / 8 / 10 字母 · 额外走 0 / 2 / 4 格"; break;
-                case SnakeRole.Timid: guide = "半速 · 3 字母 · " + (running ? lives.ToString() : "2") + " 条命"; break;
+                case SnakeRole.Timid: guide = "75% 移速 · 3 字母" +
+                    (SelectedMode == SnakeMode.Territory ? "" : " · " + (running ? lives.ToString() : "2") + " 条命"); break;
                 case SnakeRole.Fearless: guide = "120% 移速 · Tab 切换冲锋输入框"; break;
                 default: guide = ""; break;
             }
@@ -260,7 +320,10 @@ namespace EnglishTypingPractice
                     !word.Equals(online.ChargeWord, StringComparison.OrdinalIgnoreCase))
                     return;
                 chargeInput.Clear();
-                lobby.Turn(word, online.ChargeGroup, online.Round, charge: true);
+                if (soloTerritory == null)
+                    lobby.Turn(word, online.ChargeGroup, online.Round, charge: true);
+                else if (soloTerritory.TryCharge(0, word, online.ChargeGroup, online.Round, clock.ElapsedMilliseconds))
+                    RefreshSoloTerritory();
             }
             else if (game.TryCharge(word, game.ChargeGroup, clock.ElapsedMilliseconds))
             {
@@ -288,6 +351,8 @@ namespace EnglishTypingPractice
 
         private void EnterRoom()
         {
+            soloTerritory = null;
+            online = null;
             timer.Stop();
             clock.Stop();
             game.Leave();
@@ -316,7 +381,10 @@ namespace EnglishTypingPractice
                 if (ownSlot == 0 && command.Text.Equals("start", StringComparison.OrdinalIgnoreCase))
                 {
                     command.Clear();
-                    lobby.Start();
+                    if (soloTerritory == null)
+                        lobby.Start();
+                    else
+                        Start();
                 }
                 return;
             }
@@ -324,8 +392,26 @@ namespace EnglishTypingPractice
             var own = online.Players.First(player => player.Slot == ownSlot);
             if (own.Result != SnakeResult.Running)
                 return;
-            SubmitWord(online.Words, own.Role, own.Direction, own.StunRemaining > 0,
-                word => lobby.Turn(word, online.WordGroup, online.Round));
+            SubmitWord(online.Words, own.Role, own.Direction, own.StunRemaining > 0, word =>
+            {
+                if (soloTerritory == null)
+                    lobby.Turn(word, online.WordGroup, online.Round);
+                else if (soloTerritory.TryWord(0, word, online.WordGroup, online.Round, clock.ElapsedMilliseconds))
+                    RefreshSoloTerritory();
+            });
+        }
+
+        private void RefreshSoloTerritory()
+        {
+            ApplyRoomState(soloTerritory.Snapshot("单人圈地战", 0), 0);
+        }
+
+        internal static string TerritoryResult(SnakeMatchState state)
+        {
+            var ranked = state.Rankings;
+            var winners = ranked.TakeWhile(player => player.Score == ranked[0].Score).ToArray();
+            return winners.Length == 1 ? winners[0].Name + "获胜" :
+                "并列第一 · " + string.Join("、", winners.Select(player => player.Name));
         }
 
         private void ApplyRoomState(SnakeMatchState state, int slot)
@@ -333,6 +419,12 @@ namespace EnglishTypingPractice
             var previous = online;
             ownSlot = slot;
             online = state;
+            if (modePicker.SelectedIndex != (int)state.NextMode)
+            {
+                updatingMode = true;
+                modePicker.SelectedIndex = (int)state.NextMode;
+                updatingMode = false;
+            }
             var own = state.Players.First(player => player.Slot == slot);
             if (state.Phase == MatchPhase.Playing && rolePicker.SelectedIndex != (int)own.Role)
             {
@@ -351,6 +443,7 @@ namespace EnglishTypingPractice
                     ? (slot == 0 ? "等待同学加入，输入 start 开局。" : "等待房主输入 start。")
                     : state.Phase == MatchPhase.Finished
                         ? ((own.Result == SnakeResult.Survived ? "你是最后存活的玩家。" : "本局结束。") +
+                            (soloTerritory != null ? "共占领 " + own.Score + " 格。" : "") +
                             (slot == 0 ? "输入 start 再开一局。" : "等待房主开局。"))
                         : running ? "" : "你已出局，可以继续观战。";
             }
@@ -373,6 +466,12 @@ namespace EnglishTypingPractice
                     command.Clear();
                     status.Text = "已复活，剩余 1 条命。";
                 }
+                if (running && own.Respawns != previousOwn.Respawns)
+                {
+                    command.Clear();
+                    chargeInput.Clear();
+                    status.Text = "撞墙后已回到起点。";
+                }
             }
             command.IsReadOnly = state.Phase == MatchPhase.Playing ? !running || own.StunRemaining > 0 : slot != 0;
             if (restoreCommandFocus && !command.IsKeyboardFocused)
@@ -383,9 +482,15 @@ namespace EnglishTypingPractice
             score.Text = own.Score.ToString(CultureInfo.CurrentCulture);
             int size = state.Size;
             boardSize.Text = size + " × " + size + " 格";
-            fruitLegend.Visibility = Visibility.Visible;
-            scoreGuide.Text = "有效输入按字母计分";
-            board.SetBoard(size, state.SmallFruits, state.LargeFruit, slot, state.Players);
+            bool territory = state.Mode == SnakeMode.Territory;
+            scoreLabel.Text = territory ? "占地格数" : "分数";
+            fruitLegend.Visibility = territory ? Visibility.Collapsed : Visibility.Visible;
+            int seconds = (state.Remaining + 999) / 1000;
+            scoreGuide.Text = territory
+                ? (state.Phase == MatchPhase.Playing ? string.Format("剩余 {0}:{1:00} · ", seconds / 60, seconds % 60) : "五分钟 · ") +
+                    "闭合轨迹占地"
+                : state.Mode == SnakeMode.Obstacles ? "避开障碍 · 有效输入按字母计分" : "有效输入按字母计分";
+            board.SetBoard(size, state.SmallFruits, state.LargeFruit, slot, state.Players, state.Obstacles, state.Land, state.Trails);
             UpdateMusic(running);
         }
 
@@ -409,24 +514,38 @@ namespace EnglishTypingPractice
         private static readonly Brush FruitHighlight = MakeBrush(255, 240, 183);
         private static readonly Brush ChargeGlow = MakeBrush(26, 154, 165);
         private static readonly Brush StunFill = MakeBrush(105, 117, 132);
+        private static readonly Brush Obstacle = MakeBrush(71, 77, 91);
+        private static readonly Pen ObstacleOutline = MakeObstaclePen();
         private static readonly Pen Grid = MakeGridPen();
         private static readonly Brush[] Rivals =
         {
             MakeBrush(49, 99, 184), MakeBrush(126, 75, 161), MakeBrush(151, 105, 26)
+        };
+        private static readonly Brush[] TerritoryColors = { Body, Rivals[0], Rivals[1], Rivals[2] };
+        private static readonly Brush[] LandColors =
+        {
+            MakeBrush(168, 219, 185), MakeBrush(180, 207, 245), MakeBrush(215, 190, 237), MakeBrush(247, 218, 158)
         };
         private int size = SnakeGame.BaseSize;
         private int[] smallFruits = new int[0];
         private int largeFruit = -1;
         private int ownSlot;
         private SnakePlayerState[] players = new SnakePlayerState[0];
+        private int[] obstacles;
+        private int[] land;
+        private int[] trails;
 
-        internal void SetBoard(int size, int[] smallFruits, int largeFruit, int ownSlot, SnakePlayerState[] players)
+        internal void SetBoard(int size, int[] smallFruits, int largeFruit, int ownSlot, SnakePlayerState[] players,
+            int[] obstacles = null, int[] land = null, int[] trails = null)
         {
             this.size = size;
             this.smallFruits = smallFruits;
             this.largeFruit = largeFruit;
             this.ownSlot = ownSlot;
             this.players = players;
+            this.obstacles = obstacles;
+            this.land = land;
+            this.trails = trails;
             InvalidateVisual();
         }
 
@@ -439,20 +558,44 @@ namespace EnglishTypingPractice
             var area = new Rect((ActualWidth - side) / 2, (ActualHeight - side) / 2, side, side);
             drawing.DrawRectangle(Board, null, area);
             double cell = side / size;
+            if (land != null)
+                for (int i = 0; i < land.Length; i++)
+                    if (land[i] != 0)
+                        drawing.DrawRectangle(LandColors[land[i] - 1], null, CellBounds(i, area, cell));
             for (int i = 1; i < size; i++)
             {
                 drawing.DrawLine(Grid, new Point(area.X + i * cell, area.Top), new Point(area.X + i * cell, area.Bottom));
                 drawing.DrawLine(Grid, new Point(area.Left, area.Y + i * cell), new Point(area.Right, area.Y + i * cell));
             }
 
+            if (obstacles != null)
+                foreach (int obstacle in obstacles)
+                    drawing.DrawRectangle(Obstacle, ObstacleOutline, CellBounds(obstacle, area, cell));
+            if (trails != null)
+                for (int i = 0; i < trails.Length; i++)
+                {
+                    if (trails[i] == 0)
+                        continue;
+                    var bounds = CellBounds(i, area, cell);
+                    int stripe = 0;
+                    for (int slot = 0; slot < TerritoryColors.Length; slot++)
+                        if ((trails[i] & (1 << slot)) != 0)
+                        {
+                            drawing.DrawRectangle(TerritoryColors[slot], null, new Rect(
+                                bounds.X + cell * 0.15, bounds.Y + cell * (0.12 + 0.2 * stripe),
+                                cell * 0.7, cell * 0.15));
+                            stripe++;
+                        }
+                }
+
             foreach (var player in players)
             {
                 Brush fill = player.Charging ? ChargeGlow :
-                    player.StunRemaining > 0 ? StunFill : PlayerColor(player.Slot, ownSlot);
+                    player.StunRemaining > 0 ? StunFill : PlayerColor(player.Slot, ownSlot, land != null);
                 for (int i = 0; i < player.Body.Length; i++)
                 {
                     var bounds = CellBounds(player.Body[i], area, cell);
-                    drawing.DrawRectangle(i == 0 && player.Slot == ownSlot && !player.Charging &&
+                    drawing.DrawRectangle(land == null && i == 0 && player.Slot == ownSlot && !player.Charging &&
                         player.StunRemaining == 0 ? Head : fill, null, bounds);
                     if (i == 0)
                     {
@@ -478,9 +621,18 @@ namespace EnglishTypingPractice
             return new Rect(area.X + position % size * cell, area.Y + position / size * cell, cell, cell);
         }
 
-        internal static Brush PlayerColor(int slot, int ownSlot)
+        internal static Brush PlayerColor(int slot, int ownSlot, bool territory = false)
         {
+            if (territory)
+                return TerritoryColors[slot];
             return slot == ownSlot ? Body : Rivals[slot < ownSlot ? slot : slot - 1];
+        }
+
+        private static Pen MakeObstaclePen()
+        {
+            var pen = new Pen(MakeBrush(110, 120, 139), 0.8);
+            pen.Freeze();
+            return pen;
         }
 
         private static Brush MakeBrush(byte red, byte green, byte blue)

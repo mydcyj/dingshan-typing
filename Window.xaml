@@ -86,6 +86,8 @@
                   ToolTip="取消勾选后，字母大小写均可。更改后重练本篇。" />
         <CheckBox x:Name="IncludePunctuation" Content="练习标点"
                   ToolTip="取消勾选后，短文会去掉标点。更改后重练本篇。" />
+        <CheckBox x:Name="TypingFeedback" Content="打击感" Margin="19,0,0,0"
+                  ToolTip="开启按键音、单词回响和完成震动。" />
         <Button x:Name="OpenSnake" Content="贪吃蛇模式" Margin="18,0,0,0" Padding="11,4" MinHeight="28" />
       </StackPanel>
 
@@ -98,9 +100,12 @@
                 <TextBlock x:Name="Count" DockPanel.Dock="Right" FontFamily="Consolas"
                            Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
               </DockPanel>
-              <TextBlock x:Name="Passage" MinHeight="63" Margin="0,9,0,0" FontFamily="Consolas"
-                         FontSize="22" LineHeight="31" LineStackingStrategy="BlockLineHeight"
-                         TextWrapping="Wrap" Language="en-US" />
+              <Grid>
+                <TextBlock x:Name="Passage" MinHeight="63" Margin="0,9,0,0" FontFamily="Consolas"
+                           FontSize="22" LineHeight="31" LineStackingStrategy="BlockLineHeight"
+                           TextWrapping="Wrap" Language="en-US" />
+                <Canvas x:Name="WordEcho" IsHitTestVisible="False" ClipToBounds="True" />
+              </Grid>
             </StackPanel>
           </Border>
           <ProgressBar x:Name="Progress" Height="3" BorderThickness="0"
@@ -272,6 +277,15 @@
               <TextBlock DockPanel.Dock="Right" x:Name="SnakeBoardSize" Text="32 × 32 格" Foreground="{StaticResource Muted}" />
             </DockPanel>
             <DockPanel Margin="0,8,0,0">
+              <TextBlock Text="模式" VerticalAlignment="Center" Margin="0,0,9,0" FontWeight="SemiBold" />
+              <ComboBox x:Name="SnakeMode" SelectedIndex="0" MinHeight="27"
+                        AutomationProperties.Name="贪吃蛇玩法">
+                <ComboBoxItem Content="经典" />
+                <ComboBoxItem Content="障碍赛" />
+                <ComboBoxItem Content="圈地战" />
+              </ComboBox>
+            </DockPanel>
+            <DockPanel Margin="0,8,0,0">
               <TextBlock Text="职业" VerticalAlignment="Center" Margin="0,0,9,0" FontWeight="SemiBold" />
               <ComboBox x:Name="SnakeRole" SelectedIndex="0" MinHeight="27"
                         AutomationProperties.Name="贪吃蛇职业">
@@ -284,7 +298,7 @@
             <TextBlock x:Name="SnakeRoleGuide" Foreground="{StaticResource Muted}" FontSize="12"
                        TextWrapping="Wrap" Margin="0,4,0,1" />
             <DockPanel Margin="0,7,0,9" LastChildFill="False">
-              <TextBlock Text="分数" VerticalAlignment="Center"
+              <TextBlock x:Name="SnakeScoreLabel" Text="分数" VerticalAlignment="Center"
                          Foreground="{StaticResource Muted}" FontSize="12" />
               <TextBlock DockPanel.Dock="Right" x:Name="SnakeScore" Text="0" FontFamily="Consolas"
                          FontSize="27" FontWeight="Bold" Foreground="#1A5F44" />

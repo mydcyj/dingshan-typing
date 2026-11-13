@@ -28,6 +28,7 @@ namespace EnglishTypingPractice
         private readonly Action<SnakeMatchState, int> update;
         private readonly Action exited;
         private readonly Func<SnakeRole> selectedRole;
+        private readonly Func<SnakeMode> selectedMode;
         private readonly DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(45) };
         private LanHost host;
         private LanClient client;
@@ -36,12 +37,14 @@ namespace EnglishTypingPractice
         private int action;
         private bool busy;
 
-        internal LanLobby(Window window, Action entered, Action<SnakeMatchState, int> update, Action exited, Func<SnakeRole> selectedRole)
+        internal LanLobby(Window window, Action entered, Action<SnakeMatchState, int> update, Action exited,
+            Func<SnakeRole> selectedRole, Func<SnakeMode> selectedMode)
         {
             this.entered = entered;
             this.update = update;
             this.exited = exited;
             this.selectedRole = selectedRole;
+            this.selectedMode = selectedMode;
             panel = (FrameworkElement)window.FindName("LanPanel");
             name = (TextBox)window.FindName("LanName");
             roomName = (TextBox)window.FindName("LanRoomName");
@@ -111,6 +114,14 @@ namespace EnglishTypingPractice
                 client.SetRole(role);
         }
 
+        internal void SetMode(SnakeMode mode)
+        {
+            if (host == null)
+                return;
+            host.SetMode(mode);
+            RefreshRoom();
+        }
+
         private void CreateRoom()
         {
             string player = name.Text.Trim();
@@ -127,6 +138,7 @@ namespace EnglishTypingPractice
             try
             {
                 host = new LanHost(room, player, role: selectedRole());
+                host.SetMode(selectedMode());
             }
             catch (SocketException)
             {
@@ -245,7 +257,7 @@ namespace EnglishTypingPractice
             if (ReferenceEquals(state, latest))
                 return;
             int slot = host != null ? 0 : client.Slot;
-            if (latest == null || latest.Phase != state.Phase || latest.Round != state.Round ||
+            if (latest == null || latest.Phase != state.Phase || latest.Round != state.Round || latest.Mode != state.Mode ||
                 !latest.Players.Select(PlayerLine).SequenceEqual(state.Players.Select(PlayerLine)))
                 RenderRoster(state, slot);
             latest = state;
@@ -254,12 +266,15 @@ namespace EnglishTypingPractice
 
         private void RenderRoster(SnakeMatchState state, int slot)
         {
+            bool territory = state.Mode == SnakeMode.Territory;
+            string unit = territory ? " 格" : " 分";
             if (state.Phase == MatchPhase.Finished)
             {
                 var ranked = state.Rankings;
-                roster.Text = "本局排行榜\n" + string.Join("\n", ranked.Select(player =>
+                roster.Text = (territory && ranked.Length > 0 ? SnakePractice.TerritoryResult(state) + "\n" : "") +
+                    "本局排行榜\n" + string.Join("\n", ranked.Select(player =>
                     (1 + ranked.Count(other => other.Score > player.Score)) + ". " + player.Name +
-                    "  " + player.Score + " 分"));
+                    "  " + player.Score + unit));
                 return;
             }
             string title = state.Room + (state.Phase == MatchPhase.Lobby ? " · " + state.Players.Length + "/4" : "");
@@ -270,11 +285,11 @@ namespace EnglishTypingPractice
             {
                 roster.Inlines.Add(new System.Windows.Documents.LineBreak());
                 var dot = new System.Windows.Documents.Run("● ")
-                    { Foreground = SnakeBoard.PlayerColor(player.Slot, slot) };
+                    { Foreground = SnakeBoard.PlayerColor(player.Slot, slot, territory) };
                 roster.Inlines.Add(dot);
                 roster.Inlines.Add(new System.Windows.Documents.Run(PlayerLabel(player, slot) +
                     " · " + SnakeWords.RoleName(player.Role) +
-                    (state.Phase == MatchPhase.Playing ? "  " + player.Score + " 分" : "") +
+                    (state.Phase == MatchPhase.Playing ? "  " + player.Score + unit : "") +
                     (player.Result == SnakeResult.Left ? " · 已离开" :
                         state.Phase == MatchPhase.Playing && player.Result != SnakeResult.Running ? " · 出局" : "")));
             }
