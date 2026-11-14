@@ -52,6 +52,8 @@ namespace EnglishTypingPractice
                 case SnakeMode.Obstacles: return "障碍赛";
                 case SnakeMode.Territory: return "圈地战";
                 case SnakeMode.Teams: return "团战";
+                case SnakeMode.Race: return "镜像竞速";
+                case SnakeMode.Power: return "四区供电";
                 default: return "经典";
             }
         }

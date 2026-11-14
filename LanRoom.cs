@@ -241,7 +241,7 @@ namespace EnglishTypingPractice
                 }
                 if (!match.Start())
                 {
-                    failure = "团战人数至少要达到队伍数。";
+                    failure = match.NextMode == SnakeMode.Power ? "四区供电至少需要两名玩家。" : "团战人数至少要达到队伍数。";
                     return false;
                 }
                 clock.Restart();
@@ -312,6 +312,16 @@ namespace EnglishTypingPractice
                 if (!closed && match.Phase != MatchPhase.Playing && match.NextTeamCount != count)
                 {
                     match.SetTeamCount(count);
+                    ClearReadiness();
+                }
+        }
+
+        internal void SetUniformRaceRole(bool uniform)
+        {
+            lock (sync)
+                if (!closed && match.Phase != MatchPhase.Playing && match.UniformRaceRole != uniform)
+                {
+                    match.SetUniformRaceRole(uniform);
                     ClearReadiness();
                 }
         }
@@ -837,7 +847,9 @@ namespace EnglishTypingPractice
         private static bool ValidState(SnakeMatchState state, int slot)
         {
             if (state == null || !LanWire.IsName(state.Room, 24) ||
-                (state.Mode == SnakeMode.Teams ? state.Size != SnakeTeams.Size : state.Size < 32 ||
+                (state.Mode == SnakeMode.Race ? state.Size != SnakeRace.Size :
+                    state.Mode == SnakeMode.Power ? state.Size != SnakePower.Size :
+                    state.Mode == SnakeMode.Teams ? state.Size != SnakeTeams.Size : state.Size < 32 ||
                     state.Size > 80 || (state.Size - 32) % 16 != 0) || !Enum.IsDefined(typeof(MatchPhase), state.Phase) ||
                 !Enum.IsDefined(typeof(SnakeMode), state.Mode) || !Enum.IsDefined(typeof(SnakeMode), state.NextMode) ||
                 state.Players == null || state.Players.Length == 0 || state.Players.Length > 4 ||
@@ -872,11 +884,22 @@ namespace EnglishTypingPractice
                 if (cell < 0 || cell >= cells)
                     return false;
             bool territory = state.Mode == SnakeMode.Territory && state.Phase != MatchPhase.Lobby;
+            bool race = state.Mode == SnakeMode.Race && state.Phase != MatchPhase.Lobby;
+            bool power = state.Mode == SnakeMode.Power && state.Phase != MatchPhase.Lobby;
+            if (state.RaceTarget < -1 || state.RaceTarget >= cells || (!race && (state.RaceSeed != 0 || state.RaceTarget != -1)) ||
+                (race && state.RaceSeed <= 0) || state.PowerStations == null || state.PowerStations.Length != (power ? 4 : 0) ||
+                (state.PowerWon && !power))
+                return false;
+            foreach (var station in state.PowerStations)
+                if (station == null || station.Center < 0 || station.Center >= cells || station.Required < 4 || station.Required > 6 ||
+                    station.Charge < 0 || station.Charge > station.Required)
+                    return false;
             if (state.Obstacles == null || state.Obstacles.Length > cells ||
-                state.Remaining < 0 || state.Remaining > (teams ? SnakeTeams.Duration : SnakeTerritory.Duration) ||
+                state.Remaining < 0 || state.Remaining > (teams ? SnakeTeams.Duration : race ? SnakeRace.Duration :
+                    power ? SnakePower.Duration : territory ? SnakeTerritory.Duration : 0) ||
                 (territory ? state.Land == null || state.Trails == null ||
                     state.Land.Length != cells || state.Trails.Length != cells
-                    : state.Land != null || state.Trails != null || (!teams && state.Remaining != 0)))
+                    : state.Land != null || state.Trails != null))
                 return false;
             if (territory)
                 for (int i = 0; i < cells; i++)
@@ -909,10 +932,10 @@ namespace EnglishTypingPractice
                     return false;
                 if (player.Team < -1 || player.Team >= state.TeamCount || player.Carrying < 0 ||
                     player.Carrying > state.TeamBalls.Length || player.RespawnRemaining < 0 ||
-                    player.RespawnRemaining > SnakeTeams.RespawnDelay + 1000 || (!teams && player.RespawnRemaining != 0))
+                    player.RespawnRemaining > (teams ? SnakeTeams.RespawnDelay : power ? SnakePower.RespawnDelay : 0))
                     return false;
                 if (!SnakeTypingPreview.IsValidText(player.Typing, player.TypingSkill) ||
-                    (player.TypingSkill && !SnakeWords.HasSkill(player.Role)))
+                    (player.TypingSkill && !SnakeWords.HasSkill(player.Role, state.Mode)))
                     return false;
                 if (player.Stabilizing && (player.Role != SnakeRole.Stabilizer || player.Result != SnakeResult.Running))
                     return false;
@@ -925,6 +948,12 @@ namespace EnglishTypingPractice
                 if (player.Turns < 0 || player.Turns > player.WordCount || player.SkillHits < 0 ||
                     player.Deliveries < 0 || player.LandGained < 0 || player.LandLost < 0 || player.SurvivalMs < 0)
                     return false;
+                if (player.RaceProgress < 0 || player.RaceProgress > (race ? SnakeRace.CheckpointCount : 0) ||
+                    player.RacePenaltyMs < 0 || player.RaceFinishMs < -1 || player.RaceCheckpointMs < 0 ||
+                    (!race && (player.RacePenaltyMs != 0 || player.RaceFinishMs != -1 || player.RaceCheckpointMs != 0)) ||
+                    (race && player.Slot != slot && player.Body.Length != 0) ||
+                    player.PowerContribution < 0 || player.PowerContribution > (power ? 24 : 0))
+                    return false;
                 foreach (int cell in player.Body)
                     if (cell < 0 || cell >= cells)
                         return false;
@@ -932,7 +961,7 @@ namespace EnglishTypingPractice
                     state.Words.Length != 4 * SnakeWords.Variants(player.Role))
                     return false;
                 if (player.Slot == slot && state.Phase == MatchPhase.Playing &&
-                    (SnakeWords.HasSkill(player.Role) ? !SnakeWords.IsSkillWord(state.ChargeWord, player.Role) :
+                    (SnakeWords.HasSkill(player.Role, state.Mode) ? !SnakeWords.IsSkillWord(state.ChargeWord, player.Role) :
                         state.ChargeWord != null))
                     return false;
             }

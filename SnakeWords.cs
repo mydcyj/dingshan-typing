@@ -105,6 +105,12 @@ namespace EnglishTypingPractice
             return role == SnakeRole.Fearless || role == SnakeRole.Hunter || role == SnakeRole.Bard || role == SnakeRole.Stabilizer;
         }
 
+        internal static bool HasSkill(SnakeRole role, SnakeMode mode)
+        {
+            return HasSkill(role) && ((mode != SnakeMode.Race && mode != SnakeMode.Power) ||
+                (role != SnakeRole.Hunter && role != SnakeRole.Bard));
+        }
+
         internal static string DrawCharge(Random random, string previous, SnakeRole role)
         {
             var pool = role == SnakeRole.Fearless ? ChargeWords : role == SnakeRole.Stabilizer ? StabilizerWords :

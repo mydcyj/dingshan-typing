@@ -30,6 +30,7 @@ namespace EnglishTypingPractice
         private readonly FrameworkElement audioControls;
         private readonly FrameworkElement masterControl;
         private readonly ComboBox teamPicker;
+        private readonly CheckBox uniformRaceRole;
         private readonly TextBlock teamLabel;
         private readonly RoomMusic music;
         private readonly Action entered;
@@ -80,6 +81,15 @@ namespace EnglishTypingPractice
             audioControls = (FrameworkElement)window.FindName("LanAudioControls");
             masterControl = (FrameworkElement)window.FindName("LanMasterControl");
             teamPicker = (ComboBox)window.FindName("LanTeamCount");
+            uniformRaceRole = (CheckBox)window.FindName("LanUniformRaceRole");
+            uniformRaceRole.Click += (sender, e) =>
+            {
+                if (host != null)
+                {
+                    host.SetUniformRaceRole(uniformRaceRole.IsChecked == true);
+                    RefreshRoom();
+                }
+            };
             teamLabel = (TextBlock)window.FindName("LanTeamsLabel");
             music = new RoomMusic((TextBlock)window.FindName("LanMusicStatus"), settings);
             BindVolume(window, "LanMaster", settings.RoomMasterVolume, value =>
@@ -402,6 +412,9 @@ namespace EnglishTypingPractice
                 return;
             int slot = host != null ? 0 : client.Slot;
             bool teamMode = state.NextMode == SnakeMode.Teams;
+            uniformRaceRole.Visibility = state.NextMode == SnakeMode.Race ? Visibility.Visible : Visibility.Collapsed;
+            uniformRaceRole.IsEnabled = host != null && state.Phase != MatchPhase.Playing;
+            uniformRaceRole.IsChecked = state.RaceUniformRole;
             teamPicker.Visibility = teamMode && host != null ? Visibility.Visible : Visibility.Collapsed;
             teamPicker.IsEnabled = state.Phase != MatchPhase.Playing;
             teamLabel.Visibility = teamMode ? Visibility.Visible : Visibility.Collapsed;
@@ -414,7 +427,8 @@ namespace EnglishTypingPractice
             ready.Content = host != null ? "返回准备" : state.ReadySlots.Contains(slot) ? "取消准备" : "准备";
             rules.Visibility = Visibility.Visible;
             rules.Text = "房主设置 · " + LanDiscovery.ModeName(state.NextMode) +
-                (teamMode ? " · " + state.NextTeamCount + " 队 · 每局随机分队" : "") + " · " + LanWire.AppVersion;
+                (teamMode ? " · " + state.NextTeamCount + " 队 · 每局随机分队" :
+                    state.NextMode == SnakeMode.Race && state.RaceUniformRole ? " · 统一职业" : "") + " · " + LanWire.AppVersion;
             if (latest == null || latest.Phase != state.Phase || latest.Round != state.Round || latest.Mode != state.Mode ||
                 !latest.Players.Select(PlayerLine).SequenceEqual(state.Players.Select(PlayerLine)) ||
                 !latest.ReadySlots.SequenceEqual(state.ReadySlots) || !latest.ReconnectingSlots.SequenceEqual(state.ReconnectingSlots) ||
@@ -427,6 +441,18 @@ namespace EnglishTypingPractice
 
         private void RenderRoster(SnakeMatchState state, int slot)
         {
+            if (state.Phase != MatchPhase.Lobby && (state.Mode == SnakeMode.Race || state.Mode == SnakeMode.Power))
+            {
+                var players = state.Phase == MatchPhase.Finished ? state.Rankings : state.Players;
+                roster.Text = (state.Phase != MatchPhase.Finished ? state.Room : state.Mode == SnakeMode.Race ? "竞速排名" :
+                    state.PowerWon ? "四区供电成功" : "供电未完成") + "\n" + string.Join("\n", players.Select((player, i) =>
+                        (state.Mode == SnakeMode.Race && state.Phase == MatchPhase.Finished ?
+                            (1 + players.Take(i).Count(other => RaceAhead(other, player))) + ". " : "") +
+                        PlayerLabel(player, slot) + " · " + (state.Mode == SnakeMode.Race ?
+                            SnakePractice.RaceResult(player) : "充能 " + player.PowerContribution + " 格") +
+                        (state.ReconnectingSlots.Contains(player.Slot) ? " · 重连中" : "")));
+                return;
+            }
             if (state.TeamCount > 0)
             {
                 RenderTeams(state, slot);
@@ -464,6 +490,16 @@ namespace EnglishTypingPractice
             }
         }
 
+        private static bool RaceAhead(SnakePlayerState other, SnakePlayerState player)
+        {
+            if ((other.Result == SnakeResult.Left) != (player.Result == SnakeResult.Left))
+                return player.Result == SnakeResult.Left;
+            if (other.RaceFinishMs >= 0 && player.RaceFinishMs >= 0)
+                return other.RaceFinishMs < player.RaceFinishMs;
+            return other.RaceProgress > player.RaceProgress ||
+                (other.RaceProgress == player.RaceProgress && other.RaceCheckpointMs < player.RaceCheckpointMs);
+        }
+
         private void RenderTeams(SnakeMatchState state, int slot)
         {
             int best = state.TeamScores.Max();
@@ -487,7 +523,8 @@ namespace EnglishTypingPractice
         private static string PlayerLine(SnakePlayerState player)
         {
             return player.Slot + " " + player.Name + " " + player.Score + " " + player.Result + " " + player.Role +
-                " " + player.Team + " " + player.Carrying;
+                " " + player.Team + " " + player.Carrying + " " + player.RaceProgress + " " + player.RaceFinishMs +
+                " " + player.RacePenaltyMs + " " + player.PowerContribution;
         }
 
         private static string PlayerLabel(SnakePlayerState player, int slot)
@@ -497,6 +534,7 @@ namespace EnglishTypingPractice
 
         internal void Close(bool intentional = true)
         {
+            uniformRaceRole.Visibility = Visibility.Collapsed;
             action++;
             timer.Stop();
             music.Close();

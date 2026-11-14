@@ -116,7 +116,7 @@ namespace EnglishTypingPractice
             spawnDirection = direction;
             chargeUntil = stunUntil = stabilizationUntil = stabilizeReadyAt = 0;
             nextMoveAt = Interval(0);
-            ChargeWord = SnakeWords.HasSkill(role) ? SnakeWords.DrawCharge(random, ChargeWord, role) : null;
+            ChargeWord = SnakeWords.HasSkill(role, mode) ? SnakeWords.DrawCharge(random, ChargeWord, role) : null;
             chargeGroup++;
             ResetBody(y * size + x, direction);
         }
@@ -176,7 +176,7 @@ namespace EnglishTypingPractice
 
         internal bool TryCharge(string word, int group, long now)
         {
-            if (!IsRunning || !SnakeWords.HasSkill(Role) || IsStunned(now) || IsCharging(now) || IsStabilizing(now) ||
+            if (!IsRunning || !SnakeWords.HasSkill(Role, mode) || IsStunned(now) || IsCharging(now) || IsStabilizing(now) ||
                 StabilizerCooldownRemaining(now) > 0 || group != chargeGroup ||
                 !string.Equals(word, ChargeWord, StringComparison.OrdinalIgnoreCase))
                 return false;
@@ -435,10 +435,15 @@ namespace EnglishTypingPractice
 
         internal void Respawn(long now, int? head = null)
         {
+            RespawnAt(now, head ?? (spawnY * Size + spawnX), spawnDirection);
+        }
+
+        internal void RespawnAt(long now, int head, SnakeDirection direction)
+        {
             Respawns++;
             chargeUntil = stunUntil = stabilizationUntil = 0;
             nextMoveAt = now + Interval(now);
-            ResetBody(head ?? (spawnY * Size + spawnX), spawnDirection);
+            ResetBody(head, direction);
         }
 
         internal int SpawnHead { get { return spawnY * Size + spawnX; } }

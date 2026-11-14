@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace EnglishTypingPractice
 {
-    internal enum SnakeMode { Classic, Obstacles, Territory, Teams }
+    internal enum SnakeMode { Classic, Obstacles, Territory, Teams, Race, Power }
 
     internal struct SnakeBounds
     {

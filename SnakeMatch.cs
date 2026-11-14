@@ -48,6 +48,11 @@ namespace EnglishTypingPractice
         public int LandGained { get; set; }
         public int LandLost { get; set; }
         public long SurvivalMs { get; set; }
+        public int RaceProgress { get; set; }
+        public int RacePenaltyMs { get; set; }
+        public int RaceFinishMs { get; set; }
+        public int RaceCheckpointMs { get; set; }
+        public int PowerContribution { get; set; }
     }
 
     internal sealed class SnakeMatchState
@@ -82,6 +87,11 @@ namespace EnglishTypingPractice
         public SnakePlayerState[] Rankings { get; set; }
         public int[] ReadySlots { get; set; }
         public int[] ReconnectingSlots { get; set; }
+        public int RaceSeed { get; set; }
+        public int RaceTarget { get; set; }
+        public bool RaceUniformRole { get; set; }
+        public PowerStation[] PowerStations { get; set; }
+        public bool PowerWon { get; set; }
     }
 
     internal sealed class SnakeMatch
@@ -118,6 +128,9 @@ namespace EnglishTypingPractice
         private int[] obstacleCells = new int[0];
         private SnakeTerritory territory;
         private SnakeTeams teams;
+        private SnakeRace race;
+        private SnakePower power;
+        private bool uniformRaceRole;
         private int teamCount = 2;
         private SnakeMode mode;
         private SnakeMode nextMode;
@@ -133,6 +146,7 @@ namespace EnglishTypingPractice
         internal int Round { get { return round; } }
         internal SnakeMode NextMode { get { return nextMode; } }
         internal int NextTeamCount { get { return teamCount; } }
+        internal bool UniformRaceRole { get { return uniformRaceRole; } }
         internal int Count { get { return players.Count(player => player != null && player.Connected); } }
         internal bool CanJoin { get { return Phase != MatchPhase.Playing && Count < players.Length; } }
         internal bool HasBurst { get { return players.Any(player => player != null && player.BurstUntil > now); } }
@@ -172,6 +186,12 @@ namespace EnglishTypingPractice
                 teamCount = count;
         }
 
+        internal void SetUniformRaceRole(bool uniform)
+        {
+            if (Phase != MatchPhase.Playing)
+                uniformRaceRole = uniform;
+        }
+
         internal bool ResetLobby()
         {
             if (Phase != MatchPhase.Finished)
@@ -186,6 +206,8 @@ namespace EnglishTypingPractice
                 }
             teams = null;
             territory = null;
+            race = null;
+            power = null;
             now = 0;
             smallFruits.Clear();
             shots.Clear();
@@ -208,10 +230,16 @@ namespace EnglishTypingPractice
                 return;
             player.Connected = false;
             if (player.Snake != null)
+            {
                 player.Snake.Leave();
+                if (player.RespawnAt > 0)
+                    player.RespawnAt = 0;
+            }
             if (Phase != MatchPhase.Playing)
                 return;
-            if (territory != null)
+            if (race != null || power != null)
+                FinishNewModeIfDecided();
+            else if (territory != null)
                 territory.ClearTrail(slot);
             else if (teams != null)
                 teams.Return(slot, ActivePlayers().SelectMany(other => other.Snake.Body));
@@ -221,14 +249,18 @@ namespace EnglishTypingPractice
 
         internal bool Start()
         {
-            if (Phase == MatchPhase.Playing || (nextMode == SnakeMode.Teams && (solo || Count < teamCount)))
+            if (Phase == MatchPhase.Playing || (nextMode == SnakeMode.Teams && (solo || Count < teamCount)) ||
+                (nextMode == SnakeMode.Power && (solo || Count < 2)))
                 return false;
             round++;
             now = 0;
             participants = Count;
             mode = nextMode;
-            size = mode == SnakeMode.Teams ? SnakeTeams.Size :
+            size = mode == SnakeMode.Race ? SnakeRace.Size : mode == SnakeMode.Power ? SnakePower.Size :
+                mode == SnakeMode.Teams ? SnakeTeams.Size :
                 solo && mode == SnakeMode.Classic ? soloClassicSize : SnakeGame.BoardSize(participants);
+            race = mode == SnakeMode.Race ? new SnakeRace(solo ? SnakeRace.SoloSeed : random.Next(1, int.MaxValue)) : null;
+            power = mode == SnakeMode.Power ? new SnakePower(participants, random) : null;
             teams = mode == SnakeMode.Teams ? new SnakeTeams(teamCount,
                 Enumerable.Range(0, players.Length).Where(slot => players[slot] != null && players[slot].Connected).ToArray(), random) : null;
             bounds = new SnakeBounds(size, 0);
@@ -253,12 +285,19 @@ namespace EnglishTypingPractice
                     players[slot] = null;
                     continue;
                 }
-                player.Snake = new SnakeGame(random);
+                player.Snake = new SnakeGame(race == null ? random : new Random(race.Seed));
                 player.BurstCell = -1;
                 player.BurstUntil = 0;
                 player.RespawnAt = 0;
                 player.Preview = null;
-                if (teams != null)
+                if (race != null)
+                    race.Start(slot, player.Snake, uniformRaceRole ? players[0].Role : player.Role);
+                else if (power != null)
+                {
+                    int cell = power.Spawn(seat);
+                    player.Snake.Start(size, cell % size, cell / size, directions[seat], player.Role, mode);
+                }
+                else if (teams != null)
                 {
                     int team = teams.Team(slot);
                     int cell = SnakeTeams.Spawn(team, teams.Count, teamSeats[team]++ > 0);
@@ -270,16 +309,16 @@ namespace EnglishTypingPractice
                     player.Snake.Start(size, xs[seat], ys[seat], directions[seat], player.Role, mode);
                 seat++;
             }
-            obstacles = mode == SnakeMode.Obstacles
+            obstacles = race != null ? race.Obstacles : power != null ? power.Obstacles : mode == SnakeMode.Obstacles
                 ? SnakeObstacles.Create(size, ActivePlayers().SelectMany(player => player.Snake.Body), random)
                 : new HashSet<int>();
-            obstacleCells = obstacles.ToArray();
+            obstacleCells = race == null ? obstacles.ToArray() : race.ObstacleCells;
             territory = mode == SnakeMode.Territory ? new SnakeTerritory(size) : null;
             if (teams != null)
                 teams.PlaceInitial(ActivePlayers().SelectMany(player => player.Snake.Body));
-            else if (territory == null)
+            else if (territory == null && race == null && power == null)
                 FillFruits();
-            else
+            else if (territory != null)
                 for (int slot = 0; slot < players.Length; slot++)
                     if (players[slot] != null)
                         territory.Visit(slot, players[slot].Snake.Body.First.Value);
@@ -291,7 +330,18 @@ namespace EnglishTypingPractice
             if (Phase != MatchPhase.Playing || roundNumber != round || HasEnded(elapsed))
                 return false;
             var player = players[slot];
-            return player != null && player.Connected && player.Snake.TryWord(word, group, elapsed);
+            if (player == null || !player.Connected)
+                return false;
+            var snake = player.Snake;
+            var previous = snake.Direction;
+            if (!snake.TryWord(word, group, elapsed))
+                return false;
+            if (power != null && snake.Direction != previous)
+            {
+                power.Charge(slot, snake.Body.First.Value, elapsed);
+                FinishNewModeIfDecided();
+            }
+            return true;
         }
 
         internal void SetPreview(int slot, SnakeTypingPreview preview, long elapsed)
@@ -299,7 +349,7 @@ namespace EnglishTypingPractice
             var player = players[slot];
             if (Phase != MatchPhase.Playing || preview.Round != round || HasEnded(elapsed) || player == null ||
                 !player.Connected || !player.Snake.IsRunning || player.Snake.IsStunned(elapsed) ||
-                preview.Respawns != player.Snake.Respawns || (preview.Skill && !SnakeWords.HasSkill(player.Snake.Role)) ||
+                preview.Respawns != player.Snake.Respawns || (preview.Skill && !SnakeWords.HasSkill(player.Snake.Role, mode)) ||
                 !SnakeTypingPreview.IsValidText(preview.Text, preview.Skill))
                 return;
             player.Preview = preview;
@@ -361,7 +411,8 @@ namespace EnglishTypingPractice
 
         private bool HasEnded(long elapsed)
         {
-            return territory != null && elapsed >= SnakeTerritory.Duration || teams != null && elapsed >= SnakeTeams.Duration;
+            return territory != null && elapsed >= SnakeTerritory.Duration || teams != null && elapsed >= SnakeTeams.Duration ||
+                race != null && elapsed >= SnakeRace.Duration || power != null && elapsed >= SnakePower.Duration;
         }
 
         internal void Step(long elapsed)
@@ -381,6 +432,13 @@ namespace EnglishTypingPractice
             }
             if (teams != null)
                 ReviveTeamPlayers();
+            if (power != null)
+                foreach (var player in players)
+                    if (player != null && player.Connected && player.RespawnAt > 0 && player.RespawnAt <= now)
+                    {
+                        player.Snake.Respawn(now);
+                        player.RespawnAt = 0;
+                    }
             var active = ActivePlayers().ToArray();
             if (mode == SnakeMode.Classic)
             {
@@ -427,6 +485,23 @@ namespace EnglishTypingPractice
         {
             if (due.Length == 0)
                 return;
+            if (race != null || power != null)
+            {
+                foreach (var snake in due)
+                {
+                    int slot = Slot(snake);
+                    if (race != null)
+                        race.Move(slot, snake, now);
+                    else
+                    {
+                        power.Move(snake);
+                        if (!snake.IsRunning)
+                            players[slot].RespawnAt = now + SnakePower.RespawnDelay;
+                    }
+                }
+                FinishNewModeIfDecided();
+                return;
+            }
             if (territory != null)
             {
                 MoveTerritory(due);
@@ -675,7 +750,8 @@ namespace EnglishTypingPractice
         internal SnakeMatchState Snapshot(string room, int slot)
         {
             var own = players[slot].Snake;
-            int displaySize = Phase == MatchPhase.Lobby ? (nextMode == SnakeMode.Teams ? SnakeTeams.Size : SnakeGame.BoardSize(Count)) : size;
+            int displaySize = Phase != MatchPhase.Lobby ? size : nextMode == SnakeMode.Race ? SnakeRace.Size :
+                nextMode == SnakeMode.Power ? SnakePower.Size : nextMode == SnakeMode.Teams ? SnakeTeams.Size : SnakeGame.BoardSize(Count);
             return new SnakeMatchState
             {
                 Room = room,
@@ -687,7 +763,8 @@ namespace EnglishTypingPractice
                 Land = territory == null ? null : territory.Land,
                 Trails = territory == null ? null : territory.Trails,
                 Remaining = (int)Math.Max(0, (teams != null ? SnakeTeams.Duration :
-                    territory != null ? SnakeTerritory.Duration : 0) - now),
+                    territory != null ? SnakeTerritory.Duration : race != null ? SnakeRace.Duration :
+                    power != null ? SnakePower.Duration : 0) - now),
                 SafeStart = Phase == MatchPhase.Lobby ? 0 : bounds.Start,
                 SafeEnd = Phase == MatchPhase.Lobby ? displaySize : bounds.End,
                 TeamCount = teams == null ? 0 : teams.Count,
@@ -704,12 +781,17 @@ namespace EnglishTypingPractice
                 ChargeWord = own == null ? null : own.ChargeWord,
                 Round = round,
                 Words = own == null ? new string[0] : own.Words,
-                Players = PlayerStates(),
-                Rankings = rankings
+                Players = PlayerStates(race == null ? -1 : slot),
+                Rankings = rankings,
+                RaceSeed = race == null ? 0 : race.Seed,
+                RaceTarget = race == null || Phase != MatchPhase.Playing || own == null || !own.IsRunning ? -1 : race.NextCheckpoint(slot),
+                RaceUniformRole = uniformRaceRole,
+                PowerStations = power == null ? new PowerStation[0] : power.Snapshot(Math.Min(now, SnakePower.Duration)),
+                PowerWon = power != null && power.IsComplete
             };
         }
 
-        private SnakePlayerState[] PlayerStates()
+        private SnakePlayerState[] PlayerStates(int visibleRaceSlot = -1)
         {
             var result = new List<SnakePlayerState>(players.Length);
             for (int slot = 0; slot < players.Length; slot++)
@@ -725,7 +807,8 @@ namespace EnglishTypingPractice
                 {
                     Slot = slot,
                     Name = player.Name,
-                    Score = territory != null ? territory.Score(slot) : snake == null ? 0 : snake.Score,
+                    Score = territory != null ? territory.Score(slot) : power != null ? power.Contribution(slot) :
+                        snake == null ? 0 : snake.Score,
                     Direction = snake == null ? SnakeDirection.North : snake.Direction,
                     Result = snake == null ? SnakeResult.Ready : snake.Result,
                     Role = Phase == MatchPhase.Playing && snake != null ? snake.Role : player.Role,
@@ -733,7 +816,7 @@ namespace EnglishTypingPractice
                     Respawns = snake == null ? 0 : snake.Respawns,
                     Team = teams == null || snake == null ? -1 : teams.Team(slot),
                     Carrying = teams == null || snake == null ? 0 : teams.Carrying(slot),
-                    RespawnRemaining = teams != null && player.Connected && Phase == MatchPhase.Playing
+                    RespawnRemaining = (teams != null || power != null) && player.Connected && Phase == MatchPhase.Playing
                         ? (int)Math.Max(0, player.RespawnAt - now) : 0,
                     Charging = snake != null && snake.IsCharging(now),
                     Stabilizing = snake != null && snake.IsStabilizing(now),
@@ -749,7 +832,13 @@ namespace EnglishTypingPractice
                     LandGained = territory == null ? 0 : territory.Gained(slot),
                     LandLost = territory == null ? 0 : territory.Lost(slot),
                     SurvivalMs = snake == null ? 0 : snake.SurvivalMs,
-                    Body = snake != null && (snake.IsRunning || snake.Result == SnakeResult.Survived ||
+                    RaceProgress = race == null ? 0 : race.Progress(slot),
+                    RacePenaltyMs = race == null ? 0 : race.PenaltyMs(slot),
+                    RaceFinishMs = race == null ? -1 : race.FinishMs(slot),
+                    RaceCheckpointMs = race == null ? 0 : race.LastCheckpointMs(slot),
+                    PowerContribution = power == null ? 0 : power.Contribution(slot),
+                    Body = snake != null && (visibleRaceSlot < 0 || slot == visibleRaceSlot) &&
+                        (snake.IsRunning || snake.Result == SnakeResult.Survived ||
                         snake.Result == SnakeResult.Won || snake.Result == SnakeResult.TimeUp) ? snake.Body.ToArray() : new int[0]
                 });
             }
@@ -760,8 +849,21 @@ namespace EnglishTypingPractice
         {
             Phase = MatchPhase.Finished;
             shots.Clear();
-            rankings = PlayerStates().Where(player => territory == null || player.Result != SnakeResult.Left)
+            var standings = PlayerStates(race == null ? -1 : players.Length);
+            rankings = race != null ? race.Rank(standings).ToArray() : standings.Where(player => territory == null || player.Result != SnakeResult.Left)
                 .OrderByDescending(player => player.Score).ThenBy(player => player.Slot).ToArray();
+        }
+
+        private void FinishNewModeIfDecided()
+        {
+            if (race != null && !ActivePlayers().Any())
+                Finish();
+            else if (power != null && (power.IsComplete || Count < 2))
+            {
+                foreach (var player in ActivePlayers())
+                    player.Snake.End(power.IsComplete ? SnakeResult.Won : SnakeResult.TimeUp);
+                Finish();
+            }
         }
 
         private void FinishIfDecided()
