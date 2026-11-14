@@ -38,6 +38,7 @@ namespace EnglishTypingPractice
             { SnakeBotDifficulty.Easy, SnakeBotDifficulty.Normal, SnakeBotDifficulty.Hard, SnakeBotDifficulty.Hell };
         private readonly TextBlock teamLabel;
         private readonly RoomMusic music;
+        private readonly SnakeBoard board;
         private readonly Action entered;
         private readonly Action<SnakeMatchState, int> update;
         private readonly Action exited;
@@ -57,7 +58,8 @@ namespace EnglishTypingPractice
         private string displayedNickname;
 
         internal LanLobby(Window window, Action entered, Action<SnakeMatchState, int> update, Action exited,
-            Func<SnakeRole> selectedRole, Func<SnakeMode> selectedMode, PracticeSettings settings, Action saveSettings)
+            Func<SnakeRole> selectedRole, Func<SnakeMode> selectedMode, PracticeSettings settings, Action saveSettings,
+            SnakeBoard board)
         {
             this.entered = entered;
             this.update = update;
@@ -66,6 +68,7 @@ namespace EnglishTypingPractice
             this.selectedMode = selectedMode;
             this.settings = settings;
             this.saveSettings = saveSettings;
+            this.board = board;
             panel = (FrameworkElement)window.FindName("LanPanel");
             name = (TextBox)window.FindName("LanName");
             RefreshNickname();
@@ -519,7 +522,7 @@ namespace EnglishTypingPractice
             {
                 roster.Inlines.Add(new System.Windows.Documents.LineBreak());
                 var dot = new System.Windows.Documents.Run("● ")
-                    { Foreground = SnakeBoard.PlayerColor(player.Slot, slot, territory) };
+                    { Foreground = board.PlayerColor(player.Slot, slot, territory) };
                 roster.Inlines.Add(dot);
                 roster.Inlines.Add(new System.Windows.Documents.Run(PlayerLabel(player, slot) + (state.BotSlots.Contains(player.Slot) ? "（人机）" : "") +
                     " · " + SnakeWords.RoleName(player.Role) +
@@ -553,7 +556,7 @@ namespace EnglishTypingPractice
             {
                 roster.Inlines.Add(new System.Windows.Documents.LineBreak());
                 roster.Inlines.Add(new System.Windows.Documents.Run("● " + SnakeBoard.TeamName(team))
-                    { Foreground = SnakeBoard.PlayerColor(team, 0, true) });
+                    { Foreground = board.PlayerColor(team, 0, true) });
                 roster.Inlines.Add(" " + state.TeamScores[team] + " 球");
                 foreach (var player in state.Players.Where(player => player.Team == team))
                     roster.Inlines.Add(" · " + PlayerLabel(player, slot) +

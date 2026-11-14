@@ -33,6 +33,7 @@ namespace EnglishTypingPractice
         public bool SnakeLowEffects { get; set; }
         public string LocalNickname { get; set; }
         public string PracticeFont { get; set; }
+        public UiTheme Theme { get; set; }
         public Dictionary<string, int> SnakeReviewWords { get; set; }
         public Dictionary<string, int> SnakeRaceBest { get; set; }
         public PracticeLeaderboard PracticeRecords { get; set; }
@@ -53,6 +54,8 @@ namespace EnglishTypingPractice
                     ?? new PracticeSettings();
                 if (!Enum.IsDefined(typeof(PlaybackMode), settings.MusicMode))
                     settings.MusicMode = PlaybackMode.Sequential;
+                if (!Enum.IsDefined(typeof(UiTheme), settings.Theme))
+                    settings.Theme = UiTheme.Cyberpunk;
                 settings.MusicVolume = Math.Max(0, Math.Min(100, settings.MusicVolume));
                 settings.RoomMasterVolume = Math.Max(0, Math.Min(100, settings.RoomMasterVolume));
                 settings.RoomMusicVolume = Math.Max(0, Math.Min(100, settings.RoomMusicVolume));

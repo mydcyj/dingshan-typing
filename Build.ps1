@@ -37,6 +37,7 @@ try {
         ("/resource:{0},{1}.g.resources" -f $fontResources, [IO.Path]::GetFileNameWithoutExtension($Destination)) `
         (Join-Path $PSScriptRoot 'Program.cs') (Join-Path $PSScriptRoot 'PracticeSettings.cs') `
         (Join-Path $PSScriptRoot 'PracticeLeaderboard.cs') `
+        (Join-Path $PSScriptRoot 'ThemePalette.cs') `
         (Join-Path $PSScriptRoot 'StartupExperience.cs') `
         (Join-Path $PSScriptRoot 'InteractionMotion.cs') (Join-Path $PSScriptRoot 'SnakeBot.cs') `
         (Join-Path $PSScriptRoot 'TypingRound.cs') (Join-Path $PSScriptRoot 'SnakeTutorial.cs') `

@@ -9,7 +9,6 @@ using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
-using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
@@ -21,7 +20,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.2.1.0")]
+[assembly: System.Reflection.AssemblyVersion("2.2.2.0")]
 
 namespace EnglishTypingPractice
 {
@@ -32,29 +31,30 @@ namespace EnglishTypingPractice
         {
             Forms.Application.EnableVisualStyles();
             var app = new Application();
-            Window window;
-            using (var stream = typeof(Program).Assembly.GetManifestResourceStream("Window.xaml"))
-                window = (Window)XamlReader.Load(stream);
+            var settings = PracticeSettings.Load();
+            var window = ThemePalette.LoadWindow(settings.Theme);
             using (var stream = typeof(Program).Assembly.GetManifestResourceStream("TypingIcon.ico"))
                 window.Icon = BitmapFrame.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-            new Practice(window, showStartup: true);
+            new Practice(window, true, settings);
             app.Run(window);
         }
     }
 
     internal sealed class Practice
     {
-        private static readonly Brush Correct = new SolidColorBrush(Color.FromRgb(160, 224, 200));
-        private static readonly Brush Incorrect = new SolidColorBrush(Color.FromRgb(255, 190, 178));
-        private static readonly Brush IncorrectBackground = new SolidColorBrush(Color.FromRgb(84, 40, 47));
-        private static readonly Brush NextBackground = new SolidColorBrush(Color.FromRgb(83, 91, 35));
+        private readonly Brush correctBrush;
+        private readonly Brush incorrectBrush;
+        private readonly Brush incorrectBackground;
+        private readonly Brush nextBackground;
 
         private readonly Window window;
-        private readonly PracticeSettings settings = PracticeSettings.Load();
+        private readonly PracticeSettings settings;
         private readonly Random random = new Random();
         private readonly string[][] passages;
         private readonly Stopwatch clock = new Stopwatch();
         private readonly DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        private readonly Stopwatch autoPlayClock = new Stopwatch();
+        private readonly DispatcherTimer autoPlayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         private readonly MusicPlayback music;
         private readonly DispatcherTimer musicTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         private readonly SnakePractice snake;
@@ -86,6 +86,7 @@ namespace EnglishTypingPractice
         private readonly ComboBox reviewLevel;
         private readonly Button newPassage;
         private readonly Button retry;
+        private readonly Button autoPlay;
         private readonly TextBlock reviewMeaning;
         private readonly TextBlock practiceResult;
         private readonly ComboBox rankingOrder;
@@ -104,6 +105,8 @@ namespace EnglishTypingPractice
         private bool resetting;
         private bool updatingPlaylist;
         private bool composingChinese;
+        private bool completedRound;
+        private bool nextPracticeSpaceDown;
         private int roundGeneration;
         private string committedChinese = "";
         private TypingRound round;
@@ -115,8 +118,18 @@ namespace EnglishTypingPractice
         }
 
         internal Practice(Window window, bool showStartup)
+            : this(window, showStartup, PracticeSettings.Load())
+        {
+        }
+
+        internal Practice(Window window, bool showStartup, PracticeSettings settings)
         {
             this.window = window;
+            this.settings = settings;
+            correctBrush = (Brush)window.FindResource("PracticeCorrect");
+            incorrectBrush = (Brush)window.FindResource("PracticeIncorrect");
+            incorrectBackground = (Brush)window.FindResource("PracticeIncorrectBackground");
+            nextBackground = (Brush)window.FindResource("PracticeNextBackground");
             using (var reader = new StreamReader(typeof(Practice).Assembly.GetManifestResourceStream("Passages.json")))
                 passages = new JavaScriptSerializer().Deserialize<string[][]>(reader.ReadToEnd());
 
@@ -126,6 +139,7 @@ namespace EnglishTypingPractice
             reviewLevel = (ComboBox)window.FindName("ReviewLevel");
             newPassage = (Button)window.FindName("NewPassage");
             retry = (Button)window.FindName("Retry");
+            autoPlay = (Button)window.FindName("AutoPlay");
             reviewMeaning = (TextBlock)window.FindName("ReviewMeaning");
             practiceResult = (TextBlock)window.FindName("PracticeResult");
             rankingOrder = (ComboBox)window.FindName("PracticeRankingOrder");
@@ -177,6 +191,7 @@ namespace EnglishTypingPractice
             snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running), settings,
                 SaveSettings, effects.ShakeWindow);
             var practicePage = (FrameworkElement)window.FindName("PracticePage");
+            ConfigureSettingsPage(practicePage);
             Action closeRecord = () =>
             {
                 recordOverlay.Visibility = Visibility.Collapsed;
@@ -193,6 +208,35 @@ namespace EnglishTypingPractice
                 }
             };
             rankingOrder.SelectionChanged += (sender, e) => RefreshRanking();
+            window.PreviewKeyDown += (sender, e) =>
+            {
+                if (e.Key != Key.Space)
+                    return;
+                if (nextPracticeSpaceDown)
+                {
+                    e.Handled = true;
+                    return;
+                }
+                if (!completedRound || !practicePage.IsVisible || Keyboard.Modifiers != ModifierKeys.None ||
+                    !(typed.IsKeyboardFocusWithin || recordOverlay.IsKeyboardFocusWithin))
+                    return;
+                e.Handled = true;
+                if (e.IsRepeat)
+                    return;
+                nextPracticeSpaceDown = true;
+                if (recordOverlay.IsVisible)
+                    closeRecord();
+                NextPassage();
+            };
+            window.PreviewKeyUp += (sender, e) =>
+            {
+                if (e.Key == Key.Space && nextPracticeSpaceDown)
+                {
+                    nextPracticeSpaceDown = false;
+                    e.Handled = true;
+                }
+            };
+            window.Deactivated += (sender, e) => nextPracticeSpaceDown = false;
             var snakePage = (FrameworkElement)window.FindName("SnakePage");
             var rulesPage = (FrameworkElement)window.FindName("SnakeRules");
             InteractionMotion.Attach(window, () => settings.SnakeLowEffects && (snakePage.IsVisible || rulesPage.IsVisible));
@@ -221,6 +265,8 @@ namespace EnglishTypingPractice
             };
             ((Button)window.FindName("OpenSnake")).Click += (sender, e) =>
             {
+                if (autoPlayClock.IsRunning)
+                    ResetRound();
                 resumePractice = clock.IsRunning;
                 effects.Reset();
                 clock.Stop();
@@ -260,11 +306,23 @@ namespace EnglishTypingPractice
                 SaveSettings();
                 UpdatePracticeMusic();
             };
-            newPassage.Click += (sender, e) =>
+            newPassage.Click += (sender, e) => NextPassage();
+            autoPlay.Click += (sender, e) =>
             {
-                ChoosePassage();
+                bool stopping = autoPlayClock.IsRunning;
+                ResetRound();
+                if (!stopping && target.Length != 0)
+                {
+                    typed.IsReadOnly = true;
+                    autoPlay.Content = "停止演示";
+                    roundStatus.Text = "自动演示 · 60 WPM";
+                    speed.Text = elapsed.Text = "—";
+                    autoPlayClock.Start();
+                    autoPlayTimer.Start();
+                }
                 typed.Focus();
             };
+            autoPlayTimer.Tick += (sender, e) => AdvanceAutoPlay();
             retry.Click += (sender, e) =>
             {
                 if (lastRoundResult != null)
@@ -326,6 +384,7 @@ namespace EnglishTypingPractice
             window.Closed += (sender, e) =>
             {
                 timer.Stop();
+                autoPlayTimer.Stop();
                 musicTimer.Stop();
                 snake.Leave();
                 if (musicTrack.SelectedValue is string)
@@ -337,6 +396,90 @@ namespace EnglishTypingPractice
             ChoosePassage();
             if (showStartup)
                 new StartupExperience(window, settings, () => typed.Focus());
+        }
+
+        private void ConfigureSettingsPage(FrameworkElement practicePage)
+        {
+            var page = (FrameworkElement)window.FindName("SettingsPage");
+            var close = (Button)window.FindName("CloseSettings");
+            var restart = (Button)window.FindName("RestartWithTheme");
+            var status = (TextBlock)window.FindName("ThemeStatus");
+            var options = new Dictionary<UiTheme, RadioButton>
+            {
+                { UiTheme.Cyberpunk, (RadioButton)window.FindName("ThemeCyberpunk") },
+                { UiTheme.Minimal, (RadioButton)window.FindName("ThemeMinimal") },
+                { UiTheme.Steampunk, (RadioButton)window.FindName("ThemeSteampunk") }
+            };
+            bool resume = false;
+            Func<UiTheme> selected = () => options.First(item => item.Value.IsChecked == true).Key;
+            foreach (var option in options.Values)
+                option.Checked += (sender, e) =>
+                {
+                    restart.IsEnabled = selected() != settings.Theme;
+                    status.Text = restart.IsEnabled ? "保存并重启后应用所选风格。" : "正在使用此风格。";
+                };
+            ((Button)window.FindName("OpenSettings")).Click += (sender, e) =>
+            {
+                if (autoPlayClock.IsRunning)
+                    ResetRound();
+                resume = clock.IsRunning;
+                effects.Reset();
+                clock.Stop();
+                timer.Stop();
+                music.SetPlaying(false);
+                options[settings.Theme].IsChecked = true;
+                restart.IsEnabled = false;
+                status.Text = "正在使用此风格。";
+                practicePage.Visibility = Visibility.Collapsed;
+                InteractionMotion.Reveal(page, 14, false);
+                close.Focus();
+            };
+            Action back = () =>
+            {
+                page.Visibility = Visibility.Collapsed;
+                InteractionMotion.Reveal(practicePage, -14, false);
+                if (resume)
+                {
+                    clock.Start();
+                    timer.Start();
+                }
+                UpdatePracticeMusic();
+                typed.Focus();
+            };
+            close.Click += (sender, e) => back();
+            page.PreviewKeyDown += (sender, e) =>
+            {
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    back();
+                }
+            };
+            restart.Click += (sender, e) =>
+            {
+                UiTheme oldTheme = settings.Theme;
+                UiTheme newTheme = selected();
+                if (newTheme == oldTheme)
+                    return;
+                settings.Theme = newTheme;
+                if (!settings.Save())
+                {
+                    settings.Theme = oldTheme;
+                    status.Text = "无法保存设置，请重试。";
+                    return;
+                }
+                try
+                {
+                    Process.Start(new ProcessStartInfo(typeof(Program).Assembly.Location) { UseShellExecute = false }).Dispose();
+                }
+                catch (System.ComponentModel.Win32Exception)
+                {
+                    settings.Theme = oldTheme;
+                    status.Text = settings.Save() ? "无法启动新窗口，请重试。" : "无法启动新窗口，请手动重开。";
+                    return;
+                }
+                window.Close();
+            };
         }
 
         private void ConfigureBackgroundMotion(TranslateTransform drift, FrameworkElement practicePage)
@@ -424,6 +567,33 @@ namespace EnglishTypingPractice
             ResetRound();
         }
 
+        private void NextPassage()
+        {
+            ChoosePassage();
+            typed.Focus();
+        }
+
+        private void AdvanceAutoPlay()
+        {
+            int length = (int)Math.Min(target.Length, autoPlayClock.ElapsedMilliseconds / 200);
+            if (length <= correctCount)
+                return;
+            string sample = target.Substring(0, length);
+            typed.Text = sample;
+            typed.CaretIndex = typed.Text.Length;
+            if (IsChinese)
+                committedChinese = sample;
+            RefreshProgress();
+            if (length == target.Length)
+            {
+                autoPlayTimer.Stop();
+                autoPlayClock.Stop();
+                autoPlay.Content = "AutoPlay";
+                completedRound = true;
+                roundStatus.Text = "演示结束 · 空格换题";
+            }
+        }
+
         private HashSet<string> ReviewBank(int index)
         {
             if (reviewBanks[index] != null)
@@ -477,14 +647,19 @@ namespace EnglishTypingPractice
             progressGlint.BeginAnimation(UIElement.OpacityProperty, null);
             timer.Stop();
             clock.Reset();
+            autoPlayTimer.Stop();
+            autoPlayClock.Reset();
+            autoPlay.Content = "AutoPlay";
             UpdatePracticeMusic();
             resetting = true;
+            completedRound = false;
             roundGeneration++;
             composingChinese = false;
             committedChinese = "";
             typed.Clear();
             typed.IsReadOnly = original.Length == 0;
             retry.IsEnabled = original.Length != 0;
+            autoPlay.IsEnabled = original.Length != 0;
             reviewMeaning.Visibility = Visibility.Collapsed;
             practiceResult.Visibility = Visibility.Collapsed;
             lastRoundResult = null;
@@ -591,10 +766,11 @@ namespace EnglishTypingPractice
             }
             if (complete)
             {
+                completedRound = true;
                 clock.Stop();
                 timer.Stop();
                 typed.IsReadOnly = true;
-                roundStatus.Text = "本轮完成";
+                roundStatus.Text = "本轮完成 · 空格换题";
                 UpdatePracticeMusic();
             }
             double completedSpeed = RefreshClock();
@@ -735,8 +911,8 @@ namespace EnglishTypingPractice
                 if (correct)
                     correctCount++;
 
-                letter.Foreground = correct ? Correct : incorrect ? Incorrect : passage.Foreground;
-                letter.Background = incorrect ? IncorrectBackground : i == input.Length ? NextBackground : null;
+                letter.Foreground = correct ? correctBrush : incorrect ? incorrectBrush : passage.Foreground;
+                letter.Background = incorrect ? incorrectBackground : i == input.Length ? nextBackground : null;
                 letter.TextDecorations = incorrect ? TextDecorations.Underline : null;
             }
 

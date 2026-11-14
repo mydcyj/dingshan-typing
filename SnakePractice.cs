@@ -123,7 +123,7 @@ namespace EnglishTypingPractice
             flashMeaning = (TextBlock)window.FindName("SnakeFlashMeaning");
             directionWords = new[] { "SnakeNorth", "SnakeEast", "SnakeSouth", "SnakeWest" }
                 .Select(name => (TextBlock)window.FindName(name)).ToArray();
-            board = new SnakeBoard();
+            board = new SnakeBoard(window);
             var lowEffects = (CheckBox)window.FindName("SnakeLowEffects");
             lowEffects.IsChecked = board.LowEffects = settings.SnakeLowEffects;
             lowEffects.Click += (sender, e) =>
@@ -163,7 +163,7 @@ namespace EnglishTypingPractice
             largeFruitLegend = (System.Windows.Documents.Run)window.FindName("SnakeLargeFruitLegend");
             scoreGuide = (TextBlock)window.FindName("SnakeScoreGuide");
             lobby = new LanLobby(window, EnterRoom, ApplyRoomState, LeaveRoom, () => SelectedRole, () => SelectedMode,
-                settings, saveSettings);
+                settings, saveSettings, board);
             tutorial = new SnakeTutorial(window, StartTutorial, StopTutorial, () =>
             {
                 game.PlaceTutorialFruit();
@@ -300,15 +300,53 @@ namespace EnglishTypingPractice
                 }
             };
             timer.Tick += Tick;
-            command.TextChanged += OnCommandChanged;
-            chargeInput.TextChanged += OnChargeChanged;
+            RestrictWordInput(command, OnCommandChanged);
+            RestrictWordInput(chargeInput, OnChargeChanged);
             command.TextChanged += (sender, e) => PublishTyping();
             chargeInput.TextChanged += (sender, e) => PublishTyping();
             command.GotKeyboardFocus += (sender, e) => PublishTyping();
             chargeInput.GotKeyboardFocus += (sender, e) => PublishTyping();
-            DataObject.AddPastingHandler(command, (sender, e) => e.CancelCommand());
-            DataObject.AddPastingHandler(chargeInput, (sender, e) => e.CancelCommand());
             Render();
+        }
+
+        private static void RestrictWordInput(TextBox input, TextChangedEventHandler changed)
+        {
+            input.PreviewTextInput += (sender, e) =>
+            {
+                string letters = NormalizeWordInput(e.Text);
+                if (letters == e.Text)
+                    return;
+                e.Handled = true;
+                int available = input.MaxLength - input.Text.Length + input.SelectionLength;
+                if (input.IsReadOnly || letters.Length == 0 || available <= 0)
+                    return;
+                int caret = input.SelectionStart;
+                int count = Math.Min(letters.Length, available);
+                input.SelectedText = letters.Substring(0, count);
+                input.CaretIndex = Math.Min(caret + count, input.Text.Length);
+            };
+            input.TextChanged += (sender, e) =>
+            {
+                string text = input.Text;
+                string letters = NormalizeWordInput(text);
+                if (text == letters)
+                    changed(sender, e);
+                else
+                {
+                    int caret = NormalizeWordInput(text.Substring(0, input.CaretIndex)).Length;
+                    input.Text = letters;
+                    input.CaretIndex = Math.Min(caret, input.Text.Length);
+                }
+            };
+            DataObject.AddPastingHandler(input, (sender, e) => e.CancelCommand());
+        }
+
+        private static string NormalizeWordInput(string text)
+        {
+            if (text.All(character => character >= 'a' && character <= 'z'))
+                return text;
+            return new string(text.Where(character => character >= 'a' && character <= 'z' ||
+                character >= 'A' && character <= 'Z').ToArray()).ToLowerInvariant();
         }
 
         private SnakeRole SelectedRole { get { return (SnakeRole)rolePicker.SelectedIndex; } }
@@ -573,12 +611,12 @@ namespace EnglishTypingPractice
                             " +" + variant * (SnakeGame.UsesTimewalkerBalance(online == null ? SelectedMode : online.Mode) ? 1 : 2) + "格";
                         return word + effect + " " + SnakeWords.Meaning(word) + (opposite ? " ×" : "");
                     }).Where(line => line != null));
-                label.Foreground = opposite || !running ? SnakeBoard.Quiet : SnakeBoard.Label;
+                label.Foreground = opposite || !running ? board.Quiet : board.Label;
                 label.ToolTip = !running ? null : opposite ? "禁止掉头" :
                     current ? (role == SnakeRole.Timewalker ? "最长词可沿当前方向额外前进" : "当前方向") : label.Text;
                 var card = (Border)((StackPanel)label.Parent).Parent;
                 if (current)
-                    card.Background = SnakeBoard.Current;
+                    card.Background = board.Current;
                 else
                     card.ClearValue(Border.BackgroundProperty);
             }
@@ -1228,21 +1266,14 @@ namespace EnglishTypingPractice
             internal double StartedAt;
         }
 
-        private static readonly Brush Head = MakeBrush(236, 246, 100);
-        internal static readonly Brush Current = MakeBrush(49, 63, 42);
-        internal static readonly Brush Quiet = MakeBrush(158, 181, 188);
-        internal static readonly Brush Label = MakeBrush(228, 244, 237);
-        private static readonly Brush Board = MakeBrush(16, 30, 39);
-        private static readonly Brush Bubble = MakeBrush(30, 49, 58);
-        private static readonly Brush Body = MakeBrush(135, 194, 100);
+        private readonly Brush Head, Board, Bubble, Body, ClosedZone, OutsideMap, Obstacle;
+        internal readonly Brush Current, Quiet, Label;
         private static readonly Brush Fruit = MakeBrush(255, 139, 113);
         private static readonly Brush LargeFruit = MakeBrush(255, 192, 99);
         private static readonly Brush FruitHighlight = MakeBrush(255, 240, 183);
         private static readonly Brush ChargeGlow = MakeBrush(129, 230, 238);
         private static readonly Pen StabilizingOutline = MakePen(MakeBrush(130, 248, 205), 2);
         private static readonly Brush StunFill = MakeBrush(149, 154, 167);
-        private static readonly Brush ClosedZone = MakeBrush(47, 58, 66);
-        private static readonly Brush OutsideMap = MakeBrush(9, 16, 23);
         private static readonly Brush ShotCore = MakeBrush(255, 248, 220);
         private static readonly Brush ShotGlow = MakeBrush(255, 105, 44, 90);
         private static readonly Pen ShotTrail = MakePen(MakeBrush(255, 126, 57, 155), 2.5);
@@ -1253,26 +1284,9 @@ namespace EnglishTypingPractice
             MakeBrush(93, 225, 252), MakeBrush(242, 144, 248), MakeBrush(237, 251, 172)
         };
         private static readonly Pen FruitArrowOutline = MakePen(MakeBrush(69, 38, 20), 1.6);
-        private static readonly Brush Obstacle = MakeBrush(93, 118, 127);
-        private static readonly Pen ObstacleOutline = MakeObstaclePen();
-        private static readonly Pen Grid = MakeGridPen();
-        private static readonly Pen ViewOutline = MakePen(Head, 1.25);
-        private static readonly Brush[] Stars =
-        {
-            MakeBrush(255, 255, 255, 82),
-            MakeBrush(255, 255, 255, 135),
-            MakeBrush(255, 255, 255, 197)
-        };
-        private static readonly Brush[] Rivals =
-        {
-            MakeBrush(103, 189, 239), MakeBrush(209, 146, 241), MakeBrush(247, 193, 93)
-        };
-        private static readonly Brush[] TerritoryColors = { Body, Rivals[0], Rivals[1], Rivals[2] };
+        private readonly Pen ObstacleOutline, Grid, ViewOutline;
+        private readonly Brush[] Stars, Rivals, TerritoryColors, LandColors;
         private static readonly string[] TeamNames = { "绿队", "蓝队", "紫队", "金队" };
-        private static readonly Brush[] LandColors =
-        {
-            MakeBrush(36, 64, 47), MakeBrush(34, 62, 83), MakeBrush(63, 46, 78), MakeBrush(75, 60, 38)
-        };
         private int size = SnakeGame.BaseSize;
         private int[] smallFruits = new int[0];
         private int largeFruit = -1;
@@ -1335,8 +1349,32 @@ namespace EnglishTypingPractice
             }
         }
 
-        internal SnakeBoard()
+        internal SnakeBoard() : this(ThemePalette.LoadWindow(UiTheme.Cyberpunk))
         {
+        }
+
+        internal SnakeBoard(Window window)
+        {
+            Func<string, Brush> brush = key => (Brush)window.FindResource(key);
+            Head = brush("Accent");
+            Current = brush("PracticeNextBackground");
+            Quiet = brush("Muted");
+            Label = brush("Text");
+            Board = brush("BoardSurface");
+            Bubble = brush("BoardBubble");
+            Body = brush("BoardBody");
+            ClosedZone = brush("BoardClosed");
+            OutsideMap = brush("BoardOuter");
+            Obstacle = brush("BoardObstacle");
+            ObstacleOutline = MakePen(brush("BoardObstacleLine"), .8);
+            Grid = MakePen(brush("BoardGrid"), .65);
+            ViewOutline = MakePen(Head, 1.25);
+            Rivals = new[] { brush("BoardBluePlayer"), brush("BoardPurplePlayer"), brush("BoardGoldPlayer") };
+            TerritoryColors = new[] { Body, Rivals[0], Rivals[1], Rivals[2] };
+            LandColors = new[] { brush("BoardGreenLand"), brush("BoardBlueLand"), brush("BoardPurpleLand"), brush("BoardGoldLand") };
+            var star = ((SolidColorBrush)Quiet).Color;
+            Stars = new[] { MakeBrush(star.R, star.G, star.B, 82), MakeBrush(star.R, star.G, star.B, 135),
+                MakeBrush(star.R, star.G, star.B, 197) };
             Minimap = new MapOverview(this);
             effectTimer.Tick += (sender, e) =>
             {
@@ -1590,7 +1628,7 @@ namespace EnglishTypingPractice
                     drawing.DrawRectangle(Obstacle, ObstacleOutline, CellBounds(obstacle, area, cell));
         }
 
-        private static void DrawStars(DrawingContext drawing, Rect world, double cell, Int32Rect visible)
+        private void DrawStars(DrawingContext drawing, Rect world, double cell, Int32Rect visible)
         {
             for (int y = visible.Y; y < visible.Y + visible.Height; y++)
             {
@@ -2100,18 +2138,11 @@ namespace EnglishTypingPractice
             return new Point(position % size + .5, position / size + .5);
         }
 
-        internal static Brush PlayerColor(int slot, int ownSlot, bool territory = false)
+        internal Brush PlayerColor(int slot, int ownSlot, bool territory = false)
         {
             if (territory)
                 return TerritoryColors[slot];
             return slot == ownSlot ? Body : Rivals[slot < ownSlot ? slot : slot - 1];
-        }
-
-        private static Pen MakeObstaclePen()
-        {
-            var pen = new Pen(MakeBrush(153, 173, 178), 0.8);
-            pen.Freeze();
-            return pen;
         }
 
         private static Pen MakeBurstPen()
@@ -2126,11 +2157,6 @@ namespace EnglishTypingPractice
             var brush = new SolidColorBrush(Color.FromArgb(alpha, red, green, blue));
             brush.Freeze();
             return brush;
-        }
-
-        private static Pen MakeGridPen()
-        {
-            return MakePen(MakeBrush(53, 75, 85), 0.65);
         }
 
         private static Pen MakePen(Brush brush, double width)

@@ -16,6 +16,7 @@ namespace EnglishTypingPractice
         private readonly Window window;
         private readonly Canvas echo;
         private readonly TextBlock passage;
+        private readonly Brush[] echoBrushes;
         private readonly TranslateTransform shake = new TranslateTransform();
         private readonly SoundPlayer[] sounds = new SoundPlayer[3];
         private readonly DispatcherTimer windowShake = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
@@ -30,6 +31,7 @@ namespace EnglishTypingPractice
             ((FrameworkElement)window.Content).RenderTransform = shake;
             this.echo = echo;
             this.passage = passage;
+            echoBrushes = new[] { (Brush)window.FindResource("WordEchoPrimary"), (Brush)window.FindResource("WordEchoSecondary") };
             windowShake.Tick += (sender, e) => MoveWindow();
             window.PreviewMouseDown += (sender, e) => StopWindowShake();
             window.StateChanged += (sender, e) => StopWindowShake();
@@ -99,14 +101,13 @@ namespace EnglishTypingPractice
             if (bounds.IsEmpty)
                 return;
             Point origin = passage.TranslatePoint(bounds.Location, echo);
-            var colors = new[] { Color.FromRgb(126, 209, 239), Color.FromRgb(231, 154, 213) };
-            for (int i = 0; i < colors.Length; i++)
+            for (int i = 0; i < echoBrushes.Length; i++)
             {
                 double direction = i == 0 ? -1 : 1;
                 var shadow = new TextBlock
                 {
                     Text = word, FontFamily = passage.FontFamily, FontSize = passage.FontSize,
-                    Foreground = new SolidColorBrush(colors[i])
+                    Foreground = echoBrushes[i]
                 };
                 Canvas.SetLeft(shadow, origin.X + direction * 2);
                 Canvas.SetTop(shadow, origin.Y);
