@@ -441,15 +441,15 @@ namespace EnglishTypingPractice
             boardSize.Text = SelectedMode == SnakeMode.Teams ? "60 × 60 格" : side + " × " + side + " 格";
             var role = game.IsRunning ? game.Role : SelectedRole;
             ShowWords(game.IsRunning, game.Direction, game.Words, role);
-            ShowRole(role, game.IsRunning, game.IsCharging(clock.ElapsedMilliseconds),
+            ShowRole(role, SelectedMode, game.IsRunning, game.IsCharging(clock.ElapsedMilliseconds),
                 0, game.ChargeWord);
             fruitLegend.Visibility = Visibility.Collapsed;
             scoreLabel.Text = territory ? "占地格数" : "分数";
             scoreGuide.Text = SelectedMode == SnakeMode.Teams ? "八分钟 · 回己方区域按 Shift 放球"
                 : territory ? "五分钟 · 闭合轨迹占地"
-                : SelectedMode == SnakeMode.Obstacles ? "避开障碍 · 吃果 +10 · 有效输入按字母计分"
+                : SelectedMode == SnakeMode.Obstacles ? "避开障碍 · 吃果 +10 · " + WordScoreGuide(role, SelectedMode)
                 : (game.IsRunning ? ShrinkGuide(side, (int)(60000 - clock.ElapsedMilliseconds % 60000)) : "每分钟缩小 5 格") +
-                    " · 吃果 +10";
+                    " · 吃果 +10 · " + WordScoreGuide(role, SelectedMode);
             board.SetBoard(size, territory || game.Fruit < 0 ? new int[0] : new[] { game.Fruit }, -1, 0, new[]
             {
                 new SnakePlayerState { Slot = 0, Result = game.Result, Body = territory ? new int[0] : game.Body.ToArray(),
@@ -487,7 +487,14 @@ namespace EnglishTypingPractice
             }
         }
 
-        private void ShowRole(SnakeRole role, bool running, bool charging, int stun, string special)
+        private static string WordScoreGuide(SnakeRole role, SnakeMode mode)
+        {
+            return role == SnakeRole.Timewalker && SnakeGame.UsesTimewalkerBalance(mode)
+                ? "转向 +" + SnakeGame.TimewalkerTurnPoints + " · 直行不计分"
+                : "有效输入按字母计分";
+        }
+
+        private void ShowRole(SnakeRole role, SnakeMode mode, bool running, bool charging, int stun, string special)
         {
             rolePicker.IsEnabled = !running && (online == null || online.Phase != MatchPhase.Playing);
             modePicker.IsEnabled = rolePicker.IsEnabled && (online == null || ownSlot == 0);
@@ -498,9 +505,13 @@ namespace EnglishTypingPractice
             string guide;
             switch (role)
             {
-                case SnakeRole.Timewalker: guide = "6 / 8 / 10 字母 · 额外走 0 / 2 / 4 格"; break;
+                case SnakeRole.Timewalker:
+                    guide = "6 / 8 / 10 字母 · 额外走 " + (SnakeGame.UsesTimewalkerBalance(mode) ? "0 / 1 / 2" : "0 / 2 / 4") + " 格";
+                    break;
                 case SnakeRole.Timid: guide = "85% 移速 · 5–6 字母"; break;
-                case SnakeRole.Fearless: guide = "120% 移速 · Tab 切换冲锋输入框"; break;
+                case SnakeRole.Fearless:
+                    guide = (SnakeGame.FearlessBaseSpeed(mode) * 100).ToString("0") + "% 基础移速 · Tab 切换冲锋输入框";
+                    break;
                 case SnakeRole.Hunter: guide = "Tab 切换射击输入框 · 15–20 字母 · 子弹为自身 3 倍移速"; break;
                 case SnakeRole.Bard: guide = "Tab 切换吟唱输入框 · 15–20 字母 · 瞬间判定周围 5 × 5 格"; break;
                 default: guide = ""; break;
@@ -710,7 +721,8 @@ namespace EnglishTypingPractice
             if (restoreCommandFocus && !command.IsKeyboardFocused)
                 command.Focus();
             ShowWords(running, own.Direction, state.Words, own.Role);
-            ShowRole(state.Phase == MatchPhase.Playing ? own.Role : SelectedRole, running,
+            ShowRole(state.Phase == MatchPhase.Playing ? own.Role : SelectedRole,
+                state.Phase == MatchPhase.Playing ? state.Mode : state.NextMode, running,
                 own.Charging, own.StunRemaining, state.ChargeWord);
             bool teams = state.Mode == SnakeMode.Teams;
             score.Text = (own.Team >= 0 ? state.TeamScores[own.Team] : own.Score).ToString(CultureInfo.CurrentCulture);
@@ -728,9 +740,9 @@ namespace EnglishTypingPractice
                 : territory
                 ? (state.Phase == MatchPhase.Playing ? string.Format("剩余 {0}:{1:00} · ", seconds / 60, seconds % 60) : "五分钟 · ") +
                     "每分钟提速 20% · 闭合轨迹占地"
-                : state.Mode == SnakeMode.Obstacles ? "避开障碍 · 有效输入按字母计分"
+                : state.Mode == SnakeMode.Obstacles ? "避开障碍 · " + WordScoreGuide(own.Role, state.Mode)
                 : (state.Phase == MatchPhase.Playing ? ShrinkGuide(side, state.NextMinute) : "每分钟缩小 5 格") +
-                    " · 有效输入按字母计分";
+                    " · " + WordScoreGuide(own.Role, state.Mode);
             board.SetBoard(size, state.SmallFruits, state.LargeFruit, slot, state.Players, state.Obstacles, state.Land,
                 state.Trails, state.SafeStart, state.SafeEnd, state.Shots, state.Bursts,
                 state.TeamCount, state.TeamBalls, soloMatch == null);

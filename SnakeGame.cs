@@ -13,6 +13,7 @@ namespace EnglishTypingPractice
         internal const int MaxSoloSize = 128;
         internal const int MoveInterval = 350;
         internal const int SmallFruitPoints = 10;
+        internal const int TimewalkerTurnPoints = 6;
         internal const int ChargeDuration = 1000;
         internal const int StunDuration = 3000;
 
@@ -134,13 +135,22 @@ namespace EnglishTypingPractice
             if (direction == Opposite || (direction == Direction && variant != 2))
                 return false;
 
-            Score += words[index].Length;
+            bool balancedTimewalker = Role == SnakeRole.Timewalker && UsesTimewalkerBalance(mode);
+            if (!balancedTimewalker)
+                Score += words[index].Length;
+            else if (direction != Direction)
+                Score += TimewalkerTurnPoints;
             LastWord = words[index];
             WordCount++;
             Direction = direction;
-            ExtraMoves = variant * 2;
+            ExtraMoves = variant * (balancedTimewalker ? 1 : 2);
             DrawWords();
             return true;
+        }
+
+        internal static bool UsesTimewalkerBalance(SnakeMode mode)
+        {
+            return mode == SnakeMode.Classic || mode == SnakeMode.Obstacles;
         }
 
         internal bool TryCharge(string word, int group, long now)
@@ -196,8 +206,13 @@ namespace EnglishTypingPractice
             if (Role == SnakeRole.Timid)
                 return MoveInterval / (0.85 * speed * carrySpeed);
             if (Role == SnakeRole.Fearless)
-                return (IsCharging(now) ? 110 : MoveInterval / 1.2) / (speed * carrySpeed);
+                return (IsCharging(now) ? 110 : MoveInterval / FearlessBaseSpeed(mode)) / (speed * carrySpeed);
             return MoveInterval / (speed * carrySpeed);
+        }
+
+        internal static double FearlessBaseSpeed(SnakeMode mode)
+        {
+            return mode == SnakeMode.Territory ? 1 : 1.2;
         }
 
         internal void SetCarrying(int count, long now)

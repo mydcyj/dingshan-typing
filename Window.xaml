@@ -872,8 +872,8 @@
           <TextBlock Text="六个职业" Style="{StaticResource RuleHeading}" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="平凡者　" FontWeight="Bold" /><Run Text="基础移速，使用 6–7 字母方向词。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="胆怯者　" FontWeight="Bold" /><Run Text="85% 移速，使用 5–6 字母方向词。" /></TextBlock>
-          <TextBlock Style="{StaticResource RuleText}"><Run Text="时空者　" FontWeight="Bold" /><Run Text="每个可用方向有 6、8、10 字母词，分别额外前进 0、2、4 格。也可打最长词沿当前方向加速前进。" /></TextBlock>
-          <TextBlock Style="{StaticResource RuleText}"><Run Text="无畏者　" FontWeight="Bold" /><Run Text="120% 移速。打完技能词后冲锋 1 秒，穿过对手会使其僵直 3 秒。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="时空者　" FontWeight="Bold" /><Run Text="每个可用方向有 6、8、10 字母词。经典和障碍赛分别额外前进 0、1、2 格，每次转向加 6 分。最长词可沿当前方向加速，直行加速不计分。圈地战和团战的额外位移为 0、2、4 格。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="无畏者　" FontWeight="Bold" /><Run Text="圈地战的基础移速为 100%，其余模式为 120%。打完技能词后冲锋 1 秒，穿过对手会使其僵直 3 秒。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="狩猎者　" FontWeight="Bold" /><Run Text="打完技能词后朝前射击，子弹速度为自身移速 3 倍，碰到对手蛇身即命中。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="吟唱者　" FontWeight="Bold" /><Run Text="打完技能词后，瞬间命中以蛇头为中心 5×5 格内的对手蛇头。" /></TextBlock>
         </StackPanel>
