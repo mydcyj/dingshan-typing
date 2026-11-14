@@ -39,7 +39,7 @@ namespace EnglishTypingPractice
             window.StateChanged += (sender, e) => StopWindowShake();
         }
 
-        internal void Play(Run firstLetter, string word, bool complete, Run hitLetter = null)
+        internal void Play(TextPointer firstLetter, string word, bool complete, TextPointer hitLetter = null)
         {
             int level = complete ? 2 : word != null ? 1 : 0;
             if (sounds[level] == null)
@@ -47,21 +47,21 @@ namespace EnglishTypingPractice
             sounds[level].Play();
             if (!SystemParameters.ClientAreaAnimation)
                 return;
-            if (word != null)
+            if (word != null && firstLetter != null)
                 Echo(firstLetter, word);
             DrawImpact(hitLetter ?? firstLetter, level);
             if (level > 0)
                 ShakeWindow(complete ? 11 : 3.5, complete ? 390 : 160);
         }
 
-        private void DrawImpact(Run hitLetter, int level)
+        private void DrawImpact(TextPointer hitLetter, int level)
         {
             if (echo.ActualWidth <= 0 || echo.ActualHeight <= 0)
                 return;
             var center = new Point(echo.ActualWidth / 2, echo.ActualHeight / 2);
             if (hitLetter != null)
             {
-                Rect bounds = hitLetter.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+                Rect bounds = hitLetter.GetCharacterRect(LogicalDirection.Forward);
                 if (!bounds.IsEmpty)
                     center = passage.TranslatePoint(new Point(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2), echo);
             }
@@ -127,9 +127,9 @@ namespace EnglishTypingPractice
             }
         }
 
-        private void Echo(Run firstLetter, string word)
+        private void Echo(TextPointer firstLetter, string word)
         {
-            Rect bounds = firstLetter.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+            Rect bounds = firstLetter.GetCharacterRect(LogicalDirection.Forward);
             if (bounds.IsEmpty)
                 return;
             Point origin = passage.TranslatePoint(bounds.Location, echo);

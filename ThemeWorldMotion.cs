@@ -15,6 +15,7 @@ namespace EnglishTypingPractice
     {
         private readonly Window window;
         private readonly Func<bool> lowEffects;
+        private readonly FrameworkElement startup;
         private readonly WorldScene background, header;
         private readonly Stopwatch elapsed = new Stopwatch();
         private readonly DispatcherTimer timer;
@@ -29,6 +30,7 @@ namespace EnglishTypingPractice
         {
             this.window = window;
             this.lowEffects = lowEffects;
+            startup = (FrameworkElement)window.FindName("StartupOverlay");
             background = new WorldScene(theme, false) { Name = "ThemeWorldBackground", Opacity = .74 };
             header = new WorldScene(theme, true) { Name = "ThemeWorldHeader", HorizontalAlignment = HorizontalAlignment.Right };
             ((Grid)window.FindName("BackgroundLayers")).Children.Add(background);
@@ -44,7 +46,7 @@ namespace EnglishTypingPractice
             window.StateChanged += Update;
             window.IsVisibleChanged += VisibilityChanged;
             window.Closed += Close;
-            ((FrameworkElement)window.FindName("PracticePage")).IsVisibleChanged += VisibilityChanged;
+            startup.IsVisibleChanged += VisibilityChanged;
             var checkbox = window.FindName("SnakeLowEffects") as System.Windows.Controls.Primitives.ButtonBase;
             if (checkbox != null) checkbox.Click += Update;
             SystemParameters.StaticPropertyChanged += SystemChanged;
@@ -65,7 +67,7 @@ namespace EnglishTypingPractice
 
         private bool CanRun()
         {
-            return !closed && window.IsLoaded && window.IsVisible && window.WindowState != WindowState.Minimized
+            return !closed && window.IsLoaded && window.IsVisible && !startup.IsVisible && window.WindowState != WindowState.Minimized
                 && SystemParameters.ClientAreaAnimation && (lowEffects == null || !lowEffects());
         }
 
@@ -93,7 +95,7 @@ namespace EnglishTypingPractice
             window.StateChanged -= Update;
             window.IsVisibleChanged -= VisibilityChanged;
             window.Closed -= Close;
-            ((FrameworkElement)window.FindName("PracticePage")).IsVisibleChanged -= VisibilityChanged;
+            startup.IsVisibleChanged -= VisibilityChanged;
             ((Grid)window.FindName("PracticeHero")).SizeChanged -= ResizeHeader;
             var checkbox = window.FindName("SnakeLowEffects") as System.Windows.Controls.Primitives.ButtonBase;
             if (checkbox != null) checkbox.Click -= Update;
@@ -105,6 +107,10 @@ namespace EnglishTypingPractice
             private readonly UiTheme theme;
             private readonly bool hero;
             private readonly Dictionary<string, DrawingImage> art = new Dictionary<string, DrawingImage>();
+            private readonly DrawingGroup scenery = new DrawingGroup();
+            private readonly TranslateTransform[] traffic;
+            private readonly TranslateTransform carrier = new TranslateTransform(), rescue = new TranslateTransform();
+            private readonly DrawingGroup rescueLights = new DrawingGroup();
             private readonly Brush white = Paint("FFF3DC"), dark = Paint("191422"), cyan = Paint("68F5ED"), pink = Paint("F05D9E");
             private readonly Brush brass = Paint("D7AA65"), iron = Paint("49382C"), steam = Paint("E9D4B4");
             private readonly Brush ink = Paint("37655A"), paper = Paint("F4ECD9"), red = Paint("BA3329"), violet = Paint("8C61C7");
@@ -131,53 +137,95 @@ namespace EnglishTypingPractice
                 redSix = Stroke(red, 6); redTwelve = Stroke(red, 12); redEight = Stroke(red, 8);
                 redEighteen = Stroke(red, 18); darkTwo = Stroke(dark, 2);
                 MakeArt();
+                if (theme == UiTheme.Cyberpunk)
+                {
+                    traffic = new TranslateTransform[hero ? 5 : 12];
+                    BuildCyberpunk();
+                }
+                Advance(0);
             }
 
-            internal void Advance(double value) { seconds = value; InvalidateVisual(); }
+            private double SceneWidth { get { return hero ? 440 : 1100; } }
+            private double SceneHeight { get { return hero ? 150 : 700; } }
+            private double CarrierWidth { get { return hero ? 168 : 240; } }
+            private double RescueWidth { get { return hero ? 138 : 180; } }
+
+            internal void Advance(double value)
+            {
+                seconds = value;
+                if (theme == UiTheme.Cyberpunk)
+                {
+                    MoveCyberpunk();
+                    return;
+                }
+                // Keep the drawing attached to the visual. A frame changes its content without invalidating layout.
+                double w = SceneWidth, h = SceneHeight;
+                using (var dc = scenery.Open())
+                    switch (theme)
+                    {
+                        case UiTheme.Steampunk: Steampunk(dc, w, h); break;
+                        case UiTheme.Vaporwave: Vaporwave(dc, w, h); break;
+                        case UiTheme.ChineseStyle: Chinese(dc, w, h); break;
+                        case UiTheme.Persona5: Persona(dc, w, h); break;
+                        case UiTheme.Constructivist: Constructivist(dc, w, h); break;
+                        case UiTheme.Minimal: Minimal(dc, w, h); break;
+                        default: Modern(dc, w, h); break;
+                    }
+            }
 
             protected override void OnRender(DrawingContext dc)
             {
                 base.OnRender(dc);
                 if (ActualWidth < 1 || ActualHeight < 1) return;
-                double width = hero ? 440 : 1100, height = hero ? 150 : 700;
-                dc.PushTransform(new ScaleTransform(ActualWidth / width, ActualHeight / height));
-                switch (theme)
-                {
-                    case UiTheme.Cyberpunk: Cyberpunk(dc, width, height); break;
-                    case UiTheme.Steampunk: Steampunk(dc, width, height); break;
-                    case UiTheme.Vaporwave: Vaporwave(dc, width, height); break;
-                    case UiTheme.ChineseStyle: Chinese(dc, width, height); break;
-                    case UiTheme.Persona5: Persona(dc, width, height); break;
-                    case UiTheme.Constructivist: Constructivist(dc, width, height); break;
-                    case UiTheme.Minimal: Minimal(dc, width, height); break;
-                    default: Modern(dc, width, height); break;
-                }
+                dc.PushTransform(new ScaleTransform(ActualWidth / SceneWidth, ActualHeight / SceneHeight));
+                dc.DrawDrawing(scenery);
                 dc.Pop();
             }
 
-            private void Cyberpunk(DrawingContext dc, double w, double h)
+            private void BuildCyberpunk()
             {
-                int count = hero ? 5 : 12;
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < traffic.Length; i++)
                 {
                     double depth = .35 + (i % 3) * .21;
-                    double x = Wrap(seconds * (15 + i * 3) * (i % 2 == 0 ? 1 : -1) + i * 131, w + 100) - 70;
                     double y = hero ? 43 + i % 3 * 28 : 68 + i * 43;
                     double size = 49 * depth;
-                    dc.PushOpacity(.4 + depth * .4);
-                    dc.DrawLine(trace, new Point(x - 27, y + 6), new Point(x - 5, y + 6));
-                    Sprite(dc, "car", x, y, size, size * .4);
-                    dc.Pop();
+                    traffic[i] = new TranslateTransform(0, y);
+                    var car = AddMovingDrawing(traffic[i], dc =>
+                    {
+                        dc.DrawLine(trace, new Point(-27, 6), new Point(-5, 6));
+                        Sprite(dc, "car", 0, 0, size, size * .4);
+                    });
+                    car.Opacity = .4 + depth * .4;
                 }
-                double carrierX = Wrap(seconds * 6 + (hero ? 270 : 180), w + 200) - 130;
-                Sprite(dc, "carrier", carrierX, hero ? 10 : 62, hero ? 168 : 240, hero ? 49 : 70);
-                double rescueX = Wrap(seconds * -15 + w * .85, w + 160) - 90;
-                double rescueY = hero ? 72 + Math.Sin(seconds * .5) * 4 : h * .67 + Math.Sin(seconds * .5) * 8;
-                Sprite(dc, "rescue", rescueX, rescueY, hero ? 113 : 166, hero ? 46 : 67);
-                dc.PushOpacity(.58 + .32 * Math.Sin(seconds * 2.1));
-                dc.DrawEllipse(cyan, null, new Point(rescueX + 17, rescueY + 27), 3, 1.4);
-                dc.DrawEllipse(pink, null, new Point(rescueX + 89, rescueY + 27), 3, 1.4);
-                dc.Pop();
+                carrier.Y = hero ? 10 : 62;
+                AddMovingDrawing(carrier, dc => Sprite(dc, "carrier", 0, 0, CarrierWidth, hero ? 49 : 70));
+                double rescueHeight = hero ? 52 : 68;
+                var aircraft = AddMovingDrawing(rescue, dc => Sprite(dc, "rescue", 0, 0, RescueWidth, rescueHeight));
+                using (var dc = rescueLights.Open())
+                {
+                    dc.DrawEllipse(cyan, null, new Point(RescueWidth * .09, rescueHeight * .6), 2.5, 1.1);
+                    dc.DrawEllipse(pink, null, new Point(RescueWidth * .88, rescueHeight * .74), 2.5, 1.1);
+                }
+                aircraft.Children.Add(rescueLights);
+            }
+
+            private DrawingGroup AddMovingDrawing(TranslateTransform position, Action<DrawingContext> draw)
+            {
+                var group = new DrawingGroup { Transform = position };
+                using (var dc = group.Open()) draw(dc);
+                scenery.Children.Add(group);
+                return group;
+            }
+
+            private void MoveCyberpunk()
+            {
+                double w = SceneWidth;
+                for (int i = 0; i < traffic.Length; i++)
+                    traffic[i].X = Wrap(seconds * (15 + i * 3) * (i % 2 == 0 ? 1 : -1) + i * 131, w + 100) - 70;
+                carrier.X = Wrap(seconds * 6 + (hero ? 140 : 50) + CarrierWidth, w + CarrierWidth) - CarrierWidth;
+                rescue.X = Wrap(seconds * 15 + w * .58 + RescueWidth, w + RescueWidth) - RescueWidth;
+                rescue.Y = (hero ? 72 : SceneHeight * .67) + Math.Sin(seconds * .5) * (hero ? 4 : 8);
+                rescueLights.Opacity = .58 + .32 * Math.Sin(seconds * 2.1);
             }
 
             private void Steampunk(DrawingContext dc, double w, double h)
@@ -354,20 +402,8 @@ namespace EnglishTypingPractice
                         dc.DrawGeometry(cyan, null, Shape("M19,4 H49 L58,11 H10 Z"));
                         dc.DrawRectangle(pink, null, new Rect(5, 16, 12, 2)); dc.DrawRectangle(cyan, null, new Rect(58, 15, 9, 2));
                     });
-                    Add("carrier", dc => {
-                        dc.DrawGeometry(dark, Stroke(pink, 1.4), Shape("M0,24 L25,5 133,1 174,17 183,29 147,41 H29 Z"));
-                        dc.DrawLine(trace, new Point(25, 29), new Point(157, 29));
-                        dc.DrawGeometry(cyan, null, Shape("M140,9 L165,18 171,25 H137 Z"));
-                        dc.DrawRectangle(pink, null, new Rect(29, 37, 26, 7)); dc.DrawRectangle(pink, null, new Rect(126, 37, 26, 7));
-                        Label(dc, "鼎山航运", 36, 10, 12, white); Label(dc, "AERO", 95, 13, 8, cyan);
-                    });
-                    Add("rescue", dc => {
-                        dc.DrawGeometry(white, Stroke(cyan, 1), Shape("M0,28 L15,17 23,6 H83 L105,24 99,37 H12 Z"));
-                        dc.DrawGeometry(dark, null, Shape("M66,9 H81 L93,23 H67 Z"));
-                        dc.DrawRectangle(red, null, new Rect(27, 15, 14, 5)); dc.DrawRectangle(red, null, new Rect(32, 10, 4, 15));
-                        Label(dc, "白金急救", 44, 27, 8, dark);
-                        dc.DrawRectangle(cyan, null, new Rect(4, 30, 12, 6)); dc.DrawRectangle(pink, null, new Rect(88, 30, 12, 6));
-                    });
+                    Add("carrier", DrawCyberCarrier);
+                    Add("rescue", DrawCyberRescue);
                 }
                 if (theme == UiTheme.Steampunk)
                 {
@@ -420,6 +456,78 @@ namespace EnglishTypingPractice
                         dc.DrawGeometry(ink, null, Shape("M46,14 Q65,11 66,24 H46 Z"));
                         dc.DrawEllipse(red, null, new Point(72, 23), 2, 2);
                     });
+            }
+
+            private void DrawCyberCarrier(DrawingContext dc)
+            {
+                var graphite = Paint("272D34");
+                var steel = Paint("49515A");
+                var yellow = Paint("F5D645");
+                var amber = Paint("C9892C");
+                var edge = Stroke(Paint("95A1A6"), .75);
+
+                // Freight containers ride under the hull between the two lift pods.
+                dc.DrawGeometry(graphite, edge, Shape("M24,29 H150 L139,47 H45 L34,41 H24 Z"));
+                dc.DrawGeometry(steel, null, Shape("M42,36 H139 L131,47 H48 Z"));
+                dc.DrawGeometry(amber, null, Shape("M49,37 H75 V45 H51 Z M78,37 H104 V45 H78 Z M107,37 H132 L127,45 H107 Z"));
+                dc.DrawGeometry(graphite, edge, Shape("M0,20 L17,10 32,10 43,2 H123 L134,5 H159 L183,19 V29 L164,38 H32 L21,32 H7 Z"));
+                dc.DrawGeometry(steel, null, Shape("M33,11 L44,3 H123 L137,8 H158 L172,16 H44 Z"));
+                dc.DrawGeometry(yellow, null, Shape("M27,12 H135 L124,33 H36 L27,27 Z"));
+                dc.DrawGeometry(amber, null, Shape("M27,27 L36,33 H124 L127,28 H36 Z M7,22 H22 V27 H7 Z"));
+                dc.DrawGeometry(dark, null, Shape("M140,11 H159 L173,20 H135 Z M16,13 H23 V17 H10 Z"));
+                dc.DrawGeometry(cyan, null, Shape("M142,13 H157 L165,18 H140 Z M171,25 H181 V27 H169 Z"));
+                dc.DrawGeometry(graphite, edge, Shape("M16,29 H37 L42,34 V40 H19 L13,36 Z M139,28 H157 L169,34 L164,41 H140 L135,37 Z"));
+                dc.DrawGeometry(amber, null, Shape("M18,32 H34 L38,35 H17 Z M142,31 H157 L164,35 H139 Z"));
+                dc.DrawGeometry(cyan, null, Shape("M20,37 H36 V38.5 H20 Z M141,37 H161 V39 H141 Z"));
+                dc.DrawGeometry(dark, null, Shape("M34,16 H44 L40,20 H32 Z M32,23 H38 L34,27 H30 Z M115,17 H129 L128,19 H114 Z M112,23 H125 L124,25 H111 Z"));
+                HullMark(dc, "鼎山航运", new Rect(44, 15, 65, 14), dark, false);
+                HullMark(dc, "DS–06", new Rect(85, 5, 25, 5), white, false);
+            }
+
+            private void DrawCyberRescue(DrawingContext dc)
+            {
+                var armor = Paint("DDE7D5");
+                var olive = Paint("506F64");
+                var shadow = Paint("283D3D");
+                var signal = Paint("F74656");
+                var edge = Stroke(shadow, .9);
+
+                // The rear fan and the side thruster overlap the armored cabin.
+                dc.DrawGeometry(shadow, edge, Shape("M2,20 L12,12 H30 L36,25 28,39 H9 L0,31 Z M29,31 H107 L116,41 L102,48 H33 L21,42 Z"));
+                dc.DrawGeometry(olive, null, Shape("M4,21 L13,14 H27 L30,21 24,31 H8 Z M36,40 H104 L100,45 H38 Z"));
+                dc.DrawGeometry(armor, edge, Shape("M11,27 L24,12 38,4 H87 L102,11 126,23 129,31 116,39 H24 L12,36 Z"));
+                dc.DrawGeometry(white, null, Shape("M22,20 L39,5 H87 L101,12 H39 L31,20 Z"));
+                dc.DrawGeometry(olive, null, Shape("M14,30 L28,23 H40 L35,35 H117 L111,38 H25 L15,35 Z M79,11 H97 L120,24 H106 L91,16 H77 Z"));
+                dc.DrawGeometry(shadow, null, Shape("M91,12 H97 L114,21 H104 Z M102,12 L124,23 H117 Z M72,10 H83 L77,15 H70 Z"));
+                dc.DrawGeometry(cyan, null, Shape("M94,13 H97 L107,19 H103 Z M115,27 H127 V29 H113 Z M9,29 H18 V31 H8 Z"));
+                dc.DrawGeometry(signal, null, Shape("M30,17 H34 V20 H38 V24 H34 V29 H30 V24 H25 V20 H30 Z M41,6 H56 L53,9 H38 Z M60,6 H68 L65,9 H57 Z"));
+                dc.DrawGeometry(olive, edge, Shape("M12,31 H30 L41,37 V44 H17 L9,40 Z M99,30 H118 L124,34 V39 L114,44 H97 L92,38 Z"));
+                dc.DrawGeometry(armor, null, Shape("M14,32 H30 L35,36 H12 Z M99,31 H116 L120,34 H96 Z"));
+                dc.DrawGeometry(signal, null, Shape("M11,37 H24 L22,40 H13 Z M109,36 H122 L118,39 H107 Z"));
+                dc.DrawGeometry(shadow, null, Shape("M52,27 H94 L89,37 H48 Z"));
+                HullMark(dc, "创伤小组", new Rect(41, 15, 53, 10), shadow, true);
+                HullMark(dc, "白金会员", new Rect(54, 28, 34, 8), white, true);
+            }
+
+            private static void HullMark(DrawingContext dc, string value, Rect plate, Brush brush, bool slanted)
+            {
+                var face = new Typeface(new FontFamily("Microsoft YaHei UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+                var text = new FormattedText(value, CultureInfo.GetCultureInfo("zh-CN"), FlowDirection.LeftToRight, face, 32, brush, 1);
+                var ink = text.BuildGeometry(new Point());
+                if (ink.Bounds.IsEmpty) return;
+                ink = Geometry.Combine(ink, ink.GetWidenedPathGeometry(Stroke(brush, 1.3)), GeometryCombineMode.Union, null);
+                Rect bounds = ink.Bounds;
+                double sx = (plate.Width - (slanted ? 2 : 0)) / bounds.Width;
+                double sy = plate.Height / bounds.Height;
+                double shear = slanted ? -.17 : 0;
+                ink.Transform = new MatrixTransform(sx, 0, shear * sy, sy,
+                    plate.Left - bounds.Left * sx - bounds.Top * shear * sy + (slanted ? 2 : 0), plate.Top - bounds.Top * sy);
+
+                // Sparse stencil breaks leave complex characters readable on the small sprites.
+                var cuts = new GeometryGroup();
+                cuts.Children.Add(new RectangleGeometry(new Rect(plate.Left + plate.Width * .17, plate.Top + plate.Height * .42, plate.Width * .09, .75)));
+                cuts.Children.Add(new RectangleGeometry(new Rect(plate.Left + plate.Width * .70, plate.Top + plate.Height * .70, plate.Width * .13, .75)));
+                dc.DrawGeometry(brush, null, Geometry.Combine(ink, cuts, GeometryCombineMode.Exclude, null));
             }
 
             private void Gear(DrawingContext dc, double x, double y, double radius, double angle)

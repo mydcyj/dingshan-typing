@@ -19,6 +19,9 @@ namespace EnglishTypingPractice
             background.Height = 432;
             background.Child = DrawCity(1200, 432, steam, false);
             header.Child = DrawCity((int)header.Width, 124, steam, true);
+            // These layers are static even while aircraft pass in front of them.
+            background.CacheMode = new BitmapCache();
+            header.CacheMode = new BitmapCache();
         }
 
         private static Image DrawCity(int width, int height, bool steam, bool header)

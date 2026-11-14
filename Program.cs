@@ -20,7 +20,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.4.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.4.1.0")]
 
 namespace EnglishTypingPractice
 {
@@ -104,7 +104,8 @@ namespace EnglishTypingPractice
         private int lastTopic = -1;
         private string original = "";
         private string target = "";
-        private Run[] letters = new Run[0];
+        private readonly List<KeyValuePair<int, Inline>> passageSpans = new List<KeyValuePair<int, Inline>>();
+        private enum LetterState { Pending, Next, Correct, Incorrect }
         private int correctCount;
         private bool resetting;
         private bool updatingPlaylist;
@@ -387,7 +388,6 @@ namespace EnglishTypingPractice
                 music.Dispose();
                 effects.Dispose();
             };
-            ConfigureBackgroundMotion((TranslateTransform)window.FindName("BackgroundDrift"), practicePage);
             ThemeLayout.Attach(window, settings.Theme);
             ThemeWorldMotion.Attach(window, settings.Theme, () => settings.SnakeLowEffects);
             ChoosePassage();
@@ -484,55 +484,6 @@ namespace EnglishTypingPractice
             };
         }
 
-        private void ConfigureBackgroundMotion(TranslateTransform drift, FrameworkElement practicePage)
-        {
-            ClockGroup motion = null;
-            Action update = () =>
-            {
-                if (!SystemParameters.ClientAreaAnimation || settings.SnakeLowEffects)
-                {
-                    drift.ApplyAnimationClock(TranslateTransform.XProperty, null);
-                    drift.ApplyAnimationClock(TranslateTransform.YProperty, null);
-                    motion = null;
-                    return;
-                }
-                if (motion == null)
-                {
-                    if (window.WindowState == WindowState.Minimized)
-                        return;
-                    var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
-                    var duration = TimeSpan.FromSeconds(13);
-                    var timeline = new ParallelTimeline { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
-                    timeline.Children.Add(new DoubleAnimation(-.16, .13, duration) { EasingFunction = ease });
-                    timeline.Children.Add(new DoubleAnimation(.06, -.08, duration) { EasingFunction = ease });
-                    motion = (ClockGroup)timeline.CreateClock(true);
-                    drift.ApplyAnimationClock(TranslateTransform.XProperty, (AnimationClock)motion.Children[0]);
-                    drift.ApplyAnimationClock(TranslateTransform.YProperty, (AnimationClock)motion.Children[1]);
-                }
-                if (window.WindowState == WindowState.Minimized)
-                    motion.Controller.Pause();
-                else
-                    motion.Controller.Resume();
-            };
-            System.ComponentModel.PropertyChangedEventHandler changed = (sender, e) =>
-            {
-                if (e.PropertyName == "ClientAreaAnimation")
-                    update();
-            };
-            SystemParameters.StaticPropertyChanged += changed;
-            window.StateChanged += (sender, e) => update();
-            practicePage.IsVisibleChanged += (sender, e) => update();
-            var lowEffects = (CheckBox)window.FindName("SnakeLowEffects");
-            lowEffects.Click += (sender, e) => update();
-            window.Loaded += (sender, e) => update();
-            window.Closed += (sender, e) =>
-            {
-                SystemParameters.StaticPropertyChanged -= changed;
-                if (motion != null)
-                    motion.Controller.Stop();
-            };
-        }
-
         private void ChoosePassage()
         {
             priorRoundResult = null;
@@ -607,7 +558,7 @@ namespace EnglishTypingPractice
             if (settings.TypingFeedback)
             {
                 if (IsChinese)
-                    effects.Play(null, null, complete, letters[length - 1]);
+                    effects.Play(null, null, complete, PassagePosition(length - 1));
                 else
                 {
                     int wordStart = -1, wordEnd = -1;
@@ -722,14 +673,6 @@ namespace EnglishTypingPractice
             round = new TypingRound(target, MatchExactCase, IsCode, IsChinese);
             typed.MaxLength = target.Length + target.Count(c => c == '\n');
             progress.Maximum = target.Length;
-            letters = target.Select(c => new Run(c == '\n' ? "" : c.ToString())).ToArray();
-            passage.Inlines.Clear();
-            for (int i = 0; i < letters.Length; i++)
-            {
-                passage.Inlines.Add(letters[i]);
-                if (target[i] == '\n')
-                    passage.Inlines.Add(new LineBreak());
-            }
 
             roundStatus.Text = original.Length != 0 ? "未开始" : IsReview ? "这个词库暂无待复习词" : "这个题型暂无练习";
             resetting = false;
@@ -794,7 +737,7 @@ namespace EnglishTypingPractice
                 if (IsChinese)
                 {
                     if (complete || inputChanged && (change == null || change.Changes.Any(item => item.AddedLength > 0)))
-                        effects.Play(null, null, complete, input.Length > 0 ? letters[Math.Min(input.Length, letters.Length) - 1] : null);
+                        effects.Play(null, null, complete, PassagePosition(Math.Min(input.Length, target.Length) - 1));
                 }
                 else
                     PlayFeedback(change, complete);
@@ -928,9 +871,9 @@ namespace EnglishTypingPractice
         private void PlayFeedback(int wordStart, int wordEnd, bool letterTyped, bool complete, int hit)
         {
             if (letterTyped || complete)
-                effects.Play(wordStart < 0 ? null : letters[wordStart],
+                effects.Play(PassagePosition(wordStart),
                     wordStart < 0 ? null : target.Substring(wordStart, wordEnd - wordStart + 1), complete,
-                    hit >= 0 && hit < letters.Length ? letters[hit] : null);
+                    PassagePosition(hit));
         }
 
         private bool IsWordCharacter(int index)
@@ -946,28 +889,81 @@ namespace EnglishTypingPractice
         private void RefreshProgress()
         {
             string input = ReadInput();
+            bool exact = MatchExactCase;
             correctCount = 0;
-            for (int i = 0; i < letters.Length; i++)
+            passageSpans.Clear();
+            passage.Inlines.Clear();
+            // One run per contiguous highlight state keeps WPF from shaping each character separately.
+            int start = 0;
+            LetterState previous = LetterState.Pending;
+            for (int i = 0; i < target.Length; i++)
             {
-                var letter = letters[i];
                 bool entered = i < input.Length;
-                bool correct = entered && (MatchExactCase
+                bool correct = entered && (exact
                     ? input[i] == target[i]
                     : char.ToUpperInvariant(input[i]) == char.ToUpperInvariant(target[i]));
-                bool incorrect = entered && !correct;
                 if (correct)
                     correctCount++;
 
-                letter.Foreground = correct ? correctBrush : incorrect ? incorrectBrush : passage.Foreground;
-                letter.Background = incorrect ? incorrectBackground : i == input.Length ? nextBackground : null;
-                letter.TextDecorations = incorrect ? TextDecorations.Underline : null;
+                LetterState state = correct ? LetterState.Correct : entered ? LetterState.Incorrect
+                    : i == input.Length ? LetterState.Next : LetterState.Pending;
+                if (target[i] == '\n')
+                {
+                    AddPassageRun(start, i - start, previous);
+                    AddPassageInline(i, new LineBreak());
+                    start = i + 1;
+                }
+                else if (state != previous)
+                {
+                    AddPassageRun(start, i - start, previous);
+                    start = i;
+                }
+                previous = state;
             }
+            AddPassageRun(start, target.Length - start, previous);
 
             count.Text = input.Length + " / " + target.Length;
             progress.Value = input.Length;
             accuracy.Text = round.Accuracy;
             if (IsMapping)
                 keyboardMapping.Update(target, input, MatchExactCase);
+        }
+
+        private void AddPassageRun(int start, int length, LetterState state)
+        {
+            if (length == 0)
+                return;
+            var run = new Run(target.Substring(start, length));
+            if (state == LetterState.Correct)
+                run.Foreground = correctBrush;
+            else if (state == LetterState.Incorrect)
+            {
+                run.Foreground = incorrectBrush;
+                run.Background = incorrectBackground;
+                run.TextDecorations = TextDecorations.Underline;
+            }
+            else if (state == LetterState.Next)
+                run.Background = nextBackground;
+            AddPassageInline(start, run);
+        }
+
+        private void AddPassageInline(int start, Inline inline)
+        {
+            passage.Inlines.Add(inline);
+            passageSpans.Add(new KeyValuePair<int, Inline>(start, inline));
+        }
+
+        private TextPointer PassagePosition(int index)
+        {
+            if (index < 0 || index >= target.Length)
+                return null;
+            for (int i = passageSpans.Count - 1; i >= 0; i--)
+            {
+                var span = passageSpans[i];
+                if (index >= span.Key)
+                    return span.Value.ContentStart.GetPositionAtOffset(index - span.Key, LogicalDirection.Forward);
+            }
+            return null;
         }
 
         private string ReadInput()
