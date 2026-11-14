@@ -21,6 +21,7 @@ namespace EnglishTypingPractice
 
         internal static void Apply(Window window, UiTheme theme)
         {
+            window.FontFamily = ThemeLettering.InterfaceFamily(theme);
             var originalPrimary = window.FindResource("PrimaryButton") as Style;
             string assembly = Assembly.GetExecutingAssembly().GetName().Name;
             string markup = Templates.Replace("$ASSEMBLY$", assembly).Replace("$THEME$", theme.ToString());
@@ -34,6 +35,11 @@ namespace EnglishTypingPractice
                 var prior = window.TryFindResource(type) as Style;
                 var style = new Style(type, prior);
                 style.Setters.Add(new Setter(Control.TemplateProperty, template));
+                if (type != typeof(TextBox) && type != typeof(Slider))
+                {
+                    style.Setters.Add(new Setter(Control.FontFamilyProperty, ThemeLettering.Family(theme)));
+                    style.Setters.Add(new Setter(Control.FontWeightProperty, ThemeLettering.CaptionWeight(theme)));
+                }
                 if (type == typeof(Button))
                     style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(17, 8, 17, 8)));
                 window.Resources[type] = style;
@@ -41,16 +47,43 @@ namespace EnglishTypingPractice
             var primary = new Style(typeof(Button), originalPrimary);
             primary.Setters.Add(new Setter(Control.TemplateProperty, templates[typeof(Button)]));
             primary.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(18, 9, 18, 9)));
+            primary.Setters.Add(new Setter(Control.FontFamilyProperty, ThemeLettering.Family(theme)));
+            primary.Setters.Add(new Setter(Control.FontWeightProperty, ThemeLettering.CaptionWeight(theme)));
             window.Resources["PrimaryButton"] = primary;
 
+            // Popup containers use a separate visual tree, so give them the caption face explicitly.
+            foreach (Type type in new[] { typeof(ComboBoxItem), typeof(ListBoxItem) })
+            {
+                var style = new Style(type, window.TryFindResource(type) as Style);
+                style.Setters.Add(new Setter(Control.FontFamilyProperty, ThemeLettering.Family(theme)));
+                style.Setters.Add(new Setter(Control.FontWeightProperty, ThemeLettering.CaptionWeight(theme)));
+                window.Resources[type] = style;
+            }
+
+            var displayTitle = window.FindResource("DisplayTitle");
+            var sectionTitle = window.FindResource("SectionTitle");
+            var statValue = window.FindResource("StatValue");
             foreach (DependencyObject item in Descendants(window))
             {
                 var control = item as Control;
                 if (control != null && templates.ContainsKey(control.GetType()))
                     control.Template = templates[control.GetType()];
                 var title = item as TextBlock;
-                if (title != null && title.Style == window.TryFindResource("DisplayTitle"))
-                    StylizeTitle(title, theme);
+                if (title != null)
+                {
+                    if (title.Style == displayTitle)
+                        StylizeTitle(title, theme);
+                    else if (title.Style == sectionTitle)
+                        title.FontFamily = ThemeLettering.Family(theme);
+                    else if (title.Style == statValue || title.Name == "SnakeScore" ||
+                        title.Name == "MusicTime" || title.Name == "Count")
+                    {
+                        title.FontFamily = ThemeLettering.NumberFamily(theme);
+                        Typography.SetNumeralAlignment(title, FontNumeralAlignment.Tabular);
+                        if (title.Style == statValue && theme == UiTheme.ChineseStyle)
+                            title.FontSize = 27;
+                    }
+                }
             }
         }
 
@@ -156,7 +189,8 @@ namespace EnglishTypingPractice
     <TextBlock x:Name='Tick' Text='✓' FontWeight='Bold' FontSize='15' Foreground='{DynamicResource Accent}' Visibility='Hidden' HorizontalAlignment='Center' VerticalAlignment='Center'/>
     <Border x:Name='ActivationEdge' IsHitTestVisible='False' BorderBrush='{DynamicResource Accent}' BorderThickness='2' Opacity='0'/>
    </Grid>
-   <ContentPresenter VerticalAlignment='Center' RecognizesAccessKey='True'/>
+   <ContentPresenter VerticalAlignment='Center' RecognizesAccessKey='True'
+    TextElement.FontFamily='{TemplateBinding FontFamily}' TextElement.FontWeight='{TemplateBinding FontWeight}'/>
   </DockPanel>
   <ControlTemplate.Triggers>
    <Trigger Property='IsChecked' Value='True'><Setter TargetName='Tick' Property='Visibility' Value='Visible'/></Trigger>
@@ -171,7 +205,8 @@ namespace EnglishTypingPractice
    <Border x:Name='ActivationEdge' IsHitTestVisible='False' BorderBrush='{DynamicResource Accent}' BorderThickness='2' Margin='3' Opacity='0'/>
    <DockPanel Margin='{TemplateBinding Padding}'>
     <TextBlock x:Name='Mark' Text='◇' Foreground='{DynamicResource Accent}' FontSize='18' Margin='3,0,8,0' VerticalAlignment='Center'/>
-    <ContentPresenter VerticalAlignment='Center' RecognizesAccessKey='True'/>
+    <ContentPresenter VerticalAlignment='Center' RecognizesAccessKey='True'
+     TextElement.FontFamily='{TemplateBinding FontFamily}' TextElement.FontWeight='{TemplateBinding FontWeight}'/>
    </DockPanel>
   </Grid>
   <ControlTemplate.Triggers>
@@ -198,7 +233,8 @@ namespace EnglishTypingPractice
      </Grid>
     </ControlTemplate></ToggleButton.Template>
    </ToggleButton>
-   <ContentPresenter IsHitTestVisible='False' Margin='13,4,30,4' VerticalAlignment='Center'
+   <ContentPresenter IsHitTestVisible='False' Margin='9,4,24,4' VerticalAlignment='Center'
+    TextElement.FontFamily='{TemplateBinding FontFamily}' TextElement.FontWeight='{TemplateBinding FontWeight}'
     Content='{TemplateBinding SelectionBoxItem}' ContentTemplate='{TemplateBinding SelectionBoxItemTemplate}' ContentTemplateSelector='{TemplateBinding ItemTemplateSelector}'/>
    <Border x:Name='FocusEdge' IsHitTestVisible='False' BorderBrush='{DynamicResource Accent}' BorderThickness='1' Margin='3' Visibility='Collapsed'/>
    <Border x:Name='ActivationEdge' IsHitTestVisible='False' BorderBrush='{DynamicResource Accent}' BorderThickness='2' Margin='3' Opacity='0'/>
@@ -217,13 +253,14 @@ namespace EnglishTypingPractice
  <ControlTemplate x:Key='ExpanderDesign' TargetType='Expander'>
   <StackPanel x:Name='Chrome'>
    <ToggleButton x:Name='Header' HorizontalContentAlignment='Stretch' Content='{TemplateBinding Header}'
+    FontFamily='{TemplateBinding FontFamily}' FontWeight='{TemplateBinding FontWeight}'
     IsChecked='{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}'>
     <ToggleButton.Template><ControlTemplate TargetType='ToggleButton'>
      <Grid Background='Transparent'>
       <d:ThemePlate Theme='$THEME$' Fill='{DynamicResource Raised}' Line='{DynamicResource Line}' Accent='{DynamicResource Accent}'
        Hot='{Binding IsMouseOver, RelativeSource={RelativeSource TemplatedParent}}' Down='{Binding IsPressed, RelativeSource={RelativeSource TemplatedParent}}'
        Focused='{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource TemplatedParent}}'/>
-      <DockPanel Margin='12,7'><TextBlock x:Name='Arrow' Text='+' Margin='0,0,9,0' Foreground='{DynamicResource Accent}'/><ContentPresenter/></DockPanel>
+      <DockPanel Margin='12,7'><TextBlock x:Name='Arrow' Text='+' Margin='0,0,9,0' Foreground='{DynamicResource Accent}'/><ContentPresenter TextElement.FontFamily='{TemplateBinding FontFamily}' TextElement.FontWeight='{TemplateBinding FontWeight}'/></DockPanel>
       <Border x:Name='ActivationEdge' IsHitTestVisible='False' BorderBrush='{DynamicResource Accent}' BorderThickness='1' Margin='3' Opacity='0'/>
      </Grid>
      <ControlTemplate.Triggers><Trigger Property='IsChecked' Value='True'><Setter TargetName='Arrow' Property='Text' Value='−'/></Trigger></ControlTemplate.Triggers>
@@ -405,26 +442,55 @@ namespace EnglishTypingPractice
 
     internal static class ThemeLettering
     {
+        internal static FontFamily InterfaceFamily(UiTheme theme)
+        {
+            // Use related reading faces for instructions and other long UI text.
+            switch (theme)
+            {
+                case UiTheme.Cyberpunk: return new FontFamily("Bahnschrift SemiCondensed, DengXian, Microsoft YaHei UI");
+                case UiTheme.Minimal: return new FontFamily("Segoe UI, DengXian, Microsoft YaHei UI");
+                case UiTheme.Steampunk: return new FontFamily("Cambria, SimSun, Microsoft YaHei UI");
+                case UiTheme.Vaporwave: return new FontFamily("Consolas, Microsoft YaHei UI");
+                case UiTheme.Constructivist: return new FontFamily("Arial Narrow, SimHei, Microsoft YaHei UI");
+                case UiTheme.Persona5: return new FontFamily("Trebuchet MS, Microsoft YaHei UI");
+                case UiTheme.ChineseStyle: return new FontFamily("KaiTi, SimSun, Microsoft YaHei UI");
+                default: return new FontFamily("Bahnschrift, Microsoft YaHei UI");
+            }
+        }
+
         internal static FontFamily Family(UiTheme theme)
         {
             switch (theme)
             {
-                case UiTheme.Cyberpunk: return new FontFamily("Bahnschrift SemiCondensed, Microsoft YaHei UI");
-                case UiTheme.Minimal: return new FontFamily("Segoe UI Light, Microsoft YaHei UI");
-                case UiTheme.Steampunk: return new FontFamily("Georgia, SimSun");
-                case UiTheme.Vaporwave: return new FontFamily("Consolas, Microsoft YaHei UI");
-                case UiTheme.Constructivist: return new FontFamily("Impact, Microsoft YaHei UI");
-                case UiTheme.Persona5: return new FontFamily("Arial Black, Microsoft YaHei UI");
-                case UiTheme.ChineseStyle: return new FontFamily("KaiTi, SimSun");
+                case UiTheme.Cyberpunk: return new FontFamily("Bahnschrift SemiCondensed, SimHei, Microsoft YaHei UI");
+                case UiTheme.Minimal: return new FontFamily("Segoe UI Light, DengXian, Microsoft YaHei UI");
+                case UiTheme.Steampunk: return new FontFamily("Georgia, SimSun, Microsoft YaHei UI");
+                case UiTheme.Vaporwave: return new FontFamily("Consolas, YouYuan, Microsoft YaHei UI");
+                case UiTheme.Constructivist: return new FontFamily("Impact, SimHei, Microsoft YaHei UI");
+                case UiTheme.Persona5: return new FontFamily("Arial Black, DengXian, Microsoft YaHei UI");
+                case UiTheme.ChineseStyle: return new FontFamily("KaiTi, SimSun, Microsoft YaHei UI");
                 default: return new FontFamily("Bahnschrift, Microsoft YaHei UI");
             }
+        }
+
+        internal static FontWeight CaptionWeight(UiTheme theme)
+        {
+            return theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle ? FontWeights.Normal : FontWeights.Bold;
+        }
+
+        internal static FontFamily NumberFamily(UiTheme theme)
+        {
+            // Scores must fit decimal accuracies and multi-digit times in narrow HUD columns.
+            if (theme == UiTheme.Persona5) return new FontFamily("Arial Narrow, Microsoft YaHei UI");
+            if (theme == UiTheme.ChineseStyle) return new FontFamily("Times New Roman, KaiTi, SimSun");
+            return Family(theme);
         }
 
         internal static FormattedText Format(string value, double size, UiTheme theme, Brush ink)
         {
             return new FormattedText(value, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
                 new Typeface(Family(theme), FontStyles.Normal,
-                    theme == UiTheme.Minimal ? FontWeights.Normal : FontWeights.Bold, FontStretches.Normal), size, ink, 1.0);
+                    CaptionWeight(theme), FontStretches.Normal), size, ink, 1.0);
         }
 
         internal static void Draw(DrawingContext dc, string value, double size, UiTheme theme, Brush ink, Rect area, bool title)
@@ -462,6 +528,12 @@ namespace EnglishTypingPractice
             else
             {
                 var outline = formatted.BuildGeometry(new Point(2, 0));
+                if (theme == UiTheme.Cyberpunk || theme == UiTheme.Constructivist)
+                {
+                    // A small forward rake makes the label read like an industrial nameplate.
+                    double rake = theme == UiTheme.Cyberpunk ? -.12 : -.08;
+                    outline.Transform = new MatrixTransform(1, 0, rake, 1, -rake * formatted.Height * .7, 0);
+                }
                 if (theme == UiTheme.Cyberpunk || theme == UiTheme.Vaporwave)
                 {
                     dc.PushOpacity(title ? .65 : .34);

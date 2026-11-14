@@ -6,7 +6,6 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Threading;
 
 namespace EnglishTypingPractice
 {
@@ -18,7 +17,11 @@ namespace EnglishTypingPractice
         private readonly FrameworkElement startup;
         private readonly WorldScene background, header;
         private readonly Stopwatch elapsed = new Stopwatch();
-        private readonly DispatcherTimer timer;
+        private static readonly TimeSpan FrameInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60);
+        private static readonly TimeSpan FrameTolerance = TimeSpan.FromMilliseconds(1);
+        private TimeSpan? lastRenderingTime;
+        private TimeSpan nextFrame;
+        private bool rendering;
         private bool closed;
 
         internal static void Attach(Window window, UiTheme theme, Func<bool> lowEffects)
@@ -40,8 +43,6 @@ namespace EnglishTypingPractice
             Panel.SetZIndex(header, 0);
             hero.Children.Add(header);
             hero.SizeChanged += ResizeHeader;
-            timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(1000.0 / 24) };
-            timer.Tick += Tick;
             window.Loaded += Update;
             window.StateChanged += Update;
             window.IsVisibleChanged += VisibilityChanged;
@@ -73,24 +74,49 @@ namespace EnglishTypingPractice
 
         private void Update(object sender, EventArgs e)
         {
-            if (CanRun()) { elapsed.Start(); timer.Start(); }
-            else { elapsed.Stop(); timer.Stop(); }
+            if (!CanRun())
+                StopRendering();
+            else if (!rendering)
+            {
+                rendering = true;
+                lastRenderingTime = null;
+                elapsed.Start();
+                CompositionTarget.Rendering += Render;
+            }
         }
 
-        private void Tick(object sender, EventArgs e)
+        private void Render(object sender, EventArgs e)
         {
-            if (!CanRun()) { Update(sender, e); return; }
+            if (!CanRun()) { StopRendering(); return; }
+            var time = ((RenderingEventArgs)e).RenderingTime;
+            if (lastRenderingTime == time)
+                return;
+            if (!lastRenderingTime.HasValue || time < lastRenderingTime.Value)
+                nextFrame = time;
+            lastRenderingTime = time;
+            if (time + FrameTolerance < nextFrame)
+                return;
+            nextFrame += FrameInterval;
+            if (nextFrame <= time)
+                nextFrame = time + FrameInterval;
             double seconds = elapsed.Elapsed.TotalSeconds;
             if (background.IsVisible) background.Advance(seconds);
             if (header.IsVisible) header.Advance(seconds);
         }
 
+        private void StopRendering()
+        {
+            if (!rendering)
+                return;
+            CompositionTarget.Rendering -= Render;
+            elapsed.Stop();
+            rendering = false;
+        }
+
         private void Close(object sender, EventArgs e)
         {
             closed = true;
-            timer.Stop();
-            elapsed.Stop();
-            timer.Tick -= Tick;
+            StopRendering();
             window.Loaded -= Update;
             window.StateChanged -= Update;
             window.IsVisibleChanged -= VisibilityChanged;
@@ -108,9 +134,11 @@ namespace EnglishTypingPractice
             private readonly bool hero;
             private readonly Dictionary<string, DrawingImage> art = new Dictionary<string, DrawingImage>();
             private readonly DrawingGroup scenery = new DrawingGroup();
-            private readonly TranslateTransform[] traffic;
+            private readonly DrawingGroup[] traffic;
             private readonly TranslateTransform carrier = new TranslateTransform(), rescue = new TranslateTransform();
             private readonly DrawingGroup rescueLights = new DrawingGroup();
+            private DrawingGroup carrierDrawing, rescueDrawing;
+            private static readonly string[] VehicleKeys = { "car", "police", "luxury", "tuner" };
             private readonly Brush white = Paint("FFF3DC"), dark = Paint("191422"), cyan = Paint("68F5ED"), pink = Paint("F05D9E");
             private readonly Brush brass = Paint("D7AA65"), iron = Paint("49382C"), steam = Paint("E9D4B4");
             private readonly Brush ink = Paint("37655A"), paper = Paint("F4ECD9"), red = Paint("BA3329"), violet = Paint("8C61C7");
@@ -139,7 +167,7 @@ namespace EnglishTypingPractice
                 MakeArt();
                 if (theme == UiTheme.Cyberpunk)
                 {
-                    traffic = new TranslateTransform[hero ? 5 : 12];
+                    traffic = new DrawingGroup[hero ? 6 : 12];
                     BuildCyberpunk();
                 }
                 Advance(0);
@@ -186,27 +214,31 @@ namespace EnglishTypingPractice
             {
                 for (int i = 0; i < traffic.Length; i++)
                 {
-                    double depth = .35 + (i % 3) * .21;
                     double y = hero ? 43 + i % 3 * 28 : 68 + i * 43;
-                    double size = 49 * depth;
-                    traffic[i] = new TranslateTransform(0, y);
-                    var car = AddMovingDrawing(traffic[i], dc =>
+                    string key = VehicleKeys[i % VehicleKeys.Length];
+                    double size = VehicleWidth(i);
+                    bool eastbound = i % 2 == 0;
+                    double height = size * art[key].Height / art[key].Width;
+                    traffic[i] = AddMovingDrawing(new TranslateTransform(0, y), dc =>
                     {
-                        dc.DrawLine(trace, new Point(-27, 6), new Point(-5, 6));
-                        Sprite(dc, "car", 0, 0, size, size * .4);
+                        if (!eastbound) dc.PushTransform(new ScaleTransform(-1, 1, size / 2, 0));
+                        dc.PushOpacity(.35);
+                        dc.DrawLine(trace, new Point(-19, height * .67), new Point(-3, height * .67));
+                        dc.Pop();
+                        Sprite(dc, key, 0, 0, size, height);
+                        if (!eastbound) dc.Pop();
                     });
-                    car.Opacity = .4 + depth * .4;
                 }
                 carrier.Y = hero ? 10 : 62;
-                AddMovingDrawing(carrier, dc => Sprite(dc, "carrier", 0, 0, CarrierWidth, hero ? 49 : 70));
+                carrierDrawing = AddMovingDrawing(carrier, dc => Sprite(dc, "carrier", 0, 0, CarrierWidth, hero ? 49 : 70));
                 double rescueHeight = hero ? 52 : 68;
-                var aircraft = AddMovingDrawing(rescue, dc => Sprite(dc, "rescue", 0, 0, RescueWidth, rescueHeight));
+                rescueDrawing = AddMovingDrawing(rescue, dc => Sprite(dc, "rescue", 0, 0, RescueWidth, rescueHeight));
                 using (var dc = rescueLights.Open())
                 {
                     dc.DrawEllipse(cyan, null, new Point(RescueWidth * .09, rescueHeight * .6), 2.5, 1.1);
                     dc.DrawEllipse(pink, null, new Point(RescueWidth * .88, rescueHeight * .74), 2.5, 1.1);
                 }
-                aircraft.Children.Add(rescueLights);
+                rescueDrawing.Children.Add(rescueLights);
             }
 
             private DrawingGroup AddMovingDrawing(TranslateTransform position, Action<DrawingContext> draw)
@@ -221,22 +253,36 @@ namespace EnglishTypingPractice
             {
                 double w = SceneWidth;
                 for (int i = 0; i < traffic.Length; i++)
-                    traffic[i].X = Wrap(seconds * (15 + i * 3) * (i % 2 == 0 ? 1 : -1) + i * 131, w + 100) - 70;
-                carrier.X = Wrap(seconds * 6 + (hero ? 140 : 50) + CarrierWidth, w + CarrierWidth) - CarrierWidth;
-                rescue.X = Wrap(seconds * 15 + w * .58 + RescueWidth, w + RescueWidth) - RescueWidth;
+                {
+                    var position = (TranslateTransform)traffic[i].Transform;
+                    double width = VehicleWidth(i);
+                    double velocity = (15 + i * 3) * (i % 2 == 0 ? 1 : -1);
+                    position.X = LoopX(seconds * velocity + 45 + i * 131, w, width);
+                    traffic[i].Opacity = (.56 + i % 3 * .14) * FadeAtEdges(position.X, w, width);
+                }
+                carrier.X = LoopX(seconds * 6 + (hero ? 140 : 50), w, CarrierWidth);
+                carrierDrawing.Opacity = FadeAtEdges(carrier.X, w, CarrierWidth);
+                rescue.X = LoopX(seconds * 15 + w * .58, w, RescueWidth);
+                rescueDrawing.Opacity = FadeAtEdges(rescue.X, w, RescueWidth);
                 rescue.Y = (hero ? 72 : SceneHeight * .67) + Math.Sin(seconds * .5) * (hero ? 4 : 8);
                 rescueLights.Opacity = .58 + .32 * Math.Sin(seconds * 2.1);
             }
 
+            private static double VehicleWidth(int index) { return 32 + index % 3 * 10; }
+
             private void Steampunk(DrawingContext dc, double w, double h)
             {
-                double shipX = Wrap(seconds * 5.5 + w * .58, w + 200) - 100;
+                double shipWidth = hero ? 141 : 225;
+                double shipX = LoopX(seconds * 5.5 + w * .58 - 100, w, shipWidth);
                 double shipY = hero ? 10 : 95;
-                Sprite(dc, "airship", shipX, shipY + Math.Sin(seconds * .35) * 4, hero ? 141 : 225, hero ? 62 : 99);
-                Sprite(dc, "airship", Wrap(seconds * -3 + 70, w + 130) - 90, hero ? 30 : 38, 75, 33);
-                double mechX = Wrap(seconds * 5.8 + (hero ? 145 : 880), w + 160) - 80;
+                EdgeSprite(dc, "airship", shipX, shipY + Math.Sin(seconds * .35) * 4, shipWidth, hero ? 62 : 99);
+                EdgeSprite(dc, "airship", LoopX(seconds * -3 - 20, w, 75), hero ? 30 : 38, 75, 33);
+                double mechWidth = hero ? 130 : 300;
+                double mechLeft = LoopX(seconds * 5.8 + (hero ? 65 : 800) - mechWidth / 2, w, mechWidth);
+                double mechX = mechLeft + mechWidth / 2;
                 double floor = hero ? 146 : h - 20;
                 double scale = hero ? .79 : 1.8;
+                dc.PushOpacity(FadeAtEdges(mechLeft, w, mechWidth));
                 dc.PushTransform(new TranslateTransform(mechX, floor));
                 dc.PushTransform(new ScaleTransform(scale, scale));
                 double stride = Math.Sin(seconds * 2.5);
@@ -256,7 +302,7 @@ namespace EnglishTypingPractice
                         5 + age * 14, 4 + age * 9);
                     dc.Pop();
                 }
-                dc.Pop(); dc.Pop();
+                dc.Pop(); dc.Pop(); dc.Pop();
                 Gear(dc, hero ? 37 : 30, hero ? 122 : h - 52, hero ? 18 : 33, -seconds * 13);
             }
 
@@ -311,7 +357,8 @@ namespace EnglishTypingPractice
             {
                 for (int i = 0; i < (hero ? 2 : 5); i++)
                 {
-                    double x = Wrap(seconds * (2 + i * .3) + i * w / 4, w + 180) - 80;
+                    double radius = hero ? 91 : 150;
+                    double x = LoopX(seconds * (2 + i * .3) + i * w / 4 - 80 - radius, w, radius * 2) + radius;
                     double y = hero ? 50 + i * 25 : 95 + i * 113;
                     dc.PushOpacity(.10 + i % 2 * .04);
                     dc.DrawEllipse(paper, null, new Point(x, y), hero ? 87 : 150, hero ? 9 : 17);
@@ -320,14 +367,15 @@ namespace EnglishTypingPractice
                 }
                 for (int i = 0; i < 3; i++)
                 {
-                    dc.PushTransform(new TranslateTransform(Wrap(seconds * 6 + w * .65 + i * 21, w + 70) - 20,
+                    dc.PushTransform(new TranslateTransform(LoopX(seconds * 6 + w * .65 + i * 21 - 32, w, 24) + 12,
                         (hero ? 30 : h * .22) + i * 11 + Math.Sin(seconds * 1.2 + i) * 3));
                     dc.PushTransform(new ScaleTransform(.6, .5 + Math.Sin(seconds * 2 + i) * .23));
                     dc.DrawGeometry(null, jade, bird); dc.Pop(); dc.Pop();
                 }
-                double boat = Wrap(seconds * 3 + w * .38, w + 110) - 50, water = h - (hero ? 10 : 29);
-                Sprite(dc, "boat", boat, water - (hero ? 28 : 49) + Math.Sin(seconds * .8) * 1.5, hero ? 82 : 143, hero ? 31 : 54);
-                dc.PushOpacity(.3);
+                double boatWidth = hero ? 82 : 143;
+                double boat = LoopX(seconds * 3 + w * .38 - 50, w, boatWidth), water = h - (hero ? 10 : 29);
+                EdgeSprite(dc, "boat", boat, water - (hero ? 31 : 54) + Math.Sin(seconds * .8) * 1.5, boatWidth, hero ? 31 : 54);
+                dc.PushOpacity(.3 * FadeAtEdges(boat, w, boatWidth));
                 for (int i = 0; i < 3; i++) dc.DrawLine(jade, new Point(boat - 25 - i * 4, water + i * 4), new Point(boat + 15 - i * 5, water + i * 4));
                 dc.Pop();
             }
@@ -336,7 +384,7 @@ namespace EnglishTypingPractice
             {
                 for (int i = 0; i < (hero ? 4 : 9); i++)
                 {
-                    double x = Wrap(seconds * (2 + i % 3) + i * 149, w + 100) - 50;
+                    double x = LoopX(seconds * (2 + i % 3) + i * 149 - 78, w, 66) + 28;
                     double y = hero ? 30 + i % 3 * 40 : 28 + i * 79;
                     dc.PushTransform(new TranslateTransform(x, y + Math.Sin(seconds * .6 + i) * 6));
                     dc.PushTransform(new RotateTransform(-17 + Math.Sin(seconds * .17 + i) * 12));
@@ -344,7 +392,7 @@ namespace EnglishTypingPractice
                     dc.DrawGeometry(i % 2 == 0 ? red : white, darkTwo, i % 3 == 0 ? bolt : star);
                     dc.Pop(); dc.Pop(); dc.Pop();
                 }
-                double sweep = Wrap(seconds * 17 + w * .4, w + 200) - 100;
+                double sweep = LoopX(seconds * 17 + w * .4 - 200, w, 200) + 100;
                 dc.PushOpacity(.14);
                 dc.DrawLine(hero ? redEight : redEighteen, new Point(sweep - 100, h), new Point(sweep + 80, 0));
                 dc.Pop();
@@ -398,15 +446,32 @@ namespace EnglishTypingPractice
                 if (theme == UiTheme.Cyberpunk)
                 {
                     Add("car", dc => {
-                        dc.DrawGeometry(dark, trace, Shape("M0,11 L16,2 54,2 71,13 62,21 H8 Z"));
-                        dc.DrawGeometry(cyan, null, Shape("M19,4 H49 L58,11 H10 Z"));
-                        dc.DrawRectangle(pink, null, new Rect(5, 16, 12, 2)); dc.DrawRectangle(cyan, null, new Rect(58, 15, 9, 2));
+                        dc.DrawGeometry(Paint("323747"), Stroke(Paint("8A8FA6"), .8), Shape("M0,12 L8,8 H17 L27,2 H46 L58,10 68,12 71,16 66,21 H8 Z"));
+                        dc.DrawGeometry(Paint("55727E"), null, Shape("M27,4 H35 V10 H19 Z M38,4 H46 L54,10 H38 Z"));
+                        dc.DrawGeometry(Paint("55566B"), null, Shape("M9,12 H59 L64,14 H12 Z"));
+                        dc.DrawGeometry(Paint("272837"), null, Shape("M11,17 H23 L22,21 H13 Z M48,17 H62 L61,21 H50 Z"));
+                        dc.DrawRectangle(Paint("C5778B"), null, new Rect(3, 13, 7, 2));
+                        dc.DrawRectangle(Paint("9EB9C8"), null, new Rect(60, 13, 9, 2));
                     });
+                    Add("police", DrawCyberPatrol);
+                    Add("luxury", DrawCyberLuxury);
+                    Add("tuner", DrawCyberTuner);
                     Add("carrier", DrawCyberCarrier);
                     Add("rescue", DrawCyberRescue);
                 }
                 if (theme == UiTheme.Steampunk)
                 {
+                    Add("gear", dc =>
+                    {
+                        dc.DrawEllipse(iron, copper, new Point(), 16, 16);
+                        for (int i = 0; i < 10; i++)
+                        {
+                            dc.PushTransform(new RotateTransform(i * 36));
+                            dc.DrawRectangle(brass, null, new Rect(-2.6, -20, 5.2, 7));
+                            dc.Pop();
+                        }
+                        dc.DrawEllipse(iron, copper, new Point(), 6.2, 6.2);
+                    });
                     Add("airship", dc => {
                         dc.DrawEllipse(iron, copper, new Point(93, 29), 79, 27);
                         dc.DrawGeometry(brass, null, Shape("M15,29 L1,15 3,43 Z M158,19 L183,8 175,30 Z"));
@@ -458,13 +523,57 @@ namespace EnglishTypingPractice
                     });
             }
 
+            private void DrawCyberPatrol(DrawingContext dc)
+            {
+                var hull = Paint("272A43");
+                var plating = Paint("696B87");
+                var cold = Paint("87B7DF");
+                var warning = Paint("DE6E91");
+                dc.DrawGeometry(hull, Stroke(plating, .8), Shape("M1,10 H16 L23,5 H58 L65,11 74,13 76,18 69,24 H8 L0,20 Z"));
+                dc.DrawGeometry(plating, null, Shape("M17,12 L24,6 H44 L39,12 Z M48,7 H58 L63,12 H45 Z M2,17 H73 L71,20 H3 Z"));
+                dc.DrawGeometry(Paint("343751"), null, Shape("M13,19 H31 L28,27 H11 Z M52,19 H72 L66,27 H50 Z M29,1 H48 L51,5 H28 Z"));
+                dc.DrawRectangle(cold, null, new Rect(29, 1, 8, 2.8));
+                dc.DrawRectangle(warning, null, new Rect(41, 1, 8, 2.8));
+                dc.DrawGeometry(cold, null, Shape("M62,13 H70 L74,16 H62 Z M12,24 H24 V25.5 H12 Z M52,24 H66 V25.5 H52 Z"));
+                dc.DrawGeometry(Paint("A9AAC6"), null, Shape("M35,15 H41 L39,19 36,21 33,18 Z"));
+                dc.DrawRectangle(warning, null, new Rect(2, 12, 7, 2));
+            }
+
+            private void DrawCyberLuxury(DrawingContext dc)
+            {
+                var shell = Paint("8A819B");
+                var shade = Paint("504B67");
+                var trim = Paint("DEC5A6");
+                dc.DrawGeometry(shell, Stroke(Paint("AFA6B8"), .8), Shape("M0,13 L8,9 18,8 32,2 Q45,0 58,3 L71,9 83,11 88,15 83,19 H8 Z"));
+                dc.DrawGeometry(Paint("39374E"), null, Shape("M23,8 L33,4 Q46,2 56,4 L65,8 Z"));
+                dc.DrawGeometry(shade, null, Shape("M0,14 H86 L82,19 H8 Z M14,16 H27 V21 H17 Z M61,16 H76 L74,21 H60 Z"));
+                dc.DrawGeometry(trim, null, Shape("M12,11 H75 L81,12 H11 Z M78,14 H87 L85,16 H77 Z"));
+                dc.DrawLine(Stroke(Paint("71617A"), .9), new Point(44, 4), new Point(45, 8));
+                dc.DrawRectangle(Paint("C38194"), null, new Rect(2, 12, 8, 2));
+            }
+
+            private void DrawCyberTuner(DrawingContext dc)
+            {
+                var metal = Paint("5C395E");
+                var paint = Paint("8A5082");
+                var mark = Paint("E19BBC");
+                var engine = Paint("BBB0C6");
+                dc.DrawGeometry(metal, Stroke(Paint("A184AF"), .8), Shape("M1,3 H20 L19,6 H12 L13,12 H21 L29,4 H43 L58,13 71,15 74,20 65,24 H7 L1,21 Z"));
+                dc.DrawGeometry(Paint("33364C"), null, Shape("M24,12 L31,6 H42 L52,12 Z"));
+                dc.DrawGeometry(paint, null, Shape("M3,14 H30 L38,17 H57 L62,15 71,16 72,19 H38 L28,17 H4 Z"));
+                dc.DrawGeometry(mark, null, Shape("M22,14 H33 L45,21 H33 Z M37,14 H42 L54,21 H49 Z M2,4 H20 L19,6 H2 Z"));
+                dc.DrawGeometry(Paint("352B47"), null, Shape("M4,19 H24 L20,25 H4 Z M55,19 H70 L67,25 H54 Z"));
+                dc.DrawGeometry(engine, null, Shape("M2,19 H10 V21 H1 Z M2,22 H9 V24 H1 Z M63,16 H72 V18 H63 Z"));
+            }
+
             private void DrawCyberCarrier(DrawingContext dc)
             {
-                var graphite = Paint("272D34");
-                var steel = Paint("49515A");
-                var yellow = Paint("F5D645");
-                var amber = Paint("C9892C");
-                var edge = Stroke(Paint("95A1A6"), .75);
+                var graphite = Paint("29273D");
+                var steel = Paint("47435D");
+                var yellow = Paint("CDB05E");
+                var amber = Paint("976C46");
+                var coolLight = Paint("8EABB9");
+                var edge = Stroke(Paint("847894"), .75);
 
                 // Freight containers ride under the hull between the two lift pods.
                 dc.DrawGeometry(graphite, edge, Shape("M24,29 H150 L139,47 H45 L34,41 H24 Z"));
@@ -475,38 +584,40 @@ namespace EnglishTypingPractice
                 dc.DrawGeometry(yellow, null, Shape("M27,12 H135 L124,33 H36 L27,27 Z"));
                 dc.DrawGeometry(amber, null, Shape("M27,27 L36,33 H124 L127,28 H36 Z M7,22 H22 V27 H7 Z"));
                 dc.DrawGeometry(dark, null, Shape("M140,11 H159 L173,20 H135 Z M16,13 H23 V17 H10 Z"));
-                dc.DrawGeometry(cyan, null, Shape("M142,13 H157 L165,18 H140 Z M171,25 H181 V27 H169 Z"));
+                dc.DrawGeometry(coolLight, null, Shape("M142,13 H157 L165,18 H140 Z M171,25 H181 V27 H169 Z"));
                 dc.DrawGeometry(graphite, edge, Shape("M16,29 H37 L42,34 V40 H19 L13,36 Z M139,28 H157 L169,34 L164,41 H140 L135,37 Z"));
                 dc.DrawGeometry(amber, null, Shape("M18,32 H34 L38,35 H17 Z M142,31 H157 L164,35 H139 Z"));
-                dc.DrawGeometry(cyan, null, Shape("M20,37 H36 V38.5 H20 Z M141,37 H161 V39 H141 Z"));
+                dc.DrawGeometry(coolLight, null, Shape("M20,37 H36 V38.5 H20 Z M141,37 H161 V39 H141 Z"));
                 dc.DrawGeometry(dark, null, Shape("M34,16 H44 L40,20 H32 Z M32,23 H38 L34,27 H30 Z M115,17 H129 L128,19 H114 Z M112,23 H125 L124,25 H111 Z"));
                 HullMark(dc, "鼎山航运", new Rect(44, 15, 65, 14), dark, false);
-                HullMark(dc, "DS–06", new Rect(85, 5, 25, 5), white, false);
+                HullMark(dc, "DS–06", new Rect(85, 5, 25, 5), Paint("C6B9CB"), false);
             }
 
             private void DrawCyberRescue(DrawingContext dc)
             {
-                var armor = Paint("DDE7D5");
-                var olive = Paint("506F64");
-                var shadow = Paint("283D3D");
-                var signal = Paint("F74656");
+                var armor = Paint("A9B1AF");
+                var olive = Paint("475C63");
+                var shadow = Paint("29353F");
+                var signal = Paint("CF5976");
+                var reflection = Paint("C1BACA");
+                var coolLight = Paint("88B6C1");
                 var edge = Stroke(shadow, .9);
 
                 // The rear fan and the side thruster overlap the armored cabin.
                 dc.DrawGeometry(shadow, edge, Shape("M2,20 L12,12 H30 L36,25 28,39 H9 L0,31 Z M29,31 H107 L116,41 L102,48 H33 L21,42 Z"));
                 dc.DrawGeometry(olive, null, Shape("M4,21 L13,14 H27 L30,21 24,31 H8 Z M36,40 H104 L100,45 H38 Z"));
                 dc.DrawGeometry(armor, edge, Shape("M11,27 L24,12 38,4 H87 L102,11 126,23 129,31 116,39 H24 L12,36 Z"));
-                dc.DrawGeometry(white, null, Shape("M22,20 L39,5 H87 L101,12 H39 L31,20 Z"));
+                dc.DrawGeometry(reflection, null, Shape("M22,20 L39,5 H87 L101,12 H39 L31,20 Z"));
                 dc.DrawGeometry(olive, null, Shape("M14,30 L28,23 H40 L35,35 H117 L111,38 H25 L15,35 Z M79,11 H97 L120,24 H106 L91,16 H77 Z"));
                 dc.DrawGeometry(shadow, null, Shape("M91,12 H97 L114,21 H104 Z M102,12 L124,23 H117 Z M72,10 H83 L77,15 H70 Z"));
-                dc.DrawGeometry(cyan, null, Shape("M94,13 H97 L107,19 H103 Z M115,27 H127 V29 H113 Z M9,29 H18 V31 H8 Z"));
+                dc.DrawGeometry(coolLight, null, Shape("M94,13 H97 L107,19 H103 Z M115,27 H127 V29 H113 Z M9,29 H18 V31 H8 Z"));
                 dc.DrawGeometry(signal, null, Shape("M30,17 H34 V20 H38 V24 H34 V29 H30 V24 H25 V20 H30 Z M41,6 H56 L53,9 H38 Z M60,6 H68 L65,9 H57 Z"));
                 dc.DrawGeometry(olive, edge, Shape("M12,31 H30 L41,37 V44 H17 L9,40 Z M99,30 H118 L124,34 V39 L114,44 H97 L92,38 Z"));
                 dc.DrawGeometry(armor, null, Shape("M14,32 H30 L35,36 H12 Z M99,31 H116 L120,34 H96 Z"));
                 dc.DrawGeometry(signal, null, Shape("M11,37 H24 L22,40 H13 Z M109,36 H122 L118,39 H107 Z"));
                 dc.DrawGeometry(shadow, null, Shape("M52,27 H94 L89,37 H48 Z"));
                 HullMark(dc, "创伤小组", new Rect(41, 15, 53, 10), shadow, true);
-                HullMark(dc, "白金会员", new Rect(54, 28, 34, 8), white, true);
+                HullMark(dc, "白金会员", new Rect(54, 28, 34, 8), Paint("D9D4DE"), true);
             }
 
             private static void HullMark(DrawingContext dc, string value, Rect plate, Brush brush, bool slanted)
@@ -533,14 +644,7 @@ namespace EnglishTypingPractice
             private void Gear(DrawingContext dc, double x, double y, double radius, double angle)
             {
                 dc.PushTransform(new RotateTransform(angle, x, y));
-                dc.DrawEllipse(iron, copper, new Point(x, y), radius * .8, radius * .8);
-                for (int i = 0; i < 10; i++)
-                {
-                    dc.PushTransform(new RotateTransform(i * 36, x, y));
-                    dc.DrawRectangle(brass, null, new Rect(x - radius * .13, y - radius, radius * .26, radius * .35));
-                    dc.Pop();
-                }
-                dc.DrawEllipse(iron, copper, new Point(x, y), radius * .31, radius * .31);
+                Sprite(dc, "gear", x - radius, y - radius, radius * 2, radius * 2);
                 dc.Pop();
             }
 
@@ -554,6 +658,27 @@ namespace EnglishTypingPractice
             private void Sprite(DrawingContext dc, string key, double x, double y, double w, double h)
             {
                 dc.DrawImage(art[key], new Rect(x, y, w, h));
+            }
+
+            private void EdgeSprite(DrawingContext dc, string key, double x, double y, double w, double h)
+            {
+                dc.PushOpacity(FadeAtEdges(x, SceneWidth, w));
+                Sprite(dc, key, x, y, w, h);
+                dc.Pop();
+            }
+
+            internal static double LoopX(double x, double sceneWidth, double spriteWidth)
+            {
+                const double overscan = 24;
+                double left = -spriteWidth - overscan;
+                return left + Wrap(x - left, sceneWidth + overscan - left);
+            }
+
+            internal static double FadeAtEdges(double x, double sceneWidth, double spriteWidth)
+            {
+                const double fadeWidth = 16;
+                double amount = Math.Max(0, Math.Min(1, Math.Min(x, sceneWidth - x - spriteWidth) / fadeWidth));
+                return amount * amount * (3 - 2 * amount);
             }
             private static void Label(DrawingContext dc, string text, double x, double y, double size, Brush brush)
             {

@@ -36,6 +36,7 @@ namespace EnglishTypingPractice
             desk = Find<Grid>("PracticeWorkbench");
             hero = Find<Grid>("PracticeHero");
             options = Find<WrapPanel>("PracticeOptions");
+            Find<ComboBox>("PracticeKind").Width = 140;
             brand = Find<StackPanel>("PracticeBrand");
             sheet = Find<FrameworkElement>("PracticeSheet");
             statistics = Find<FrameworkElement>("PracticeStatistics");
@@ -305,7 +306,8 @@ namespace EnglishTypingPractice
                 var choice = Find<RadioButton>("Theme" + themes[i]);
                 var stack = new StackPanel();
                 stack.Children.Add(new ThemeThumbnail(themes[i]) { Height = 66, Margin = new Thickness(0, 0, 0, 8) });
-                stack.Children.Add(new TextBlock { Text = names[i], FontSize = 16, FontWeight = FontWeights.Bold });
+                stack.Children.Add(new TextBlock { Text = names[i], FontSize = 16,
+                    FontFamily = ThemeLettering.Family(themes[i]), FontWeight = ThemeLettering.CaptionWeight(themes[i]) });
                 stack.Children.Add(new TextBlock { Text = descriptions[i], FontSize = 11, TextWrapping = TextWrapping.Wrap,
                     Foreground = Brush("Muted"), Margin = new Thickness(0, 4, 0, 0) });
                 choice.Content = stack;
