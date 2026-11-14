@@ -562,10 +562,22 @@
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="0.67*" MinWidth="228" MaxWidth="318" />
         </Grid.ColumnDefinitions>
-        <Grid>
+        <Grid x:Name="SnakePlayArea">
+          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+          <DockPanel x:Name="SnakeOverview" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,0,0,8">
+            <Border x:Name="SnakeMinimapHost" Background="{StaticResource Field}" BorderBrush="{StaticResource Line}"
+                    BorderThickness="1" ClipToBounds="True" AutomationProperties.Name="全图与当前视野" />
+            <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+              <TextBlock Text="小地图" Style="{StaticResource SectionTitle}" />
+              <TextBlock x:Name="SnakeOverviewSize" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,3" />
+              <TextBlock Text="黄框视野 · 黄点自己" Foreground="{StaticResource Muted}" FontSize="11" />
+            </StackPanel>
+          </DockPanel>
+          <Grid Grid.Row="1" x:Name="SnakeBoardSlot" ClipToBounds="True">
+          <Grid x:Name="SnakeSquare" HorizontalAlignment="Center" VerticalAlignment="Top">
           <Border x:Name="SnakeBoardHost" ClipToBounds="True" Background="{StaticResource Field}"
                   BorderBrush="{StaticResource Line}" BorderThickness="1"
-                  AutomationProperties.Name="贪吃蛇棋盘" />
+                  AutomationProperties.Name="贪吃蛇 32 × 32 视野" />
           <Border x:Name="SnakeWordFlash" Opacity="0" IsHitTestVisible="False" VerticalAlignment="Top"
                   HorizontalAlignment="Center" Margin="7,8,7,0" Padding="13,5,13,6"
                   Background="#F521343D" BorderBrush="{StaticResource Accent}" BorderThickness="1">
@@ -591,7 +603,9 @@
               <TextBlock x:Name="SnakeFlashMeaning" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" />
             </StackPanel>
           </Border>
-          <Border x:Name="LanPanel" Background="{StaticResource Field}" BorderBrush="{StaticResource Line}"
+          </Grid>
+          </Grid>
+          <Border Grid.RowSpan="2" x:Name="LanPanel" Background="{StaticResource Field}" BorderBrush="{StaticResource Line}"
                   BorderThickness="1" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Margin="16">
@@ -623,13 +637,29 @@
             </ScrollViewer>
           </Border>
         </Grid>
-        <ScrollViewer Grid.Column="1" Margin="12,0,0,0" VerticalScrollBarVisibility="Auto"
+        <DockPanel Grid.Column="1" Margin="12,0,0,0">
+          <StackPanel DockPanel.Dock="Bottom" Margin="0,5,0,0">
+            <TextBlock Text="输入指令" Style="{StaticResource SectionTitle}" Margin="0,0,0,4" />
+            <TextBox x:Name="SnakeCommand" MinHeight="35" Padding="6,3" FontFamily="Consolas"
+                     FontSize="19" MaxLength="10" AcceptsReturn="False" SpellCheck.IsEnabled="False"
+                     InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
+                     AutomationProperties.Name="输入开始或方向词" />
+            <StackPanel x:Name="SnakeChargePanel" Visibility="Collapsed" Margin="0,5,0,0">
+              <TextBlock x:Name="SnakeChargeWord" TextWrapping="Wrap" Foreground="#9DE4EB" FontWeight="SemiBold" />
+              <TextBox x:Name="SnakeChargeInput" MinHeight="31" Padding="6,2" Margin="0,3,0,0"
+                       FontFamily="Consolas" FontSize="16" MaxLength="20" SpellCheck.IsEnabled="False"
+                       InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
+                       AutomationProperties.Name="职业技能输入框" />
+            </StackPanel>
+          </StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
           <StackPanel>
             <DockPanel LastChildFill="False">
               <TextBlock Text="对局控制" Style="{StaticResource SectionTitle}" />
               <TextBlock DockPanel.Dock="Right" x:Name="SnakeBoardSize" Text="32 × 32 格" Foreground="{StaticResource Muted}" />
             </DockPanel>
+            <StackPanel x:Name="SnakeSetup">
             <DockPanel Margin="0,8,0,0">
               <TextBlock Text="模式" VerticalAlignment="Center" Margin="0,0,9,0" FontWeight="SemiBold" />
               <ComboBox x:Name="SnakeMode" SelectedIndex="0" MinHeight="27"
@@ -644,7 +674,7 @@
               <TextBlock Text="地图边长" VerticalAlignment="Center" Margin="0,0,9,0" />
               <TextBlock x:Name="SoloMapValue" Text="32" DockPanel.Dock="Right" Margin="8,0,0,0"
                          Width="27" TextAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource Accent}" />
-              <Slider x:Name="SoloMapSize" Value="32" Minimum="12" Maximum="128" TickFrequency="1"
+              <Slider x:Name="SoloMapSize" Value="32" Minimum="32" Maximum="128" TickFrequency="1"
                       SmallChange="1" LargeChange="8" IsSnapToTickEnabled="True" VerticalAlignment="Center"
                       AutomationProperties.Name="单人经典模式地图边长" />
             </DockPanel>
@@ -672,23 +702,7 @@
             </DockPanel>
             <TextBlock x:Name="SnakeRoleGuide" Foreground="{StaticResource Muted}" FontSize="12"
                        TextWrapping="Wrap" Margin="0,4,0,1" />
-            <Border Margin="0,7,0,9" BorderBrush="{StaticResource Accent}" BorderThickness="2,0,0,0"
-                    Background="{StaticResource Field}" Padding="9,2,8,3">
-            <DockPanel LastChildFill="False">
-              <TextBlock x:Name="SnakeScoreLabel" Text="分数" VerticalAlignment="Center"
-                         Foreground="{StaticResource Muted}" FontSize="12" />
-              <TextBlock DockPanel.Dock="Right" x:Name="SnakeScore" Text="0" FontFamily="Consolas"
-                         FontSize="27" FontWeight="Bold" Foreground="{StaticResource Accent}" />
-            </DockPanel>
-            </Border>
-            <TextBlock x:Name="SnakeScoreGuide" Text="有效转向 +6 或 +7 · 吃果 +10" Foreground="{StaticResource Muted}"
-                       FontSize="12" Margin="0,-3,0,9" />
-            <TextBlock x:Name="SnakeFruitLegend" Foreground="{StaticResource Muted}" FontSize="12"
-                       Margin="0,-4,0,9" Visibility="Collapsed">
-              <Run Foreground="{StaticResource Coral}" Text="■" /><Run Text=" 小果 +10　" />
-              <Run Foreground="#FFD48C" Text="■" /><Run Text=" 大果 +30" />
-            </TextBlock>
-
+            </StackPanel>
             <Grid>
               <Grid.Resources>
                 <Style x:Key="DirectionWord" TargetType="TextBlock">
@@ -750,18 +764,23 @@
 
             <TextBlock Text="— 当前方向   × 禁止掉头" Foreground="{StaticResource Muted}"
                        FontSize="12" HorizontalAlignment="Center" Margin="0,6,0,0" />
-            <TextBlock Text="输入指令" Style="{StaticResource SectionTitle}" Margin="0,11,0,4" />
-            <TextBox x:Name="SnakeCommand" MinHeight="35" Padding="6,3" FontFamily="Consolas"
-                     FontSize="19" MaxLength="10" AcceptsReturn="False" SpellCheck.IsEnabled="False"
-                     InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
-                     AutomationProperties.Name="输入开始或方向词" />
-            <StackPanel x:Name="SnakeChargePanel" Visibility="Collapsed" Margin="0,7,0,0">
-              <TextBlock x:Name="SnakeChargeWord" TextWrapping="Wrap" Foreground="#9DE4EB" FontWeight="SemiBold" />
-              <TextBox x:Name="SnakeChargeInput" MinHeight="31" Padding="6,2" Margin="0,3,0,0"
-                       FontFamily="Consolas" FontSize="16" MaxLength="20" SpellCheck.IsEnabled="False"
-                       InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
-                       AutomationProperties.Name="职业技能输入框" />
-            </StackPanel>
+            <Border Margin="0,7,0,9" BorderBrush="{StaticResource Accent}" BorderThickness="2,0,0,0"
+                    Background="{StaticResource Field}" Padding="9,2,8,3">
+            <DockPanel LastChildFill="False">
+              <TextBlock x:Name="SnakeScoreLabel" Text="分数" VerticalAlignment="Center"
+                         Foreground="{StaticResource Muted}" FontSize="12" />
+              <TextBlock DockPanel.Dock="Right" x:Name="SnakeScore" Text="0" FontFamily="Consolas"
+                         FontSize="27" FontWeight="Bold" Foreground="{StaticResource Accent}" />
+            </DockPanel>
+            </Border>
+            <TextBlock x:Name="SnakeScoreGuide" Text="有效转向 +6 或 +7 · 吃果 +10" Foreground="{StaticResource Muted}"
+                       FontSize="12" Margin="0,-3,0,9" />
+            <TextBlock x:Name="SnakeFruitLegend" Foreground="{StaticResource Muted}" FontSize="12"
+                       Margin="0,-4,0,9" Visibility="Collapsed">
+              <Run Foreground="{StaticResource Coral}" Text="■" /><Run Text=" 小果 +10　" />
+              <Run Foreground="#FFD48C" Text="■" /><Run Text=" 大果 +30" />
+            </TextBlock>
+
             <TextBlock x:Name="SnakeStatus" Text="输入 start 开始单人游戏。" Margin="0,6,0,0"
                        MinHeight="36" TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
             <Button x:Name="LanToggle" Content="局域网联机" HorizontalAlignment="Left" Margin="0,4,0,0" />
@@ -793,6 +812,7 @@
             <Button x:Name="LanLeave" Content="离开房间" HorizontalAlignment="Left" Visibility="Collapsed" />
           </StackPanel>
         </ScrollViewer>
+        </DockPanel>
       </Grid>
     </Border>
   </Grid>
@@ -838,6 +858,7 @@
 
           <TextBlock Text="四种玩法" Style="{StaticResource RuleHeading}" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="经典　" FontWeight="Bold" /><Run Text="打方向词和吃果都得分。单人开局前可调地图边长。每分钟缩小 5 格，圈外视为撞墙。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}" Text="主棋盘固定显示 32 × 32 格。较大的地图会显示小地图，黄框标出当前视野，黄点标出自己，其他颜色的点标出对手。" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="障碍赛　" FontWeight="Bold" /><Run Text="开局随机生成四格方块障碍，绕开障碍去吃果。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="圈地战　" FontWeight="Bold" /><Run Text="走回自己的轨迹闭合圈地。对手蛇头被圈住就回出生点。每分钟提速 20%，5 分钟后占地最多者获胜。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="团战　" FontWeight="Bold" /><Run Text="仅限联机，房主选 2–4 队。可穿过己方球，碰到敌队球会捡起。带球回己方区域按 Shift 放下一颗，每带一颗球扣 10% 移速。空手按住 Shift 提速 25%。死亡后等 15 秒复活，8 分钟后按落地球数排名。" /></TextBlock>

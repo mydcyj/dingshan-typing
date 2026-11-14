@@ -9,7 +9,7 @@ namespace EnglishTypingPractice
     internal sealed class SnakeGame
     {
         internal const int BaseSize = 32;
-        internal const int MinSoloSize = 12;
+        internal const int MinSoloSize = 32;
         internal const int MaxSoloSize = 128;
         internal const int MoveInterval = 350;
         internal const int SmallFruitPoints = 10;

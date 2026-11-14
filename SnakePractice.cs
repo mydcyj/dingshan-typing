@@ -23,6 +23,10 @@ namespace EnglishTypingPractice
         private readonly ComboBox modePicker;
         private readonly Slider soloMapSize;
         private readonly FrameworkElement soloMapControls;
+        private readonly FrameworkElement overview;
+        private readonly TextBlock overviewSize;
+        private readonly FrameworkElement setup;
+        private readonly FrameworkElement playArea;
         private readonly TextBlock roleGuide;
         private readonly FrameworkElement chargePanel;
         private readonly TextBlock chargeWord;
@@ -76,6 +80,25 @@ namespace EnglishTypingPractice
                 .Select(name => (TextBlock)window.FindName(name)).ToArray();
             board = new SnakeBoard();
             ((Border)window.FindName("SnakeBoardHost")).Child = board;
+            overview = (FrameworkElement)window.FindName("SnakeOverview");
+            overviewSize = (TextBlock)window.FindName("SnakeOverviewSize");
+            playArea = (FrameworkElement)window.FindName("SnakePlayArea");
+            setup = (FrameworkElement)window.FindName("SnakeSetup");
+            var boardSlot = (FrameworkElement)window.FindName("SnakeBoardSlot");
+            var square = (FrameworkElement)window.FindName("SnakeSquare");
+            var minimapHost = (Border)window.FindName("SnakeMinimapHost");
+            minimapHost.Child = board.Minimap;
+            playArea.SizeChanged += (sender, e) =>
+            {
+                double side = Math.Floor(Math.Min(132, Math.Min(e.NewSize.Width * .36, e.NewSize.Height * .29)));
+                minimapHost.Width = minimapHost.Height = side;
+                UpdateSetup();
+            };
+            boardSlot.SizeChanged += (sender, e) =>
+            {
+                double side = Math.Floor(Math.Min(e.NewSize.Width, e.NewSize.Height));
+                square.Width = square.Height = side;
+            };
 
             boardSize = (TextBlock)window.FindName("SnakeBoardSize");
             fruitLegend = (TextBlock)window.FindName("SnakeFruitLegend");
@@ -334,7 +357,8 @@ namespace EnglishTypingPractice
         private void Render()
         {
             bool territory = SelectedMode == SnakeMode.Territory;
-            int size = SelectedMode == SnakeMode.Classic && game.Result == SnakeResult.Ready ? SelectedMapSize : game.Size;
+            int size = SelectedMode == SnakeMode.Teams ? SnakeTeams.Size :
+                SelectedMode == SnakeMode.Classic && game.Result == SnakeResult.Ready ? SelectedMapSize : game.Size;
             int side = size == game.Size ? game.Bounds.End - game.Bounds.Start : size;
             boardSize.Text = SelectedMode == SnakeMode.Teams ? "60 × 60 格" : side + " × " + side + " 格";
             var role = game.IsRunning ? game.Role : SelectedRole;
@@ -354,6 +378,7 @@ namespace EnglishTypingPractice
                     Charging = game.IsRunning && game.IsCharging(clock.ElapsedMilliseconds) }
             }, SelectedMode == SnakeMode.Obstacles ? game.Obstacles.ToArray() : null,
                 safeStart: game.Bounds.Start, safeEnd: size == game.Size ? game.Bounds.End : size);
+            UpdateOverview(size);
             score.Text = (territory ? 0 : game.Score).ToString(CultureInfo.CurrentCulture);
         }
 
@@ -390,6 +415,7 @@ namespace EnglishTypingPractice
             soloMapControls.Visibility = SelectedMode == SnakeMode.Classic && (online == null || soloMatch != null)
                 ? Visibility.Visible : Visibility.Collapsed;
             soloMapSize.IsEnabled = rolePicker.IsEnabled;
+            UpdateSetup();
             string guide;
             switch (role)
             {
@@ -621,7 +647,20 @@ namespace EnglishTypingPractice
             board.SetBoard(size, state.SmallFruits, state.LargeFruit, slot, state.Players, state.Obstacles, state.Land,
                 state.Trails, state.SafeStart, state.SafeEnd, state.Shots, state.Bursts,
                 state.TeamCount, state.TeamBalls, soloMatch == null);
+            UpdateOverview(size);
             UpdateMusic(running && soloMatch != null);
+        }
+
+        private void UpdateOverview(int size)
+        {
+            overview.Visibility = size > SnakeGame.BaseSize ? Visibility.Visible : Visibility.Collapsed;
+            overviewSize.Text = size + " × " + size + " 格";
+        }
+
+        private void UpdateSetup()
+        {
+            setup.Visibility = !rolePicker.IsEnabled && playArea.ActualHeight < 420
+                ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void UpdateMusic(bool running)
@@ -681,6 +720,23 @@ namespace EnglishTypingPractice
 
     internal sealed class SnakeBoard : FrameworkElement
     {
+        private sealed class MapOverview : FrameworkElement
+        {
+            private readonly SnakeBoard board;
+
+            internal MapOverview(SnakeBoard board)
+            {
+                this.board = board;
+            }
+
+            protected override void OnRender(DrawingContext drawing)
+            {
+                double side = Math.Min(ActualWidth, ActualHeight);
+                if (side > 0)
+                    board.DrawOverview(drawing, side);
+            }
+        }
+
         private static readonly Brush Head = MakeBrush(236, 246, 100);
         internal static readonly Brush Current = MakeBrush(49, 63, 42);
         internal static readonly Brush Quiet = MakeBrush(158, 181, 188);
@@ -699,6 +755,7 @@ namespace EnglishTypingPractice
         private static readonly Brush Obstacle = MakeBrush(93, 118, 127);
         private static readonly Pen ObstacleOutline = MakeObstaclePen();
         private static readonly Pen Grid = MakeGridPen();
+        private static readonly Pen ViewOutline = MakePen(Head, 1.25);
         private static readonly Brush[] Rivals =
         {
             MakeBrush(103, 189, 239), MakeBrush(209, 146, 241), MakeBrush(247, 193, 93)
@@ -724,11 +781,27 @@ namespace EnglishTypingPractice
         private int teams;
         private TeamBall[] teamBalls;
         private bool showNames;
+        private Int32Rect viewport = new Int32Rect(0, 0, SnakeGame.BaseSize, SnakeGame.BaseSize);
+
+        internal SnakeBoard()
+        {
+            Minimap = new MapOverview(this);
+        }
+
+        internal FrameworkElement Minimap { get; private set; }
 
         internal void SetBoard(int size, int[] smallFruits, int largeFruit, int ownSlot, SnakePlayerState[] players,
             int[] obstacles = null, int[] land = null, int[] trails = null, int safeStart = 0, int safeEnd = 0,
             int[] shots = null, int[] bursts = null, int teams = 0, TeamBall[] teamBalls = null, bool showNames = false)
         {
+            var own = players.FirstOrDefault(player => player.Slot == ownSlot && player.Body.Length > 0);
+            if (own != null || size != this.size || ownSlot != this.ownSlot ||
+                players.All(player => player.Result == SnakeResult.Ready))
+            {
+                int head = own == null ? (size / 2) * (size + 1) : own.Body[0];
+                viewport.X = CameraOrigin(head % size, size);
+                viewport.Y = CameraOrigin(head / size, size);
+            }
             this.size = size;
             this.smallFruits = smallFruits;
             this.largeFruit = largeFruit;
@@ -745,6 +818,12 @@ namespace EnglishTypingPractice
             this.teamBalls = teamBalls;
             this.showNames = showNames;
             InvalidateVisual();
+            Minimap.InvalidateVisual();
+        }
+
+        private static int CameraOrigin(int position, int size)
+        {
+            return Math.Max(0, Math.Min(size - SnakeGame.BaseSize, position - SnakeGame.BaseSize / 2));
         }
 
         protected override void OnRender(DrawingContext drawing)
@@ -754,12 +833,28 @@ namespace EnglishTypingPractice
                 return;
 
             var area = new Rect((ActualWidth - side) / 2, (ActualHeight - side) / 2, side, side);
+            double cell = side / SnakeGame.BaseSize;
+            var world = new Rect(area.X - viewport.X * cell, area.Y - viewport.Y * cell, size * cell, size * cell);
+            drawing.PushClip(new RectangleGeometry(area));
+            DrawTerrain(drawing, world, cell, viewport);
+            for (int i = 1; i < SnakeGame.BaseSize; i++)
+            {
+                drawing.DrawLine(Grid, new Point(area.X + i * cell, area.Top), new Point(area.X + i * cell, area.Bottom));
+                drawing.DrawLine(Grid, new Point(area.Left, area.Y + i * cell), new Point(area.Right, area.Y + i * cell));
+            }
+            DrawPieces(drawing, world, cell);
+            if (showNames)
+                DrawNames(drawing, area, world, cell);
+            drawing.Pop();
+        }
+
+        private void DrawTerrain(DrawingContext drawing, Rect area, double cell, Int32Rect region)
+        {
             drawing.DrawRectangle(Board, null, area);
-            double cell = side / size;
             if (teams > 0)
             {
-                double width = teams == 4 ? side / 2 : side / teams;
-                double height = teams == 4 ? side / 2 : side;
+                double width = teams == 4 ? area.Width / 2 : area.Width / teams;
+                double height = teams == 4 ? area.Height / 2 : area.Height;
                 for (int team = 0; team < teams; team++)
                     drawing.DrawRectangle(LandColors[team], null, new Rect(
                         area.X + (teams == 4 ? team % 2 : team) * width,
@@ -773,33 +868,40 @@ namespace EnglishTypingPractice
                     safeSide, safeSide));
             }
             if (land != null)
-                for (int i = 0; i < land.Length; i++)
-                    if (land[i] != 0)
-                        drawing.DrawRectangle(LandColors[land[i] - 1], null, CellBounds(i, area, cell));
-            for (int i = 1; i < size; i++)
-            {
-                drawing.DrawLine(Grid, new Point(area.X + i * cell, area.Top), new Point(area.X + i * cell, area.Bottom));
-                drawing.DrawLine(Grid, new Point(area.Left, area.Y + i * cell), new Point(area.Right, area.Y + i * cell));
-            }
+                for (int y = region.Y; y < region.Y + region.Height; y++)
+                    for (int x = region.X; x < region.X + region.Width; x++)
+                    {
+                        int i = y * size + x;
+                        if (land[i] != 0)
+                            drawing.DrawRectangle(LandColors[land[i] - 1], null, CellBounds(i, area, cell));
+                    }
 
             if (obstacles != null)
                 foreach (int obstacle in obstacles)
                     drawing.DrawRectangle(Obstacle, ObstacleOutline, CellBounds(obstacle, area, cell));
+        }
+
+        private void DrawPieces(DrawingContext drawing, Rect area, double cell)
+        {
             if (trails != null)
-                for (int i = 0; i < trails.Length; i++)
+                for (int y = viewport.Y; y < viewport.Y + viewport.Height; y++)
                 {
-                    if (trails[i] == 0)
-                        continue;
-                    var bounds = CellBounds(i, area, cell);
-                    int stripe = 0;
-                    for (int slot = 0; slot < TerritoryColors.Length; slot++)
-                        if ((trails[i] & (1 << slot)) != 0)
-                        {
-                            drawing.DrawRectangle(TerritoryColors[slot], null, new Rect(
-                                bounds.X + cell * 0.15, bounds.Y + cell * (0.12 + 0.2 * stripe),
-                                cell * 0.7, cell * 0.15));
-                            stripe++;
-                        }
+                    for (int x = viewport.X; x < viewport.X + viewport.Width; x++)
+                    {
+                        int i = y * size + x;
+                        if (trails[i] == 0)
+                            continue;
+                        var bounds = CellBounds(i, area, cell);
+                        int stripe = 0;
+                        for (int slot = 0; slot < TerritoryColors.Length; slot++)
+                            if ((trails[i] & (1 << slot)) != 0)
+                            {
+                                drawing.DrawRectangle(TerritoryColors[slot], null, new Rect(
+                                    bounds.X + cell * 0.15, bounds.Y + cell * (0.12 + 0.2 * stripe),
+                                    cell * 0.7, cell * 0.15));
+                                stripe++;
+                            }
+                    }
                 }
 
             foreach (var player in players)
@@ -808,6 +910,8 @@ namespace EnglishTypingPractice
                     player.Team >= 0 ? TerritoryColors[player.Team] : PlayerColor(player.Slot, ownSlot, land != null);
                 for (int i = 0; i < player.Body.Length; i++)
                 {
+                    if (!InView(player.Body[i]))
+                        continue;
                     var bounds = CellBounds(player.Body[i], area, cell);
                     drawing.DrawRectangle(teams == 0 && land == null && i == 0 && player.Slot == ownSlot && !player.Charging &&
                         player.StunRemaining == 0 ? Head : fill, null, bounds);
@@ -852,16 +956,59 @@ namespace EnglishTypingPractice
                     drawing.DrawRectangle(null, BurstOutline, new Rect(area.X + left * cell, area.Y + top * cell,
                         (Math.Min(size, x + 3) - left) * cell, (Math.Min(size, y + 3) - top) * cell));
                 }
-            if (showNames)
-                DrawNames(drawing, area, cell);
         }
 
-        private void DrawNames(DrawingContext drawing, Rect area, double cell)
+        private void DrawOverview(DrawingContext drawing, double side)
+        {
+            var world = new Rect(0, 0, side, side);
+            double cell = side / size;
+            DrawTerrain(drawing, world, cell, new Int32Rect(0, 0, size, size));
+            foreach (int fruit in smallFruits)
+                DrawMapItem(drawing, Fruit, fruit, world, cell);
+            if (largeFruit >= 0)
+                DrawMapItem(drawing, LargeFruit, largeFruit, world, cell);
+            if (teamBalls != null)
+                foreach (var ball in teamBalls)
+                    if (ball.Cell >= 0)
+                        DrawMapItem(drawing, TerritoryColors[ball.Team], ball.Cell, world, cell);
+            var view = new Rect(viewport.X * cell, viewport.Y * cell, viewport.Width * cell, viewport.Height * cell);
+            view.Inflate(-Math.Min(.65, view.Width / 4), -Math.Min(.65, view.Height / 4));
+            drawing.DrawRectangle(null, ViewOutline, view);
+            foreach (var player in players.OrderBy(item => item.Slot == ownSlot))
+            {
+                if (player.Body.Length == 0)
+                    continue;
+                bool own = player.Slot == ownSlot;
+                var head = CellBounds(player.Body[0], world, cell);
+                var color = own ? Head : teams > 0 && player.Team >= 0 ? TerritoryColors[player.Team] :
+                    PlayerColor(player.Slot, ownSlot, land != null);
+                double radius = own ? 3.3 : 2.65;
+                double inset = radius + .5;
+                var point = new Point(Math.Max(inset, Math.Min(side - inset, head.X + cell / 2)),
+                    Math.Max(inset, Math.Min(side - inset, head.Y + cell / 2)));
+                drawing.DrawEllipse(color, null, point, radius, radius);
+            }
+        }
+
+        private void DrawMapItem(DrawingContext drawing, Brush brush, int position, Rect world, double cell)
+        {
+            var bounds = CellBounds(position, world, cell);
+            drawing.DrawEllipse(brush, null, new Point(bounds.X + cell / 2, bounds.Y + cell / 2), 1.3, 1.3);
+        }
+
+        private bool InView(int position)
+        {
+            int x = position % size, y = position / size;
+            return x >= viewport.X && x < viewport.X + viewport.Width &&
+                y >= viewport.Y && y < viewport.Y + viewport.Height;
+        }
+
+        private void DrawNames(DrawingContext drawing, Rect area, Rect world, double cell)
         {
             var placed = new System.Collections.Generic.List<Rect>();
-            foreach (var player in players.Where(item => item.Body.Length > 0 && !string.IsNullOrEmpty(item.Name)))
+            foreach (var player in players.Where(item => item.Body.Length > 0 && InView(item.Body[0]) && !string.IsNullOrEmpty(item.Name)))
             {
-                var head = CellBounds(player.Body[0], area, cell);
+                var head = CellBounds(player.Body[0], world, cell);
                 var center = new Point(head.X + cell / 2, head.Y + cell / 2);
                 var label = new FormattedText(player.Name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
                     new Typeface("Segoe UI, Microsoft YaHei UI"), 11, Label, VisualTreeHelper.GetDpi(this).PixelsPerDip)
@@ -940,7 +1087,12 @@ namespace EnglishTypingPractice
 
         private static Pen MakeGridPen()
         {
-            var pen = new Pen(MakeBrush(53, 75, 85), 0.65);
+            return MakePen(MakeBrush(53, 75, 85), 0.65);
+        }
+
+        private static Pen MakePen(Brush brush, double width)
+        {
+            var pen = new Pen(brush, width);
             pen.Freeze();
             return pen;
         }
