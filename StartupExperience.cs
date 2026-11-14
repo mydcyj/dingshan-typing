@@ -20,10 +20,11 @@ namespace EnglishTypingPractice
         private readonly RotateTransform orbitRotation;
         private readonly TextBlock title, hint, nicknameLabel, savedName, error, orbitText;
         private readonly TextBox nickname;
-        private readonly Button confirm, skip;
+        private readonly Button confirm, skip, replay;
         private readonly DispatcherTimer timer;
         private Action next;
         private Stage stage;
+        private bool playOnRequest;
 
         internal StartupExperience(Window window, PracticeSettings settings, Action focusPractice)
         {
@@ -48,6 +49,7 @@ namespace EnglishTypingPractice
             nickname = (TextBox)window.FindName("StartupNickname");
             confirm = (Button)window.FindName("StartupConfirm");
             skip = (Button)window.FindName("StartupSkip");
+            replay = (Button)window.FindName("StartupReplay");
             ((Image)window.FindName("StartupIcon")).Source = window.Icon;
 
             timer = new DispatcherTimer(DispatcherPriority.Normal, window.Dispatcher);
@@ -61,26 +63,44 @@ namespace EnglishTypingPractice
             };
             confirm.Click += (sender, e) => Confirm();
             skip.Click += (sender, e) => ShowProfile(false);
+            replay.Click += (sender, e) => StartBrand(true);
             nickname.TextChanged += (sender, e) => error.Visibility = Visibility.Hidden;
             overlay.PreviewKeyDown += (sender, e) =>
             {
-                if (stage == Stage.Brand && (e.Key == Key.Escape || e.Key == Key.Enter || e.Key == Key.Space))
+                if (stage == Stage.Brand && e.Key == Key.Escape)
                 {
                     e.Handled = true;
                     ShowProfile(false);
                 }
             };
-            window.Loaded += OnLoaded;
+            window.ContentRendered += OnContentRendered;
             window.Closed += (sender, e) => timer.Stop();
             practicePage.IsEnabled = false;
             overlay.Visibility = Visibility.Visible;
         }
 
-        private static bool Motion { get { return SystemParameters.ClientAreaAnimation; } }
+        private bool Motion { get { return playOnRequest || SystemParameters.ClientAreaAnimation; } }
 
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        private void OnContentRendered(object sender, EventArgs e)
         {
-            window.Loaded -= OnLoaded;
+            window.ContentRendered -= OnContentRendered;
+            if (stage == Stage.Brand)
+                StartBrand(false);
+        }
+
+        private void StartBrand(bool requested)
+        {
+            if (stage != Stage.Brand && stage != Stage.Profile)
+                return;
+            playOnRequest = requested;
+            stage = Stage.Brand;
+            form.Visibility = Visibility.Collapsed;
+            form.BeginAnimation(UIElement.OpacityProperty, null);
+            panels.BeginAnimation(UIElement.OpacityProperty, null);
+            panels.Opacity = 0;
+            scanBeam.BeginAnimation(UIElement.OpacityProperty, null);
+            brand.Visibility = Visibility.Visible;
+            skip.Visibility = Visibility.Visible;
             overlay.Focus();
             if (!Motion)
             {
@@ -88,7 +108,7 @@ namespace EnglishTypingPractice
                 return;
             }
             Animate(brand, UIElement.OpacityProperty, 0, 1, 180);
-            After(550, () => ShowProfile(true));
+            After(650, () => ShowProfile(true));
         }
 
         private void ShowProfile(bool animate)
@@ -122,6 +142,7 @@ namespace EnglishTypingPractice
             }
             else
             {
+                playOnRequest = false;
                 brand.Visibility = Visibility.Collapsed;
                 panels.Opacity = 1;
                 RevealForm(false, registered);
