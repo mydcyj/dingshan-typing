@@ -20,7 +20,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("1.12.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.13.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -273,19 +273,33 @@ namespace EnglishTypingPractice
 
         private void ConfigureBackgroundMotion(TranslateTransform drift)
         {
+            ClockGroup motion = null;
             Action update = () =>
             {
-                bool animate = SystemParameters.ClientAreaAnimation && window.WindowState != WindowState.Minimized;
-                if (animate == drift.HasAnimatedProperties)
+                if (!SystemParameters.ClientAreaAnimation)
+                {
+                    drift.ApplyAnimationClock(TranslateTransform.XProperty, null);
+                    drift.ApplyAnimationClock(TranslateTransform.YProperty, null);
+                    motion = null;
                     return;
-                var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
-                var duration = TimeSpan.FromSeconds(13);
-                drift.BeginAnimation(TranslateTransform.XProperty, animate
-                    ? new DoubleAnimation(-.16, .13, duration) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease }
-                    : null);
-                drift.BeginAnimation(TranslateTransform.YProperty, animate
-                    ? new DoubleAnimation(.06, -.08, duration) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease }
-                    : null);
+                }
+                if (motion == null)
+                {
+                    if (window.WindowState == WindowState.Minimized)
+                        return;
+                    var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+                    var duration = TimeSpan.FromSeconds(13);
+                    var timeline = new ParallelTimeline { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+                    timeline.Children.Add(new DoubleAnimation(-.16, .13, duration) { EasingFunction = ease });
+                    timeline.Children.Add(new DoubleAnimation(.06, -.08, duration) { EasingFunction = ease });
+                    motion = (ClockGroup)timeline.CreateClock(true);
+                    drift.ApplyAnimationClock(TranslateTransform.XProperty, (AnimationClock)motion.Children[0]);
+                    drift.ApplyAnimationClock(TranslateTransform.YProperty, (AnimationClock)motion.Children[1]);
+                }
+                if (window.WindowState == WindowState.Minimized)
+                    motion.Controller.Pause();
+                else
+                    motion.Controller.Resume();
             };
             System.ComponentModel.PropertyChangedEventHandler changed = (sender, e) =>
             {
@@ -295,7 +309,12 @@ namespace EnglishTypingPractice
             SystemParameters.StaticPropertyChanged += changed;
             window.StateChanged += (sender, e) => update();
             window.Loaded += (sender, e) => update();
-            window.Closed += (sender, e) => SystemParameters.StaticPropertyChanged -= changed;
+            window.Closed += (sender, e) =>
+            {
+                SystemParameters.StaticPropertyChanged -= changed;
+                if (motion != null)
+                    motion.Controller.Stop();
+            };
         }
 
         private void ChoosePassage()
@@ -416,7 +435,7 @@ namespace EnglishTypingPractice
         private void PlayFeedback(TextChangedEventArgs e, bool complete)
         {
             string input = ReadInput();
-            if (IsCode || IsChinese)
+            if (IsChinese)
             {
                 if (complete || e.Changes.Any(change => change.AddedLength > 0))
                     effects.Play(null, null, complete);
@@ -425,11 +444,20 @@ namespace EnglishTypingPractice
             int wordStart = -1;
             int wordEnd = -1;
             bool letterTyped = false;
+            string rawInput = typed.Text;
             foreach (var change in e.Changes)
-                for (int i = change.Offset; i < Math.Min(input.Length, change.Offset + change.AddedLength); i++)
+            {
+                int startOffset = change.Offset;
+                int endOffset = Math.Min(rawInput.Length, change.Offset + change.AddedLength);
+                if (IsCode)
                 {
-                    letterTyped |= char.IsLetter(input[i]);
-                    if (!char.IsLetter(target[i]) || (i + 1 < target.Length && IsWordCharacter(i + 1)))
+                    startOffset = rawInput.Substring(0, startOffset).Replace("\r\n", "\n").Length;
+                    endOffset = rawInput.Substring(0, endOffset).Replace("\r\n", "\n").Length;
+                }
+                for (int i = startOffset; i < Math.Min(input.Length, endOffset); i++)
+                {
+                    letterTyped |= IsCode || char.IsLetter(input[i]);
+                    if (i >= target.Length || !IsWordCharacter(i) || (i + 1 < target.Length && IsWordCharacter(i + 1)))
                         continue;
                     int start = i;
                     while (start > 0 && IsWordCharacter(start - 1))
@@ -442,6 +470,7 @@ namespace EnglishTypingPractice
                         wordEnd = i;
                     }
                 }
+            }
             if (letterTyped || complete)
                 effects.Play(wordStart < 0 ? null : letters[wordStart],
                     wordStart < 0 ? null : target.Substring(wordStart, wordEnd - wordStart + 1), complete);
@@ -450,6 +479,8 @@ namespace EnglishTypingPractice
         private bool IsWordCharacter(int index)
         {
             char character = target[index];
+            if (IsCode)
+                return char.IsLetterOrDigit(character) || character == '_';
             return char.IsLetter(character) || ((character == '\'' || character == '’' || character == '-') &&
                 index > 0 && index + 1 < target.Length &&
                 char.IsLetter(target[index - 1]) && char.IsLetter(target[index + 1]));

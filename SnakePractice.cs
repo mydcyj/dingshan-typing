@@ -21,6 +21,8 @@ namespace EnglishTypingPractice
         private readonly TextBox command;
         private readonly ComboBox rolePicker;
         private readonly ComboBox modePicker;
+        private readonly Slider soloMapSize;
+        private readonly FrameworkElement soloMapControls;
         private readonly TextBlock roleGuide;
         private readonly FrameworkElement chargePanel;
         private readonly TextBlock chargeWord;
@@ -54,6 +56,10 @@ namespace EnglishTypingPractice
             command = (TextBox)window.FindName("SnakeCommand");
             rolePicker = (ComboBox)window.FindName("SnakeRole");
             modePicker = (ComboBox)window.FindName("SnakeMode");
+            soloMapSize = (Slider)window.FindName("SoloMapSize");
+            soloMapControls = (FrameworkElement)window.FindName("SoloMapControls");
+            soloMapSize.Minimum = SnakeGame.MinSoloSize;
+            soloMapSize.Maximum = SnakeGame.MaxSoloSize;
             roleGuide = (TextBlock)window.FindName("SnakeRoleGuide");
             chargePanel = (FrameworkElement)window.FindName("SnakeChargePanel");
             chargeWord = (TextBlock)window.FindName("SnakeChargeWord");
@@ -108,6 +114,22 @@ namespace EnglishTypingPractice
                     lobby.SetMode(SelectedMode);
             };
             var page = (FrameworkElement)window.FindName("SnakePage");
+            var mapValue = (TextBlock)window.FindName("SoloMapValue");
+            soloMapSize.ValueChanged += (sender, e) =>
+            {
+                mapValue.Text = SelectedMapSize.ToString(CultureInfo.CurrentCulture);
+                if (soloMatch != null)
+                {
+                    timer.Stop();
+                    clock.Stop();
+                    soloMatch = null;
+                    online = null;
+                    command.IsReadOnly = false;
+                }
+                game = new SnakeGame();
+                status.Text = "输入 start 开始单人游戏。";
+                Render();
+            };
             page.PreviewKeyDown += (sender, e) =>
             {
                 if ((e.Key == Key.LeftShift || e.Key == Key.RightShift) && !e.IsRepeat && online != null &&
@@ -159,6 +181,7 @@ namespace EnglishTypingPractice
 
         private SnakeRole SelectedRole { get { return (SnakeRole)rolePicker.SelectedIndex; } }
         private SnakeMode SelectedMode { get { return (SnakeMode)modePicker.SelectedIndex; } }
+        private int SelectedMapSize { get { return (int)soloMapSize.Value; } }
 
         internal void Focus()
         {
@@ -250,7 +273,7 @@ namespace EnglishTypingPractice
             chargeInput.Clear();
             if (SelectedMode == SnakeMode.Territory || SelectedRole == SnakeRole.Hunter || SelectedRole == SnakeRole.Bard)
             {
-                soloMatch = new SnakeMatch("你", SelectedRole, solo: true);
+                soloMatch = new SnakeMatch("你", SelectedRole, solo: true, soloClassicSize: SelectedMapSize);
                 soloMatch.SetMode(SelectedMode);
                 soloMatch.Start();
                 clock.Restart();
@@ -258,7 +281,7 @@ namespace EnglishTypingPractice
                 timer.Start();
                 return;
             }
-            game.Start(SelectedRole, SelectedMode);
+            game.Start(SelectedRole, SelectedMode, SelectedMode == SnakeMode.Classic ? SelectedMapSize : SnakeGame.BaseSize);
             clock.Restart();
             status.Text = "";
             Render();
@@ -311,7 +334,8 @@ namespace EnglishTypingPractice
         private void Render()
         {
             bool territory = SelectedMode == SnakeMode.Territory;
-            int side = game.Bounds.End - game.Bounds.Start;
+            int size = SelectedMode == SnakeMode.Classic && game.Result == SnakeResult.Ready ? SelectedMapSize : game.Size;
+            int side = size == game.Size ? game.Bounds.End - game.Bounds.Start : size;
             boardSize.Text = SelectedMode == SnakeMode.Teams ? "60 × 60 格" : side + " × " + side + " 格";
             var role = game.IsRunning ? game.Role : SelectedRole;
             ShowWords(game.IsRunning, game.Direction, game.Words, role);
@@ -324,12 +348,12 @@ namespace EnglishTypingPractice
                 : SelectedMode == SnakeMode.Obstacles ? "避开障碍 · 吃果 +10 · 有效输入按字母计分"
                 : (game.IsRunning ? ShrinkGuide(side, (int)(60000 - clock.ElapsedMilliseconds % 60000)) : "每分钟缩小 5 格") +
                     " · 吃果 +10";
-            board.SetBoard(game.Size, territory || game.Fruit < 0 ? new int[0] : new[] { game.Fruit }, -1, 0, new[]
+            board.SetBoard(size, territory || game.Fruit < 0 ? new int[0] : new[] { game.Fruit }, -1, 0, new[]
             {
                 new SnakePlayerState { Slot = 0, Result = game.Result, Body = territory ? new int[0] : game.Body.ToArray(),
                     Charging = game.IsRunning && game.IsCharging(clock.ElapsedMilliseconds) }
             }, SelectedMode == SnakeMode.Obstacles ? game.Obstacles.ToArray() : null,
-                safeStart: game.Bounds.Start, safeEnd: game.Bounds.End);
+                safeStart: game.Bounds.Start, safeEnd: size == game.Size ? game.Bounds.End : size);
             score.Text = (territory ? 0 : game.Score).ToString(CultureInfo.CurrentCulture);
         }
 
@@ -363,6 +387,9 @@ namespace EnglishTypingPractice
         {
             rolePicker.IsEnabled = !running && (online == null || online.Phase != MatchPhase.Playing);
             modePicker.IsEnabled = rolePicker.IsEnabled && (online == null || ownSlot == 0);
+            soloMapControls.Visibility = SelectedMode == SnakeMode.Classic && (online == null || soloMatch != null)
+                ? Visibility.Visible : Visibility.Collapsed;
+            soloMapSize.IsEnabled = rolePicker.IsEnabled;
             string guide;
             switch (role)
             {

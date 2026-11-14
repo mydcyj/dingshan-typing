@@ -301,7 +301,7 @@
   </Window.Resources>
 
   <Grid>
-  <Grid IsHitTestVisible="False">
+  <Grid x:Name="BackgroundLayers" IsHitTestVisible="False">
     <Border Background="{StaticResource Backplate}" />
     <Border>
       <Border.Background>
@@ -640,6 +640,14 @@
                 <ComboBoxItem Content="团战" />
               </ComboBox>
             </DockPanel>
+            <DockPanel x:Name="SoloMapControls" Margin="0,5,0,0">
+              <TextBlock Text="地图边长" VerticalAlignment="Center" Margin="0,0,9,0" />
+              <TextBlock x:Name="SoloMapValue" Text="32" DockPanel.Dock="Right" Margin="8,0,0,0"
+                         Width="27" TextAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource Accent}" />
+              <Slider x:Name="SoloMapSize" Value="32" Minimum="12" Maximum="128" TickFrequency="1"
+                      SmallChange="1" LargeChange="8" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                      AutomationProperties.Name="单人经典模式地图边长" />
+            </DockPanel>
             <DockPanel Margin="0,5,0,0">
               <TextBlock x:Name="LanTeamsLabel" Visibility="Collapsed" Text="队伍数量" VerticalAlignment="Center"
                          Margin="0,0,9,0" FontWeight="SemiBold" />
@@ -829,7 +837,7 @@
           </TextBlock>
 
           <TextBlock Text="四种玩法" Style="{StaticResource RuleHeading}" />
-          <TextBlock Style="{StaticResource RuleText}"><Run Text="经典　" FontWeight="Bold" /><Run Text="打方向词和吃果都得分。每分钟缩小 5 格边长，圈外视为撞墙。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="经典　" FontWeight="Bold" /><Run Text="打方向词和吃果都得分。单人开局前可调地图边长。每分钟缩小 5 格，圈外视为撞墙。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="障碍赛　" FontWeight="Bold" /><Run Text="开局随机生成四格方块障碍，绕开障碍去吃果。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="圈地战　" FontWeight="Bold" /><Run Text="走回自己的轨迹闭合圈地。对手蛇头被圈住就回出生点。每分钟提速 20%，5 分钟后占地最多者获胜。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="团战　" FontWeight="Bold" /><Run Text="仅限联机，房主选 2–4 队。可穿过己方球，碰到敌队球会捡起。带球回己方区域按 Shift 放下一颗，每带一颗球扣 10% 移速。空手按住 Shift 提速 25%。死亡后等 15 秒复活，8 分钟后按落地球数排名。" /></TextBlock>

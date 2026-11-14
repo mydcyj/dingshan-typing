@@ -9,6 +9,8 @@ namespace EnglishTypingPractice
     internal sealed class SnakeGame
     {
         internal const int BaseSize = 32;
+        internal const int MinSoloSize = 12;
+        internal const int MaxSoloSize = 128;
         internal const int MoveInterval = 350;
         internal const int SmallFruitPoints = 10;
         internal const int ChargeDuration = 1000;
@@ -70,9 +72,9 @@ namespace EnglishTypingPractice
             return BaseSize + 16 * (players - 1);
         }
 
-        internal void Start(SnakeRole role, SnakeMode mode = SnakeMode.Classic)
+        internal void Start(SnakeRole role, SnakeMode mode = SnakeMode.Classic, int size = BaseSize)
         {
-            Start(BaseSize, BaseSize / 2, BaseSize / 2, SnakeDirection.North, role, mode);
+            Start(size, size / 2, size / 2, SnakeDirection.North, role, mode);
             Obstacles = mode == SnakeMode.Obstacles ? SnakeObstacles.Create(Size, Body, random) : new HashSet<int>();
             PlaceFruit();
         }

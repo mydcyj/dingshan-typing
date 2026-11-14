@@ -103,6 +103,7 @@ namespace EnglishTypingPractice
         private readonly List<int> smallFruits = new List<int>();
         private readonly List<Shot> shots = new List<Shot>();
         private readonly bool solo;
+        private readonly int soloClassicSize;
         private HashSet<int> obstacles = new HashSet<int>();
         private int[] obstacleCells = new int[0];
         private SnakeTerritory territory;
@@ -123,8 +124,10 @@ namespace EnglishTypingPractice
         internal bool CanJoin { get { return Phase != MatchPhase.Playing && Count < players.Length; } }
         internal bool HasBurst { get { return players.Any(player => player != null && player.BurstUntil > now); } }
 
-        internal SnakeMatch(string hostName, SnakeRole role = SnakeRole.Standard, bool solo = false)
+        internal SnakeMatch(string hostName, SnakeRole role = SnakeRole.Standard, bool solo = false,
+            int soloClassicSize = SnakeGame.BaseSize)
         {
+            this.soloClassicSize = soloClassicSize;
             this.solo = solo;
             players[0] = new Player { Name = hostName, Role = role };
         }
@@ -182,7 +185,8 @@ namespace EnglishTypingPractice
             now = 0;
             participants = Count;
             mode = nextMode;
-            size = mode == SnakeMode.Teams ? SnakeTeams.Size : SnakeGame.BoardSize(participants);
+            size = mode == SnakeMode.Teams ? SnakeTeams.Size :
+                solo && mode == SnakeMode.Classic ? soloClassicSize : SnakeGame.BoardSize(participants);
             teams = mode == SnakeMode.Teams ? new SnakeTeams(teamCount,
                 Enumerable.Range(0, players.Length).Where(slot => players[slot] != null && players[slot].Connected).ToArray(), random) : null;
             bounds = new SnakeBounds(size, 0);
