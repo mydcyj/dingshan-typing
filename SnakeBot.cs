@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace EnglishTypingPractice
 {
-    internal enum SnakeBotDifficulty { Normal, Easy, Hard }
+    internal enum SnakeBotDifficulty { Normal, Easy, Hard, Hell }
 
     internal sealed class SnakeBotSession
     {
@@ -54,7 +54,7 @@ namespace EnglishTypingPractice
             }
             if (elapsed < nextStep)
                 return;
-            nextStep = elapsed + 60;
+            nextStep = elapsed + (Difficulty == SnakeBotDifficulty.Hell ? 30 : 60);
             foreach (var bot in bots.Values)
             {
                 if (match.Phase != MatchPhase.Playing)
@@ -66,10 +66,18 @@ namespace EnglishTypingPractice
 
     internal sealed class SnakeBot
     {
+        private struct ProjectedHead
+        {
+            internal int Cell;
+            internal double Arrival;
+            internal bool FirstStep;
+        }
+
         private const int Far = 10000;
         private readonly int slot;
         private readonly Random random;
         private readonly HashSet<int> dangerous = new HashSet<int>();
+        private readonly List<ProjectedHead> projectedHeads = new List<ProjectedHead>(6);
         private int[] distance, queue;
         private bool[] blocked;
         private int round = -1, respawns = -1, size, start, end;
@@ -141,17 +149,22 @@ namespace EnglishTypingPractice
                 legSteps = 0;
             }
             int head = snake.Body.First.Value, heading = (int)snake.Direction;
-            if (lastHead != head)
+            bool hell = difficulty == SnakeBotDifficulty.Hell;
+            if (hell && lastDirection != heading)
+                legSteps = 0;
+            else if (lastHead != head)
                 legSteps = lastDirection == heading && lastHead >= 0 ? legSteps + Manhattan(lastHead, head) : 0;
             lastDirection = heading;
             lastHead = head;
             SetDanger(state, snake);
+            if (hell)
+                PredictHeads(match, state, snake, now);
             var own = state.Players.First(player => player.Slot == slot);
             if (state.Mode == SnakeMode.Teams)
             {
                 if (own.Carrying > 0 && SnakeTeams.Region(head, state.TeamCount) == own.Team)
                     match.DropBall(slot, round, now);
-                bool fast = difficulty == SnakeBotDifficulty.Hard && own.Carrying == 0 && FreeRun(head, heading, 16) >= 14;
+                bool fast = (difficulty == SnakeBotDifficulty.Hard || hell) && own.Carrying == 0 && FreeRun(head, heading, 16) >= 14;
                 if (fast != sprint)
                 {
                     sprint = fast;
@@ -168,14 +181,15 @@ namespace EnglishTypingPractice
                 if (state.Mode == SnakeMode.Territory && !skill && legSteps < territoryLength &&
                     FreeRun(head, heading, 2) > 1)
                     return;
-                if (skill || FreeRun(head, nextHeading, nextExtra + 1) > nextExtra)
+                if (skill || (FreeRun(head, nextHeading, nextExtra + 1) > nextExtra &&
+                    (!hell || HeadRisk(head, nextHeading, nextExtra + 1, NextMove(snake, now), 0) == 0)))
                     Submit(match, state, difficulty, now);
                 word = null;
                 Preview(match, snake, now, "");
             }
             if (snake.TurnPending || !snake.IsRunning || now < nextPlan)
                 return;
-            nextPlan = now + 120;
+            nextPlan = now + (hell ? 30 : 120);
 
             int radius;
             int target = Target(state, own, head, out radius);
@@ -189,10 +203,19 @@ namespace EnglishTypingPractice
             int lead = MovesBefore(reaction + snake.Words[((heading + 1) % 4) * variants].Length * LetterTime(difficulty), interval, untilMove);
             int room = FreeRun(head, heading, size);
             bool territorial = state.Mode == SnakeMode.Territory;
-            int leg = difficulty == SnakeBotDifficulty.Easy ? 12 : difficulty == SnakeBotDifficulty.Normal ? 16 : 20;
-            if (territorial && legSteps + lead < leg && room > lead + 2)
+            int leg = difficulty == SnakeBotDifficulty.Easy ? 12 : difficulty == SnakeBotDifficulty.Normal ? 16 : hell ? 22 : 20;
+            bool checkpoint = state.Mode == SnakeMode.Race || state.Mode == SnakeMode.Relay;
+            int sight = hell && !territorial ? Math.Max(lead + 1, 4) : lead + 1;
+            if (hell && checkpoint && LineValue(head, heading, Math.Min(room, sight), state.Mode) == 50)
                 return;
-            double best = LineValue(head, heading, Math.Min(room, lead + 1), state.Mode) + .7;
+            double straightRisk = hell ? HeadRisk(head, heading, Math.Min(room, lead + 2), untilMove, interval) : 0;
+            if (territorial && legSteps + lead < leg && room > lead + 2 && straightRisk == 0)
+                return;
+            double best = LineValue(head, heading, Math.Min(room, sight), state.Mode) + .7;
+            if (hell && !territorial)
+                best += ContinuationValue(head, heading, room, 0, lead, state.Mode) - straightRisk;
+            else
+                best -= straightRisk;
             if (room <= lead + 1)
                 best -= 90;
             if (territorial && legSteps + lead >= leg)
@@ -212,7 +235,17 @@ namespace EnglishTypingPractice
                 int open = FreeRun(pivot, direction, size);
                 if (open <= extra)
                     continue;
-                double value = LineValue(pivot, direction, Math.Min(open, Math.Max(lead, 3) + extra), state.Mode);
+                double value = LineValue(pivot, direction, Math.Min(open, (hell && !territorial ? sight : Math.Max(lead, 3)) + extra), state.Mode);
+                if (hell)
+                {
+                    int turnAt = untilMove + (int)(advance * interval);
+                    value -= HeadRisk(pivot, direction, extra + 1, turnAt, 0);
+                    if (!territorial)
+                    {
+                        value += ContinuationValue(pivot, direction, open, extra, lead, state.Mode);
+                        value -= HeadRisk(head, heading, advance, untilMove, interval);
+                    }
+                }
                 if (state.Mode == SnakeMode.Power && direction != heading && distance[pivot] == 0)
                     value += 80;
                 value -= advance * .20 + delay * .00030 + variant * .45;
@@ -229,7 +262,7 @@ namespace EnglishTypingPractice
                         projected = Adjacent(projected, direction);
                         if (step >= 4 && (state.Trails[projected] & (1 << slot)) != 0)
                         {
-                            value += 8;
+                            value += hell ? 30 : 8;
                             break;
                         }
                     }
@@ -240,7 +273,7 @@ namespace EnglishTypingPractice
                     chosen = i;
                 }
             }
-            if (CanUseSkill(snake, state, own, difficulty, now, head, heading, room, lead, untilMove, interval))
+            if (straightRisk == 0 && CanUseSkill(snake, state, own, difficulty, now, head, heading, room, lead, untilMove, interval))
                 Begin(snake.ChargeWord, snake.ChargeGroup, true, false, difficulty, now);
             else if (chosen >= 0)
             {
@@ -274,7 +307,7 @@ namespace EnglishTypingPractice
             else
                 match.TryWord(slot, attempt, nextGroup, state.Round, now);
             word = null;
-            nextPlan = now + (mistype ? 2 * LetterTime(difficulty) : 100);
+            nextPlan = now + (mistype ? 2 * LetterTime(difficulty) : difficulty == SnakeBotDifficulty.Hell ? 30 : 100);
         }
 
         private void Preview(SnakeMatch match, SnakeGame snake, long now, string text)
@@ -387,6 +420,73 @@ namespace EnglishTypingPractice
                 dangerous.Add(shot);
         }
 
+        private void PredictHeads(SnakeMatch match, SnakeMatchState state, SnakeGame own, long now)
+        {
+            projectedHeads.Clear();
+            if (state.Mode == SnakeMode.Power || state.Mode == SnakeMode.Race || state.Mode == SnakeMode.Relay ||
+                own.IsCharging(now))
+                return;
+            foreach (var player in state.Players)
+            {
+                var snake = match.GetSnake(player.Slot);
+                if (snake == null || snake == own || !snake.IsRunning || snake.IsStunned(now))
+                    continue;
+                int cell = snake.Body.First.Value;
+                int heading = (int)snake.Direction;
+                double arrival = NextMove(snake, now);
+                for (int step = 0; step < 2; step++)
+                {
+                    cell = Adjacent(cell, heading);
+                    if (!Inside(cell) || blocked[cell])
+                        break;
+                    projectedHeads.Add(new ProjectedHead
+                    {
+                        Cell = cell,
+                        Arrival = arrival,
+                        FirstStep = step == 0
+                    });
+                    if (step >= snake.ExtraMoves)
+                        arrival += snake.Interval(now);
+                }
+            }
+        }
+
+        private double HeadRisk(int cell, int heading, int length, double arrival, double interval)
+        {
+            for (int i = 0; i < length; i++)
+            {
+                cell = Adjacent(cell, heading);
+                foreach (var head in projectedHeads)
+                    if (head.Cell == cell && Math.Abs(head.Arrival - arrival) <= (head.FirstStep ? 55 : 75))
+                        return head.FirstStep ? 40 : 20;
+                arrival += interval;
+            }
+            return 0;
+        }
+
+        private double ContinuationValue(int cell, int heading, int open, int extra, int lead, SnakeMode mode)
+        {
+            double best = -12;
+            for (int step = 1; step <= Math.Min(open, extra + lead + 4); step++)
+            {
+                cell = Adjacent(cell, heading);
+                if (step <= extra)
+                    continue;
+                for (int side = 1; side < 4; side += 2)
+                {
+                    int direction = (heading + side) % 4;
+                    int run = FreeRun(cell, direction, 4);
+                    if (run == 0)
+                        continue;
+                    double value = LineValue(cell, direction, run, mode) - step * .2;
+                    if (cachedTarget >= 0)
+                        value -= Math.Min(50, LineValue(cell, heading, 0, mode));
+                    best = Math.Max(best, value);
+                }
+            }
+            return best * .5;
+        }
+
         private void BuildDistances(int target, int radius)
         {
             cachedTarget = target;
@@ -484,11 +584,15 @@ namespace EnglishTypingPractice
 
         private int Reaction(SnakeBotDifficulty difficulty)
         {
+            if (difficulty == SnakeBotDifficulty.Hell)
+                return 15;
             return (difficulty == SnakeBotDifficulty.Easy ? 280 : difficulty == SnakeBotDifficulty.Hard ? 80 : 150) + random.Next(55);
         }
 
         private static int LetterTime(SnakeBotDifficulty difficulty)
         {
+            if (difficulty == SnakeBotDifficulty.Hell)
+                return 30;
             return difficulty == SnakeBotDifficulty.Easy ? 300 : difficulty == SnakeBotDifficulty.Hard ? 120 : 180;
         }
     }

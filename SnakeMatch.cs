@@ -22,6 +22,8 @@ namespace EnglishTypingPractice
 
     internal sealed class SnakePlayerState
     {
+        internal const int MaxDisplayNameLength = 23;
+
         public int Slot { get; set; }
         public string Name { get; set; }
         public int Score { get; set; }
@@ -355,7 +357,8 @@ namespace EnglishTypingPractice
                 seat++;
             }
             obstacles = race != null ? race.Obstacles : power != null ? power.Obstacles : relay != null ? relay.Obstacles : mode == SnakeMode.Obstacles
-                ? SnakeObstacles.Create(size, ActivePlayers().SelectMany(player => player.Snake.Body), random)
+                ? SnakeObstacles.Create(size, ActivePlayers().SelectMany(player => player.Snake.Body),
+                    ActivePlayers().Select(player => player.Snake.SpawnHead), random)
                 : new HashSet<int>();
             obstacleCells = race == null ? obstacles.ToArray() : race.ObstacleCells;
             territory = mode == SnakeMode.Territory ? new SnakeTerritory(size) : null;
@@ -600,13 +603,8 @@ namespace EnglishTypingPractice
                 if (takesLarge)
                     largeConsumers.Add(snake);
             }
-            var collisions = new HashSet<SnakeGame>();
-            foreach (var move in moves)
-            {
-                if (!move.Key.IsCharging(now) && moves.Any(other => other.Key != move.Key &&
-                    !other.Key.IsCharging(now) && other.Value == move.Value))
-                    collisions.Add(move.Key);
-            }
+            var headCollisions = FindHeadCollisions(snakes, moves);
+            var collisions = new HashSet<SnakeGame>(headCollisions);
             var charging = moves.Where(item => item.Key.IsCharging(now)).ToArray();
             var stunned = new HashSet<SnakeGame>();
             foreach (var move in charging)
@@ -643,11 +641,14 @@ namespace EnglishTypingPractice
                 players[Slot(rival)].Preview = null;
             }
 
+            foreach (var snake in headCollisions)
+                snake.End(SnakeResult.Rival);
+
             bool ateLarge = false;
             // Simultaneous arrivals at different cells of the large fruit all collect it.
             foreach (var move in moves)
             {
-                if (move.Key.IsStunned(now))
+                if (!move.Key.IsRunning || move.Key.IsStunned(now))
                     continue;
                 if (collisions.Contains(move.Key))
                     move.Key.End(SnakeResult.Rival);
@@ -670,17 +671,43 @@ namespace EnglishTypingPractice
                 largeFruit = -1;
             if (teams != null)
             {
-                foreach (var snake in due.Where(item => !item.IsRunning))
+                foreach (var snake in snakes.Where(item => !item.IsRunning))
                     QueueTeamRespawn(snake, now);
             }
             else if (hotspot != null)
             {
-                foreach (var snake in due.Where(item => !item.IsRunning))
+                foreach (var snake in snakes.Where(item => !item.IsRunning))
                     players[Slot(snake)].RespawnAt = now + SnakeHotspot.RespawnDelay;
                 FillFruits();
             }
             else
                 SettleCombat();
+        }
+
+        private HashSet<SnakeGame> FindHeadCollisions(IEnumerable<SnakeGame> snakes, Dictionary<SnakeGame, int> moves)
+        {
+            var collisions = new HashSet<SnakeGame>();
+            foreach (var move in moves)
+            {
+                if (move.Value < 0 || move.Key.IsCharging(now))
+                    continue;
+                foreach (var other in snakes)
+                {
+                    if (other == move.Key || other.IsCharging(now))
+                        continue;
+                    int otherNext;
+                    int otherHead = other.Body.First.Value;
+                    bool touchesHead = moves.TryGetValue(other, out otherNext) && otherNext >= 0
+                        ? move.Value == otherNext || (move.Value == otherHead && otherNext == move.Key.Body.First.Value)
+                        : move.Value == otherHead;
+                    if (touchesHead)
+                    {
+                        collisions.Add(move.Key);
+                        collisions.Add(other);
+                    }
+                }
+            }
+            return collisions;
         }
 
         private int Slot(SnakeGame snake)
@@ -719,13 +746,15 @@ namespace EnglishTypingPractice
 
         private void MoveTerritory(SnakeGame[] due)
         {
+            var moves = due.ToDictionary(snake => snake, snake => snake.NextCell());
+            var collisions = FindHeadCollisions(ActivePlayers().Select(player => player.Snake), moves);
             var captures = new List<KeyValuePair<Player, bool[]>>();
             foreach (var snake in due)
             {
-                if (snake.IsStunned(now))
+                if (collisions.Contains(snake) || snake.IsStunned(now))
                     continue;
                 int slot = Slot(snake);
-                int next = snake.NextCell();
+                int next = moves[snake];
                 if (next < 0)
                 {
                     RespawnTerritory(slot);
@@ -749,8 +778,11 @@ namespace EnglishTypingPractice
             }
             if (captures.Count > 0)
                 foreach (var player in ActivePlayers().ToArray())
-                    if (captures.Any(capture => capture.Key != player && capture.Value[player.Snake.Body.First.Value]))
+                    if (!collisions.Contains(player.Snake) &&
+                        captures.Any(capture => capture.Key != player && capture.Value[player.Snake.Body.First.Value]))
                         Defeat(player, now);
+            foreach (var snake in collisions)
+                RespawnTerritory(Slot(snake));
         }
 
         private void RespawnTerritory(int slot)
@@ -892,6 +924,19 @@ namespace EnglishTypingPractice
         private SnakePlayerState[] PlayerStates(int visibleSlot = -1)
         {
             var result = new List<SnakePlayerState>(players.Length);
+            var shown = players.Where(player => player != null && (player.Connected || player.Snake != null)).ToArray();
+            var usedNames = new HashSet<string>(shown.Select(player => player.Name), StringComparer.Ordinal);
+            var numberedNames = new Dictionary<Player, string>();
+            foreach (var group in shown.GroupBy(player => player.Name, StringComparer.Ordinal).Where(group => group.Count() > 1))
+            {
+                int number = 1;
+                foreach (var player in group)
+                {
+                    string label;
+                    do { label = player.Name + " #" + number++; } while (!usedNames.Add(label));
+                    numberedNames.Add(player, label);
+                }
+            }
             for (int slot = 0; slot < players.Length; slot++)
             {
                 var player = players[slot];
@@ -902,10 +947,11 @@ namespace EnglishTypingPractice
                     (relay != null && relay.HandoffWord(slot) != null)) &&
                     !snake.IsStunned(now) && player.Preview != null && player.Preview.Respawns == snake.Respawns
                     ? player.Preview : null;
+                string name;
                 result.Add(new SnakePlayerState
                 {
                     Slot = slot,
-                    Name = player.Name,
+                    Name = numberedNames.TryGetValue(player, out name) ? name : player.Name,
                     Score = territory != null ? territory.Score(slot) : power != null ? power.Contribution(slot) :
                         hotspot != null ? hotspot.Score(slot) : relay != null ? relay.Legs(relay.Team(slot)) : snake == null ? 0 : snake.Score,
                     Direction = snake == null ? SnakeDirection.North : snake.Direction,

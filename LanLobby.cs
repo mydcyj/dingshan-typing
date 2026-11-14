@@ -34,7 +34,8 @@ namespace EnglishTypingPractice
         private readonly ComboBox botCount;
         private readonly ComboBox botDifficulty;
         private bool updatingBots;
-        private static readonly SnakeBotDifficulty[] Difficulties = { SnakeBotDifficulty.Easy, SnakeBotDifficulty.Normal, SnakeBotDifficulty.Hard };
+        private static readonly SnakeBotDifficulty[] Difficulties =
+            { SnakeBotDifficulty.Easy, SnakeBotDifficulty.Normal, SnakeBotDifficulty.Hard, SnakeBotDifficulty.Hell };
         private readonly TextBlock teamLabel;
         private readonly RoomMusic music;
         private readonly Action entered;

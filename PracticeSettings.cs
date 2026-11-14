@@ -23,6 +23,7 @@ namespace EnglishTypingPractice
             RoomEffectsVolume = 50;
             SnakeReviewWords = new Dictionary<string, int>();
             SnakeRaceBest = new Dictionary<string, int>();
+            PracticeRecords = new PracticeLeaderboard();
         }
 
         public bool MatchCase { get; set; }
@@ -31,8 +32,10 @@ namespace EnglishTypingPractice
         public bool SnakeVoiceEnabled { get; set; }
         public bool SnakeLowEffects { get; set; }
         public string LocalNickname { get; set; }
+        public string PracticeFont { get; set; }
         public Dictionary<string, int> SnakeReviewWords { get; set; }
         public Dictionary<string, int> SnakeRaceBest { get; set; }
+        public PracticeLeaderboard PracticeRecords { get; set; }
         public bool PlayMusic { get; set; }
         public string Folder { get; set; }
         public PlaybackMode MusicMode { get; set; }
@@ -58,6 +61,8 @@ namespace EnglishTypingPractice
                     settings.SnakeReviewWords = new Dictionary<string, int>();
                 if (settings.SnakeRaceBest == null)
                     settings.SnakeRaceBest = new Dictionary<string, int>();
+                if (settings.PracticeRecords == null)
+                    settings.PracticeRecords = new PracticeLeaderboard();
                 settings.LocalNickname = NormalizeLocalNickname(settings.LocalNickname);
                 return settings;
             }

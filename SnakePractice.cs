@@ -2024,8 +2024,18 @@ namespace EnglishTypingPractice
                 var center = new Point(head.X + cell / 2, head.Y + cell / 2);
                 if (!area.Contains(center))
                     continue;
+                const string nameFont = "Segoe UI, Microsoft YaHei UI";
+                double nameWidth = Math.Min(138, textWidth);
+                FormattedText suffix = null;
+                if (name != null && name.Length > 3 && name[name.Length - 3] == ' ' &&
+                    name[name.Length - 2] == '#' && name[name.Length - 1] >= '1' && name[name.Length - 1] <= '4')
+                {
+                    suffix = BubbleText(name.Substring(name.Length - 3), nameFont, Label, nameWidth);
+                    name = name.Substring(0, name.Length - 3);
+                }
+                double suffixWidth = suffix == null ? 0 : suffix.Width;
                 FormattedText label = string.IsNullOrEmpty(name) ? null : BubbleText(name,
-                    "Segoe UI, Microsoft YaHei UI", Label, Math.Min(138, textWidth));
+                    nameFont, Label, Math.Max(1, nameWidth - suffixWidth));
                 FormattedText typing = null;
                 if (input != null)
                 {
@@ -2033,7 +2043,7 @@ namespace EnglishTypingPractice
                     typing = BubbleText(text, "Consolas, Microsoft YaHei UI",
                         skill ? ChargeGlow : input.Length == 0 ? Quiet : Head, textWidth);
                 }
-                double width = Math.Max(label == null ? 0 : label.Width, typing == null ? 0 : typing.Width) + 12;
+                double width = Math.Max(label == null ? 0 : label.Width + suffixWidth, typing == null ? 0 : typing.Width) + 12;
                 double labelHeight = label == null ? 0 : label.Height + 1;
                 double height = labelHeight + 6 + (typing == null ? 0 : typing.Height);
                 double x = Math.Max(area.Left + 1, Math.Min(area.Right - width - 1, center.X - width / 2));
@@ -2056,6 +2066,8 @@ namespace EnglishTypingPractice
                 drawing.DrawRectangle(Bubble, pen, bubble);
                 if (label != null)
                     drawing.DrawText(label, new Point(bubble.X + 6, bubble.Y + 3));
+                if (suffix != null)
+                    drawing.DrawText(suffix, new Point(bubble.X + 6 + label.Width, bubble.Y + 3));
                 if (typing != null)
                     drawing.DrawText(typing, new Point(bubble.X + 6, bubble.Y + labelHeight + 3));
             }

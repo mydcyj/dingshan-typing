@@ -888,7 +888,8 @@ namespace EnglishTypingPractice
                 if (!SnakeWords.Contains(word))
                     return false;
             foreach (var ranked in state.Rankings)
-                if (ranked == null || ranked.Slot < 0 || ranked.Slot > 3 || !LanWire.IsName(ranked.Name, 20))
+                if (ranked == null || ranked.Slot < 0 || ranked.Slot > 3 ||
+                    !LanWire.IsName(ranked.Name, SnakePlayerState.MaxDisplayNameLength))
                     return false;
             int cells = state.Size * state.Size;
             bool teams = state.Mode == SnakeMode.Teams && state.Phase != MatchPhase.Lobby;
@@ -965,7 +966,8 @@ namespace EnglishTypingPractice
             foreach (var player in state.Players)
             {
                 if (player == null || player.Slot < 0 || player.Slot > 3 || !slots.Add(player.Slot) ||
-                    !LanWire.IsName(player.Name, 20) || player.Body == null || player.Body.Length > cells ||
+                    !LanWire.IsName(player.Name, SnakePlayerState.MaxDisplayNameLength) ||
+                    player.Body == null || player.Body.Length > cells ||
                     !Enum.IsDefined(typeof(SnakeResult), player.Result) ||
                     !Enum.IsDefined(typeof(SnakeDirection), player.Direction) ||
                     !Enum.IsDefined(typeof(SnakeRole), player.Role))

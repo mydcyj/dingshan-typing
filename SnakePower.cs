@@ -45,7 +45,7 @@ namespace EnglishTypingPractice
         {
             required = playerCount + 2;
             outageOrder = Enumerable.Range(0, Centers.Length).OrderBy(index => random.Next()).ToArray();
-            Obstacles = SnakeObstacles.Create(Size, Centers.Concat(Spawns), random);
+            Obstacles = SnakeObstacles.Create(Size, Centers, Spawns, random);
         }
 
         internal int Spawn(int seat) { return Spawns[seat]; }

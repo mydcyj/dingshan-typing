@@ -21,7 +21,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.2.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.2.1.0")]
 
 namespace EnglishTypingPractice
 {
@@ -81,12 +81,19 @@ namespace EnglishTypingPractice
         private readonly Button nextTrack;
         private readonly TextBlock settingsNotice;
         private readonly ComboBox practiceKind;
+        private readonly ComboBox practiceFont;
         private readonly ComboBox codeExerciseKind;
         private readonly ComboBox reviewLevel;
         private readonly Button newPassage;
         private readonly Button retry;
         private readonly TextBlock reviewMeaning;
         private readonly TextBlock practiceResult;
+        private readonly ComboBox rankingOrder;
+        private readonly TextBlock rankingTitle;
+        private readonly TextBlock rankingRows;
+        private readonly FrameworkElement recordOverlay;
+        private readonly TextBlock recordDetails;
+        private readonly Button dismissRecord;
         private readonly HashSet<string>[] reviewBanks = new HashSet<string>[2];
 
         private int lastTopic = -1;
@@ -114,12 +121,19 @@ namespace EnglishTypingPractice
                 passages = new JavaScriptSerializer().Deserialize<string[][]>(reader.ReadToEnd());
 
             practiceKind = (ComboBox)window.FindName("PracticeKind");
+            practiceFont = (ComboBox)window.FindName("PracticeFont");
             codeExerciseKind = (ComboBox)window.FindName("CodeExerciseKind");
             reviewLevel = (ComboBox)window.FindName("ReviewLevel");
             newPassage = (Button)window.FindName("NewPassage");
             retry = (Button)window.FindName("Retry");
             reviewMeaning = (TextBlock)window.FindName("ReviewMeaning");
             practiceResult = (TextBlock)window.FindName("PracticeResult");
+            rankingOrder = (ComboBox)window.FindName("PracticeRankingOrder");
+            rankingTitle = (TextBlock)window.FindName("PracticeRankingTitle");
+            rankingRows = (TextBlock)window.FindName("PracticeRankingRows");
+            recordOverlay = (FrameworkElement)window.FindName("PracticeRecordOverlay");
+            recordDetails = (TextBlock)window.FindName("PracticeRecordDetails");
+            dismissRecord = (Button)window.FindName("DismissPracticeRecord");
             var workbench = (Grid)window.FindName("PracticeWorkbench");
             var sidebar = (FrameworkElement)window.FindName("PracticeSidebar");
             var sidebarColumn = (ColumnDefinition)window.FindName("PracticeSidebarColumn");
@@ -163,6 +177,22 @@ namespace EnglishTypingPractice
             snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running), settings,
                 SaveSettings, effects.ShakeWindow);
             var practicePage = (FrameworkElement)window.FindName("PracticePage");
+            Action closeRecord = () =>
+            {
+                recordOverlay.Visibility = Visibility.Collapsed;
+                practicePage.IsEnabled = true;
+                typed.Focus();
+            };
+            dismissRecord.Click += (sender, e) => closeRecord();
+            recordOverlay.PreviewKeyDown += (sender, e) =>
+            {
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    closeRecord();
+                }
+            };
+            rankingOrder.SelectionChanged += (sender, e) => RefreshRanking();
             var snakePage = (FrameworkElement)window.FindName("SnakePage");
             var rulesPage = (FrameworkElement)window.FindName("SnakeRules");
             InteractionMotion.Attach(window, () => settings.SnakeLowEffects && (snakePage.IsVisible || rulesPage.IsVisible));
@@ -251,6 +281,20 @@ namespace EnglishTypingPractice
             practiceKind.SelectionChanged += changeExercise;
             codeExerciseKind.SelectionChanged += changeExercise;
             reviewLevel.SelectionChanged += changeExercise;
+            practiceFont.SelectedValue = settings.PracticeFont ?? "";
+            if (practiceFont.SelectedIndex < 0)
+            {
+                practiceFont.SelectedIndex = 0;
+                settings.PracticeFont = null;
+            }
+            practiceFont.SelectionChanged += (sender, e) =>
+            {
+                var choice = practiceFont.SelectedItem as ComboBoxItem;
+                settings.PracticeFont = choice == null ? null : (string)choice.Tag;
+                ApplyPracticeFont();
+                SaveSettings();
+                typed.Focus();
+            };
             typed.PreviewKeyDown += (sender, e) =>
             {
                 if (IsCode && !typed.IsReadOnly && e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.None)
@@ -417,6 +461,16 @@ namespace EnglishTypingPractice
             ResetRound();
         }
 
+        private void ApplyPracticeFont()
+        {
+            string family = settings.PracticeFont;
+            var font = string.IsNullOrEmpty(family)
+                ? new FontFamily(IsChinese ? "Microsoft YaHei UI" : "Consolas")
+                : new FontFamily(new Uri("pack://application:,,,/"),
+                    "/" + typeof(Practice).Assembly.GetName().Name + ";component/fonts/#" + family + ", Microsoft YaHei UI");
+            passage.FontFamily = typed.FontFamily = font;
+        }
+
         private void ResetRound()
         {
             effects.Reset();
@@ -443,8 +497,7 @@ namespace EnglishTypingPractice
             includePunctuation.IsEnabled = !IsCode && !IsReview;
             typed.AcceptsReturn = IsCode;
             InputMethod.SetIsInputMethodEnabled(typed, IsChinese);
-            var font = new FontFamily(IsChinese ? "Microsoft YaHei UI" : "Consolas");
-            passage.FontFamily = typed.FontFamily = font;
+            ApplyPracticeFont();
             passage.FontSize = typed.FontSize = IsCode ? 18 : 20;
             typed.Height = IsCode ? 155 : 96;
             ((TextBlock)window.FindName("PracticeTitle")).Text = IsReview ? "复习单词" : IsCode ? "练习代码" : "练习短文";
@@ -472,6 +525,7 @@ namespace EnglishTypingPractice
             resetting = false;
             RefreshProgress();
             RefreshClock();
+            RefreshRanking();
         }
 
         private void OnCompositionStart(object sender, TextCompositionEventArgs e)
@@ -543,7 +597,7 @@ namespace EnglishTypingPractice
                 roundStatus.Text = "本轮完成";
                 UpdatePracticeMusic();
             }
-            RefreshClock();
+            double completedSpeed = RefreshClock();
             if (complete)
             {
                 lastRoundResult = speed.Text + (IsChinese ? " 字/分" : " WPM") + "　准确率 " + round.Accuracy;
@@ -555,7 +609,55 @@ namespace EnglishTypingPractice
                     reviewMeaning.Text = SnakeWords.Meaning(target);
                     reviewMeaning.Visibility = Visibility.Visible;
                 }
+                bool best = settings.PracticeRecords.Add(RankingKey, completedSpeed, round.AccuracyRatio);
+                SaveSettings();
+                RefreshRanking();
+                if (best)
+                {
+                    double score = settings.PracticeRecords.Top(RankingKey, PracticeRankingOrder.Composite)[0].Composite;
+                    recordDetails.Text = RankingLabel + "  ·  综合分 " + score.ToString("0.00") +
+                        "\n" + FormatRankSpeed(completedSpeed) + "　准确率 " + round.Accuracy;
+                    ((FrameworkElement)window.FindName("PracticePage")).IsEnabled = false;
+                    InteractionMotion.Reveal(recordOverlay, 0, false);
+                    dismissRecord.Focus();
+                }
             }
+        }
+
+        private string RankingKey
+        {
+            get
+            {
+                string key = (string)((ComboBoxItem)practiceKind.SelectedItem).Tag;
+                return IsCode ? key + "/" + codeExerciseKind.SelectedIndex :
+                    IsReview ? key + "/" + reviewLevel.SelectedIndex : key;
+            }
+        }
+
+        private string RankingLabel
+        {
+            get
+            {
+                string label = (string)((ComboBoxItem)practiceKind.SelectedItem).Content;
+                var submode = IsCode ? codeExerciseKind : IsReview ? reviewLevel : null;
+                return submode == null ? label : label + " · " + ((ComboBoxItem)submode.SelectedItem).Content;
+            }
+        }
+
+        private void RefreshRanking()
+        {
+            rankingTitle.Text = RankingLabel;
+            var order = (PracticeRankingOrder)Math.Max(0, rankingOrder.SelectedIndex);
+            var top = settings.PracticeRecords.Top(RankingKey, order);
+            rankingRows.Text = top.Length == 0 ? "完成一轮后，这里会显示该类型的前三名。" :
+                string.Join("\n", top.Select((entry, index) => (index + 1) + ".　" +
+                    FormatRankSpeed(entry.Speed) + "　" + entry.Accuracy.ToString("P1") + "　" +
+                    entry.Composite.ToString("0.00") + " 分"));
+        }
+
+        private string FormatRankSpeed(double value)
+        {
+            return value.ToString("0.0") + (IsChinese ? " 字/分" : " WPM");
         }
 
         private void HighlightProgress(bool complete)
@@ -648,7 +750,7 @@ namespace EnglishTypingPractice
             return (IsChinese ? committedChinese : typed.Text).Replace("\r\n", "\n");
         }
 
-        private void RefreshClock()
+        private double RefreshClock()
         {
             TimeSpan duration = clock.Elapsed;
             elapsed.Text = string.Format("{0}:{1:00}", (int)duration.TotalMinutes, duration.Seconds);
@@ -659,9 +761,10 @@ namespace EnglishTypingPractice
                 units = Enumerable.Range(0, Math.Min(input.Length, target.Length))
                     .Count(i => input[i] == target[i] && target[i] >= '\u3400' && target[i] <= '\u9fff');
             }
-            speed.Text = duration.TotalSeconds >= 1 || (typed.IsReadOnly && target.Length != 0)
-                ? Math.Round(units * (IsChinese ? 60.0 : 12.0) / Math.Max(1, duration.TotalSeconds)).ToString(CultureInfo.CurrentCulture)
-                : "0";
+            double measuredSpeed = duration.TotalSeconds >= 1 || (typed.IsReadOnly && target.Length != 0)
+                ? units * (IsChinese ? 60.0 : 12.0) / Math.Max(1, duration.TotalSeconds) : 0;
+            speed.Text = Math.Round(measuredSpeed).ToString(CultureInfo.CurrentCulture);
+            return measuredSpeed;
         }
 
         private async void ChooseMusicFolder(object sender, RoutedEventArgs e)

@@ -69,7 +69,7 @@ namespace EnglishTypingPractice
                 AddSegment(protectedCells, gates[leg], bends[leg]);
                 AddSegment(protectedCells, bends[leg], gates[leg + 1]);
             }
-            Obstacles = SnakeObstacles.Create(Size, protectedCells, course);
+            Obstacles = SnakeObstacles.Create(Size, protectedCells, gates.Take(LegCount), course);
         }
 
         internal int Team(int slot) { return teamBySlot[slot]; }

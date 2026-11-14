@@ -27,6 +27,8 @@ namespace EnglishTypingPractice
 
     internal static class SnakeObstacles
     {
+        internal const int SpawnClearance = 6;
+
         private static readonly int[][] Shapes =
         {
             new[] { 0, 1, 2, 3 }, new[] { 0, 1, 4, 5 }, new[] { 0, 1, 2, 5 },
@@ -34,12 +36,24 @@ namespace EnglishTypingPractice
             new[] { 0, 1, 5, 6 }
         };
 
-        internal static HashSet<int> Create(int size, IEnumerable<int> bodies, Random random)
+        internal static HashSet<int> Create(int size, IEnumerable<int> protectedCells, IEnumerable<int> spawnHeads, Random random)
         {
             var cells = new HashSet<int>();
             var reserved = new HashSet<int>();
-            foreach (int cell in bodies)
+            foreach (int cell in protectedCells)
                 Reserve(reserved, size, cell, 5);
+            foreach (int head in spawnHeads)
+            {
+                Reserve(reserved, size, head, SpawnClearance - 1);
+                foreach (SnakeDirection direction in Enum.GetValues(typeof(SnakeDirection)))
+                {
+                    int end = head;
+                    for (int step = 0; step < SpawnClearance && end >= 0; step++)
+                        end = SnakeGame.AdjacentCell(end, direction, size);
+                    if (end >= 0)
+                        Reserve(reserved, size, end, 1);
+                }
+            }
 
             for (int attempts = 0; cells.Count < 4 * (7 + (size - SnakeGame.BaseSize) / 4) && attempts < 300; attempts++)
             {

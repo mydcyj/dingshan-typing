@@ -68,7 +68,7 @@ namespace EnglishTypingPractice
                 }
             }
             corridor.Add(route[CheckpointCount]);
-            Obstacles = SnakeObstacles.Create(Size, corridor, random);
+            Obstacles = SnakeObstacles.Create(Size, corridor, route.Take(CheckpointCount), random);
             ObstacleCells = Obstacles.OrderBy(cell => cell).ToArray();
         }
 

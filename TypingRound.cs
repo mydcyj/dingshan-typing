@@ -31,7 +31,8 @@ namespace EnglishTypingPractice
                         indent.Add(i);
         }
 
-        internal string Accuracy { get { return attempts == 0 ? "—" : (100.0 * correct / attempts).ToString("0.#") + "%"; } }
+        internal double AccuracyRatio { get { return attempts == 0 ? 0 : (double)correct / attempts; } }
+        internal string Accuracy { get { return attempts == 0 ? "—" : (100 * AccuracyRatio).ToString("0.#") + "%"; } }
 
         internal bool Observe(string input, double seconds)
         {

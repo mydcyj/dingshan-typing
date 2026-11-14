@@ -90,7 +90,8 @@ namespace EnglishTypingPractice
         internal void Start(SnakeRole role, SnakeMode mode = SnakeMode.Classic, int size = BaseSize)
         {
             Start(size, size / 2, size / 2, SnakeDirection.North, role, mode);
-            Obstacles = mode == SnakeMode.Obstacles ? SnakeObstacles.Create(Size, Body, random) : new HashSet<int>();
+            Obstacles = mode == SnakeMode.Obstacles
+                ? SnakeObstacles.Create(Size, Body, new[] { SpawnHead }, random) : new HashSet<int>();
             PlaceFruit();
         }
 
