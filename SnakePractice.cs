@@ -48,6 +48,10 @@ namespace EnglishTypingPractice
         private readonly TextBlock[] directionWords;
         private readonly SnakeBoard board;
         private readonly Action<bool> gameRunningChanged;
+        private readonly Action<double, double> shakeWindow;
+        private readonly SnakeWordVoice voice;
+        private readonly CheckBox voiceEnabled;
+        private readonly PracticeSettings settings;
         private readonly LanLobby lobby;
         private SnakeMatchState online;
         private SnakeMatch soloMatch;
@@ -57,9 +61,12 @@ namespace EnglishTypingPractice
         private bool updatingMode;
         private int sprintRound;
 
-        internal SnakePractice(Window window, Action<bool> gameRunningChanged, PracticeSettings settings, Action saveSettings)
+        internal SnakePractice(Window window, Action<bool> gameRunningChanged, PracticeSettings settings, Action saveSettings,
+            Action<double, double> shakeWindow)
         {
             this.gameRunningChanged = gameRunningChanged;
+            this.shakeWindow = shakeWindow;
+            this.settings = settings;
             command = (TextBox)window.FindName("SnakeCommand");
             rolePicker = (ComboBox)window.FindName("SnakeRole");
             modePicker = (ComboBox)window.FindName("SnakeMode");
@@ -72,6 +79,26 @@ namespace EnglishTypingPractice
             chargeWord = (TextBlock)window.FindName("SnakeChargeWord");
             chargeInput = (TextBox)window.FindName("SnakeChargeInput");
             status = (TextBlock)window.FindName("SnakeStatus");
+            voiceEnabled = (CheckBox)window.FindName("SnakeVoiceEnabled");
+            voiceEnabled.IsChecked = settings.SnakeVoiceEnabled;
+            voice = new SnakeWordVoice(() =>
+            {
+                voiceEnabled.IsChecked = false;
+                voiceEnabled.IsEnabled = false;
+                voiceEnabled.Content = "英文女声不可用";
+                voiceEnabled.ToolTip = "请检查 Windows 的默认音频输出和英文女声，再重启游戏。";
+                ToolTipService.SetShowOnDisabled(voiceEnabled, true);
+                settings.SnakeVoiceEnabled = false;
+                saveSettings();
+            });
+            voiceEnabled.Click += (sender, e) =>
+            {
+                settings.SnakeVoiceEnabled = voiceEnabled.IsChecked == true && voice.Enable();
+                if (!settings.SnakeVoiceEnabled)
+                    voice.Stop();
+                saveSettings();
+            };
+            window.Closed += (sender, e) => voice.Dispose();
             score = (TextBlock)window.FindName("SnakeScore");
             scoreLabel = (TextBlock)window.FindName("SnakeScoreLabel");
             wordFlash = (FrameworkElement)window.FindName("SnakeWordFlash");
@@ -227,6 +254,7 @@ namespace EnglishTypingPractice
                 {
                     StopSprint();
                     ClearLook();
+                    voice.Stop();
                 }
             };
             timer.Tick += Tick;
@@ -322,10 +350,13 @@ namespace EnglishTypingPractice
 
             SubmitWord(game.Words, game.Role, game.Direction, false, word =>
             {
+                var before = game.Direction;
                 if (game.TryWord(word, game.WordGroup, clock.ElapsedMilliseconds))
                 {
                     FlashWord(game.LastWord);
                     PulseDirection(game.Direction);
+                    if (before != game.Direction)
+                        TurnFeedback(before);
                     status.Text = "";
                     Render();
                 }
@@ -625,6 +656,10 @@ namespace EnglishTypingPractice
                     previousOwn.Respawns == own.Respawns)
                     PulseDirection(own.Direction);
             }
+            if (previousOwn != null && previous.Round == state.Round && own.Respawns == previousOwn.Respawns &&
+                own.Result == SnakeResult.Running && previousOwn.Result == SnakeResult.Running &&
+                previous.WordGroup != state.WordGroup && own.Direction != previousOwn.Direction)
+                TurnFeedback(previousOwn.Direction);
             if (state.Phase == MatchPhase.Playing && rolePicker.SelectedIndex != (int)own.Role)
             {
                 updatingRole = true;
@@ -754,6 +789,12 @@ namespace EnglishTypingPractice
                 return;
             flashWord.Text = flashBlue.Text = flashRose.Text = word;
             flashMeaning.Text = SnakeWords.Meaning(word);
+            if (board.IsVisible && voiceEnabled.IsChecked == true)
+            {
+                int volume = online != null && soloMatch == null ? settings.RoomEffectsVolume : 100;
+                if (volume > 0 && voice.Enable())
+                    voice.Speak(word, volume);
+            }
             var fade = new DoubleAnimationUsingKeyFrames { FillBehavior = FillBehavior.Stop };
             fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
             fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(620))));
@@ -765,6 +806,13 @@ namespace EnglishTypingPractice
                 transform.BeginAnimation(TranslateTransform.XProperty,
                     new DoubleAnimation(i == 0 ? -8 : 8, i == 0 ? -2 : 2, TimeSpan.FromMilliseconds(300)));
             }
+        }
+
+        private void TurnFeedback(SnakeDirection previousDirection)
+        {
+            board.ShowTurnEffect(previousDirection);
+            if (board.IsVisible && SystemParameters.ClientAreaAnimation)
+                shakeWindow(2.5, 140);
         }
 
         private void PulseDirection(SnakeDirection direction)
@@ -791,6 +839,9 @@ namespace EnglishTypingPractice
     {
         private const int CameraMargin = 6;
         private const int CameraStep = 8;
+        private const int TurnEffectLength = 300;
+        private const int FireEffectLength = 280;
+        private const int BurstEffectLength = 520;
         private static readonly DependencyProperty CameraOffsetProperty = DependencyProperty.Register(
             "CameraOffset", typeof(Point), typeof(SnakeBoard),
             new FrameworkPropertyMetadata(new Point(), FrameworkPropertyMetadataOptions.AffectsRender,
@@ -813,6 +864,21 @@ namespace EnglishTypingPractice
             }
         }
 
+        private sealed class ShotVisual
+        {
+            internal int Cell;
+            internal Point From;
+            internal Vector Direction;
+            internal double MovedAt;
+        }
+
+        private struct Flash
+        {
+            internal Point Origin;
+            internal Vector Direction;
+            internal double StartedAt;
+        }
+
         private static readonly Brush Head = MakeBrush(236, 246, 100);
         internal static readonly Brush Current = MakeBrush(49, 63, 42);
         internal static readonly Brush Quiet = MakeBrush(158, 181, 188);
@@ -827,8 +893,16 @@ namespace EnglishTypingPractice
         private static readonly Brush StunFill = MakeBrush(149, 154, 167);
         private static readonly Brush ClosedZone = MakeBrush(47, 58, 66);
         private static readonly Brush OutsideMap = MakeBrush(9, 16, 23);
-        private static readonly Brush ShotFill = MakeBrush(255, 149, 99);
+        private static readonly Brush ShotCore = MakeBrush(255, 248, 220);
+        private static readonly Brush ShotGlow = MakeBrush(255, 105, 44, 90);
+        private static readonly Pen ShotTrail = MakePen(MakeBrush(255, 126, 57, 155), 2.5);
+        private static readonly Brush BurstFill = MakeBrush(207, 129, 255, 55);
         private static readonly Pen BurstOutline = MakeBurstPen();
+        private static readonly Brush[] TurnColors =
+        {
+            MakeBrush(93, 225, 252), MakeBrush(242, 144, 248), MakeBrush(237, 251, 172)
+        };
+        private static readonly Pen FruitArrowOutline = MakePen(MakeBrush(69, 38, 20), 1.6);
         private static readonly Brush Obstacle = MakeBrush(93, 118, 127);
         private static readonly Pen ObstacleOutline = MakeObstaclePen();
         private static readonly Pen Grid = MakeGridPen();
@@ -861,6 +935,12 @@ namespace EnglishTypingPractice
         private int safeEnd;
         private int[] shots;
         private int[] bursts;
+        private ShotVisual[] shotVisuals = new ShotVisual[0];
+        private readonly System.Collections.Generic.List<Flash> muzzleFlashes = new System.Collections.Generic.List<Flash>();
+        private readonly System.Collections.Generic.List<Flash> burstFlashes = new System.Collections.Generic.List<Flash>();
+        private readonly System.Collections.Generic.List<Flash> turnFlashes = new System.Collections.Generic.List<Flash>();
+        private readonly Stopwatch effectClock = Stopwatch.StartNew();
+        private readonly DispatcherTimer effectTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(24) };
         private int teams;
         private TeamBall[] teamBalls;
         private bool showNames;
@@ -876,6 +956,22 @@ namespace EnglishTypingPractice
         internal SnakeBoard()
         {
             Minimap = new MapOverview(this);
+            effectTimer.Tick += (sender, e) =>
+            {
+                double now = effectClock.Elapsed.TotalMilliseconds;
+                turnFlashes.RemoveAll(flash => now - flash.StartedAt >= TurnEffectLength);
+                muzzleFlashes.RemoveAll(flash => now - flash.StartedAt >= FireEffectLength);
+                burstFlashes.RemoveAll(flash => now - flash.StartedAt >= BurstEffectLength);
+                if (turnFlashes.Count == 0 && muzzleFlashes.Count == 0 && burstFlashes.Count == 0 &&
+                    !shotVisuals.Any(shot => now - shot.MovedAt < 95))
+                    effectTimer.Stop();
+                InvalidateVisual();
+            };
+            IsVisibleChanged += (sender, e) =>
+            {
+                if (!IsVisible)
+                    effectTimer.Stop();
+            };
         }
 
         internal FrameworkElement Minimap { get; private set; }
@@ -911,6 +1007,26 @@ namespace EnglishTypingPractice
             resetCamera = true;
         }
 
+        internal void ShowTurnEffect(SnakeDirection previousDirection)
+        {
+            var own = players.FirstOrDefault(player => player.Slot == ownSlot && player.Body.Length > 0);
+            if (own == null || !IsVisible)
+                return;
+            AddTurnEffect(own.Body[0], previousDirection, effectClock.Elapsed.TotalMilliseconds);
+            effectTimer.Start();
+            InvalidateVisual();
+        }
+
+        private void AddTurnEffect(int head, SnakeDirection previousDirection, double now)
+        {
+            turnFlashes.Add(new Flash
+            {
+                Origin = CellCenter(head),
+                Direction = DirectionVector(previousDirection),
+                StartedAt = now
+            });
+        }
+
         internal void SetBoard(int size, int[] smallFruits, int largeFruit, int ownSlot, SnakePlayerState[] players,
             int[] obstacles = null, int[] land = null, int[] trails = null, int safeStart = 0, int safeEnd = 0,
             int[] shots = null, int[] bursts = null, int teams = 0, TeamBall[] teamBalls = null, bool showNames = false)
@@ -927,6 +1043,25 @@ namespace EnglishTypingPractice
             if (own != null)
                 respawns = own.Respawns;
             resetCamera = false;
+            if (!reset && IsVisible)
+            {
+                double now = effectClock.Elapsed.TotalMilliseconds;
+                foreach (var player in players)
+                {
+                    var prior = this.players.FirstOrDefault(item => item.Slot == player.Slot);
+                    if (prior == null || prior.Body.Length == 0 || player.Respawns != prior.Respawns)
+                        continue;
+                    if (player.Slot != ownSlot && player.Body.Length > 0 && player.Direction != prior.Direction)
+                        AddTurnEffect(prior.Body[0], prior.Direction, now);
+                    if (player.Role == SnakeRole.Hunter && player.SkillUses > prior.SkillUses)
+                        muzzleFlashes.Add(new Flash
+                        {
+                            Origin = CellCenter(player.Body.Length == 0 ? prior.Body[0] : player.Body[0]),
+                            Direction = DirectionVector(player.Direction),
+                            StartedAt = now
+                        });
+                }
+            }
             this.size = size;
             this.smallFruits = smallFruits;
             this.largeFruit = largeFruit;
@@ -937,11 +1072,19 @@ namespace EnglishTypingPractice
             this.trails = trails;
             this.safeStart = safeStart;
             this.safeEnd = safeEnd == 0 ? size : safeEnd;
-            this.shots = shots;
-            this.bursts = bursts;
             this.teams = teams;
             this.teamBalls = teamBalls;
             this.showNames = showNames;
+            if (reset)
+            {
+                this.shots = null;
+                this.bursts = null;
+                shotVisuals = new ShotVisual[0];
+                muzzleFlashes.Clear();
+                burstFlashes.Clear();
+                turnFlashes.Clear();
+            }
+            UpdateSkillEffects(shots, bursts);
             InvalidateVisual();
             Minimap.InvalidateVisual();
         }
@@ -1023,6 +1166,7 @@ namespace EnglishTypingPractice
             }
             DrawPieces(drawing, world, cell, visible);
             DrawBubbles(drawing, area, world, cell);
+            DrawFruitArrow(drawing, area, world, cell);
             drawing.Pop();
         }
 
@@ -1087,6 +1231,7 @@ namespace EnglishTypingPractice
 
         private void DrawPieces(DrawingContext drawing, Rect area, double cell, Int32Rect visible)
         {
+            double now = effectClock.Elapsed.TotalMilliseconds;
             if (trails != null)
                 for (int y = visible.Y; y < visible.Y + visible.Height; y++)
                 {
@@ -1108,6 +1253,7 @@ namespace EnglishTypingPractice
                     }
                 }
 
+            DrawTurnEffect(drawing, area, cell, now);
             foreach (var player in players)
             {
                 Brush fill = player.Charging ? ChargeGlow : player.StunRemaining > 0 ? StunFill :
@@ -1146,20 +1292,239 @@ namespace EnglishTypingPractice
                 drawing.DrawRectangle(FruitHighlight, null,
                     new Rect(anchor.X + cell * 0.65, anchor.Y + cell * 0.65, cell * 0.7, cell * 0.7));
             }
-            if (shots != null)
-                foreach (int shot in shots)
+            DrawSkillEffects(drawing, area, cell, now);
+        }
+
+        private void UpdateSkillEffects(int[] nextShots, int[] nextBursts)
+        {
+            double now = effectClock.Elapsed.TotalMilliseconds;
+            if (nextShots == null)
+                shotVisuals = new ShotVisual[0];
+            else if (shots == null || !shots.SequenceEqual(nextShots))
+            {
+                var previous = shotVisuals;
+                var matched = new bool[previous.Length];
+                shotVisuals = new ShotVisual[nextShots.Length];
+                for (int i = 0; i < nextShots.Length; i++)
                 {
-                    var bounds = CellBounds(shot, area, cell);
-                    drawing.DrawEllipse(ShotFill, null, new Point(bounds.X + cell / 2, bounds.Y + cell / 2), cell * 0.35, cell * 0.35);
+                    int cell = nextShots[i];
+                    int nearest = -1;
+                    double distance = 5;
+                    for (int j = 0; j < previous.Length; j++)
+                    {
+                        var motion = CellCenter(cell) - CellCenter(previous[j].Cell);
+                        double steps = Math.Abs(motion.X) + Math.Abs(motion.Y);
+                        if (matched[j] || steps >= distance || (motion.X != 0 && motion.Y != 0) ||
+                            (steps > 0 && previous[j].Direction.LengthSquared > 0 &&
+                                Vector.Multiply(motion, previous[j].Direction) <= 0))
+                            continue;
+                        nearest = j;
+                        distance = steps;
+                    }
+                    if (nearest >= 0)
+                    {
+                        matched[nearest] = true;
+                        var shot = previous[nearest];
+                        if (shot.Cell != cell)
+                        {
+                            Point destination = CellCenter(cell);
+                            shot.From = ShotPosition(shot, now);
+                            var direction = destination - CellCenter(shot.Cell);
+                            direction.Normalize();
+                            shot.Cell = cell;
+                            shot.Direction = direction;
+                            shot.MovedAt = now;
+                        }
+                        shotVisuals[i] = shot;
+                    }
+                    else
+                        shotVisuals[i] = StartShot(cell, now);
                 }
-            if (bursts != null)
-                foreach (int burst in bursts)
+            }
+
+            if (nextBursts != null && IsVisible)
+                foreach (int cell in nextBursts.Distinct())
+                    if (bursts == null || nextBursts.Count(other => other == cell) > bursts.Count(other => other == cell))
+                        burstFlashes.Add(new Flash { Origin = CellCenter(cell), StartedAt = now });
+            shots = nextShots;
+            bursts = nextBursts;
+            if (IsVisible && (turnFlashes.Count > 0 || muzzleFlashes.Count > 0 || burstFlashes.Count > 0 ||
+                shotVisuals.Any(shot => now - shot.MovedAt < 95)))
+                effectTimer.Start();
+        }
+
+        private ShotVisual StartShot(int cell, double now)
+        {
+            Point center = CellCenter(cell);
+            var origin = center;
+            var direction = new Vector();
+            double closest = 4;
+            foreach (var player in players)
+            {
+                if (player.Role != SnakeRole.Hunter || player.Body.Length == 0)
+                    continue;
+                var head = CellCenter(player.Body[0]);
+                var facing = DirectionVector(player.Direction);
+                var path = center - head;
+                double distance = Vector.Multiply(path, facing);
+                if (distance < 0 || distance >= closest || (path - facing * distance).LengthSquared > 0)
+                    continue;
+                closest = distance;
+                origin = head;
+                direction = facing;
+            }
+            if (IsVisible && !muzzleFlashes.Any(flash => now - flash.StartedAt < 95 && (flash.Origin - origin).LengthSquared <= 1))
+                muzzleFlashes.Add(new Flash { Origin = origin, Direction = direction, StartedAt = now });
+            return new ShotVisual { Cell = cell, From = origin, Direction = direction, MovedAt = now };
+        }
+
+        private Point ShotPosition(ShotVisual shot, double now)
+        {
+            var destination = CellCenter(shot.Cell);
+            double progress = SystemParameters.ClientAreaAnimation ? Math.Min(1, (now - shot.MovedAt) / 95) : 1;
+            return shot.From + (destination - shot.From) * progress;
+        }
+
+        private void DrawTurnEffect(DrawingContext drawing, Rect area, double cell, double now)
+        {
+            foreach (var flash in turnFlashes)
+            {
+                double progress = (now - flash.StartedAt) / TurnEffectLength;
+                if (progress >= 1)
+                    continue;
+                Point head = ToScreen(flash.Origin, area, cell);
+                var side = new Vector(-flash.Direction.Y, flash.Direction.X);
+                drawing.PushOpacity((1 - progress) * .72);
+                for (int i = 0; i < TurnColors.Length; i++)
                 {
-                    int x = burst % size, y = burst / size;
-                    int left = Math.Max(0, x - 2), top = Math.Max(0, y - 2);
-                    drawing.DrawRectangle(null, BurstOutline, new Rect(area.X + left * cell, area.Y + top * cell,
-                        (Math.Min(size, x + 3) - left) * cell, (Math.Min(size, y + 3) - top) * cell));
+                    Point afterimage = head + flash.Direction * (cell * (.34 + i * .24)) + side * (cell * (i - 1) * .14);
+                    double radius = cell * (.35 - i * .05);
+                    drawing.DrawRectangle(TurnColors[i], null,
+                        new Rect(afterimage.X - radius, afterimage.Y - radius, radius * 2, radius * 2));
                 }
+                drawing.Pop();
+            }
+        }
+
+        private void DrawSkillEffects(DrawingContext drawing, Rect area, double cell, double now)
+        {
+            foreach (var shot in shotVisuals)
+            {
+                Point center = ToScreen(ShotPosition(shot, now), area, cell);
+                if (shot.Direction.LengthSquared > 0)
+                {
+                    Point tail = center - shot.Direction * (cell * 1.75);
+                    drawing.DrawLine(ShotTrail, tail, center);
+                    for (int i = 1; i <= 3; i++)
+                    {
+                        Point spark = center - shot.Direction * (cell * (.38 + i * .36));
+                        double radius = cell * (.22 - .035 * i);
+                        drawing.DrawEllipse(ShotGlow, null, spark, radius, radius);
+                    }
+                }
+                drawing.DrawEllipse(ShotGlow, null, center, cell * .54, cell * .54);
+                drawing.DrawEllipse(ShotCore, null, center, cell * .20, cell * .20);
+            }
+            foreach (var flash in muzzleFlashes)
+            {
+                double progress = (now - flash.StartedAt) / FireEffectLength;
+                if (progress >= 1)
+                    continue;
+                Point center = ToScreen(flash.Origin, area, cell) + flash.Direction * (cell * .52);
+                drawing.PushOpacity(1 - progress);
+                double radius = cell * (.42 + progress * .45);
+                drawing.DrawEllipse(ShotGlow, null, center, radius, radius);
+                drawing.DrawEllipse(null, ShotTrail, center, radius, radius);
+                drawing.DrawEllipse(ShotCore, null, center, cell * .22, cell * .22);
+                if (flash.Direction.LengthSquared > 0)
+                    drawing.DrawLine(ShotTrail, center, center + flash.Direction * (cell * (1.1 + progress)));
+                drawing.Pop();
+            }
+            foreach (var flash in burstFlashes)
+            {
+                double progress = (now - flash.StartedAt) / BurstEffectLength;
+                if (progress >= 1)
+                    continue;
+                var burst = new Rect(flash.Origin.X - 2.5, flash.Origin.Y - 2.5, 5, 5);
+                burst.Intersect(new Rect(0, 0, size, size));
+                var pulseArea = new Rect(ToScreen(burst.TopLeft, area, cell), ToScreen(burst.BottomRight, area, cell));
+                Point center = ToScreen(flash.Origin, area, cell);
+                drawing.PushOpacity(1 - progress);
+                drawing.DrawRectangle(BurstFill, BurstOutline, pulseArea);
+                double radius = cell * (.25 + progress * 2.25);
+                drawing.DrawEllipse(null, BurstOutline, center, radius, radius);
+                drawing.DrawEllipse(ShotCore, null, center, cell * .18, cell * .18);
+                drawing.Pop();
+            }
+        }
+
+        private void DrawFruitArrow(DrawingContext drawing, Rect viewportArea, Rect world, double cell)
+        {
+            if (largeFruit < 0)
+                return;
+            var own = players.FirstOrDefault(player => player.Slot == ownSlot && player.Body.Length > 0);
+            if (own == null)
+                return;
+            Point head = ToScreen(CellCenter(own.Body[0]), world, cell);
+            if (!viewportArea.Contains(head))
+                return;
+            Point fruit = ToScreen(CellCenter(largeFruit) + new Vector(.5, .5), world, cell);
+            var direction = fruit - head;
+            if (direction.LengthSquared == 0)
+                return;
+            direction.Normalize();
+            var normal = new Vector(-direction.Y, direction.X);
+            double length = Math.Max(3.5, Math.Min(9, cell * .48));
+            var bounds = viewportArea;
+            bounds.Inflate(-length, -length);
+            if (bounds.IsEmpty)
+                return;
+
+            var anchor = head + direction * (cell * 1.35 + length);
+            double separation = cell * 1.1 + length;
+            var nearFruit = new Rect(fruit.X - cell, fruit.Y - cell, 2 * cell, 2 * cell);
+            nearFruit.Inflate(length * .5, length * .5);
+            foreach (var candidate in new[]
+            {
+                anchor, head + normal * separation, head - normal * separation,
+                head - direction * separation, head + (normal - direction) * separation,
+                head - (normal + direction) * separation
+            })
+            {
+                if (!bounds.Contains(candidate) || nearFruit.Contains(candidate) || own.Body.Any(position =>
+                {
+                    Rect body = CellBounds(position, world, cell);
+                    body.Inflate(length * .70, length * .70);
+                    return body.Contains(candidate);
+                }))
+                    continue;
+                var arrow = new StreamGeometry();
+                using (var shape = arrow.Open())
+                {
+                    shape.BeginFigure(candidate + direction * length, true, true);
+                    shape.LineTo(candidate - direction * length * .75 + normal * length * .70, true, false);
+                    shape.LineTo(candidate - direction * length * .33, true, false);
+                    shape.LineTo(candidate - direction * length * .75 - normal * length * .70, true, false);
+                }
+                drawing.DrawGeometry(LargeFruit, FruitArrowOutline, arrow);
+                return;
+            }
+        }
+
+        private static Point ToScreen(Point point, Rect world, double cell)
+        {
+            return new Point(world.X + point.X * cell, world.Y + point.Y * cell);
+        }
+
+        private static Vector DirectionVector(SnakeDirection direction)
+        {
+            switch (direction)
+            {
+                case SnakeDirection.North: return new Vector(0, -1);
+                case SnakeDirection.East: return new Vector(1, 0);
+                case SnakeDirection.South: return new Vector(0, 1);
+                default: return new Vector(-1, 0);
+            }
         }
 
         private void DrawOverview(DrawingContext drawing, double side)
@@ -1283,6 +1648,11 @@ namespace EnglishTypingPractice
             return new Rect(area.X + position % size * cell, area.Y + position / size * cell, cell, cell);
         }
 
+        private Point CellCenter(int position)
+        {
+            return new Point(position % size + .5, position / size + .5);
+        }
+
         internal static Brush PlayerColor(int slot, int ownSlot, bool territory = false)
         {
             if (territory)
@@ -1299,7 +1669,7 @@ namespace EnglishTypingPractice
 
         private static Pen MakeBurstPen()
         {
-            var pen = new Pen(MakeBrush(214, 37, 52), 2.4);
+            var pen = new Pen(MakeBrush(241, 167, 255), 2.4);
             pen.Freeze();
             return pen;
         }

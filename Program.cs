@@ -136,7 +136,8 @@ namespace EnglishTypingPractice
             };
 
             music = new MusicPlayback(text => musicStatus.Text = text, UpdatePlaylist);
-            snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running), settings, SaveSettings);
+            snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running), settings,
+                SaveSettings, effects.ShakeWindow);
             var practicePage = (FrameworkElement)window.FindName("PracticePage");
             var snakePage = (FrameworkElement)window.FindName("SnakePage");
             var rulesPage = (FrameworkElement)window.FindName("SnakeRules");

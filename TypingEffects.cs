@@ -44,25 +44,26 @@ namespace EnglishTypingPractice
             if (word != null)
                 Echo(firstLetter, word);
             if (level > 0)
+                ShakeWindow(complete ? 11 : 3.5, complete ? 390 : 160);
+        }
+
+        internal void ShakeWindow(double strength, double duration)
+        {
+            if (window.IsVisible && window.WindowState == WindowState.Normal &&
+                !double.IsNaN(window.Left) && !double.IsNaN(window.Top))
             {
-                double strength = complete ? 11 : 3.5;
-                double duration = complete ? 390 : 160;
-                if (window.IsVisible && window.WindowState == WindowState.Normal &&
-                    !double.IsNaN(window.Left) && !double.IsNaN(window.Top))
-                {
-                    if (!windowShake.IsEnabled)
-                        origin = new Point(window.Left, window.Top);
-                    windowStrength = strength;
-                    windowDuration = duration;
-                    shakeClock.Restart();
-                    windowShake.Start();
-                    MoveWindow();
-                }
-                else
-                {
-                    shake.BeginAnimation(TranslateTransform.XProperty, Shake(strength, duration));
-                    shake.BeginAnimation(TranslateTransform.YProperty, Shake(strength * -0.6, duration));
-                }
+                if (!windowShake.IsEnabled)
+                    origin = new Point(window.Left, window.Top);
+                windowStrength = strength;
+                windowDuration = duration;
+                shakeClock.Restart();
+                windowShake.Start();
+                MoveWindow();
+            }
+            else
+            {
+                shake.BeginAnimation(TranslateTransform.XProperty, Shake(strength, duration));
+                shake.BeginAnimation(TranslateTransform.YProperty, Shake(strength * -0.6, duration));
             }
         }
 

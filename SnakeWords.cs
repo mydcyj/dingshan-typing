@@ -15,15 +15,17 @@ namespace EnglishTypingPractice
         private static readonly string[] ChargeWords = Meanings.Keys.Where(word => word.Length >= 11).ToArray();
         private static readonly Dictionary<string, string> SkillPhrases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            { "environmentalimpact", "环境影响" },
-            { "culturalheritage", "文化遗产" },
-            { "scientificresearch", "科学研究" },
-            { "economicdevelopment", "经济发展" },
-            { "renewableenergy", "可再生能源" },
-            { "sustainablefuture", "可持续发展的未来" },
-            { "technologicalchange", "技术变革" },
-            { "effectivelearning", "有效学习" }
+            { "environmental impact", "环境影响" },
+            { "cultural heritage", "文化遗产" },
+            { "scientific research", "科学研究" },
+            { "economic development", "经济发展" },
+            { "renewable energy", "可再生能源" },
+            { "sustainable future", "可持续发展的未来" },
+            { "technological change", "技术变革" },
+            { "effective learning", "有效学习" }
         };
+        private static readonly Dictionary<string, string> SpokenPhrases = SkillPhrases.Keys
+            .ToDictionary(phrase => phrase.Replace(" ", ""), phrase => phrase, StringComparer.OrdinalIgnoreCase);
 
         private static Dictionary<string, string> LoadMeanings()
         {
@@ -45,8 +47,14 @@ namespace EnglishTypingPractice
 
         internal static string Meaning(string word)
         {
-            string meaning;
-            return SkillPhrases.TryGetValue(word, out meaning) ? meaning : Meanings[word];
+            string phrase;
+            return SpokenPhrases.TryGetValue(word, out phrase) ? SkillPhrases[phrase] : Meanings[word];
+        }
+
+        internal static string SpokenText(string word)
+        {
+            string phrase;
+            return SpokenPhrases.TryGetValue(word, out phrase) ? phrase : word;
         }
 
         internal static int Variants(SnakeRole role)
@@ -82,7 +90,7 @@ namespace EnglishTypingPractice
         internal static string DrawCharge(Random random, string previous, SnakeRole role)
         {
             var pool = role == SnakeRole.Fearless ? ChargeWords :
-                SkillPhrases.Keys.Concat(ChargeWords.Where(word => word.Length >= 15 && word.Length <= 20));
+                SpokenPhrases.Keys.Concat(ChargeWords.Where(word => word.Length >= 15 && word.Length <= 20));
             var choices = pool.Where(word => word != previous).ToArray();
             return choices[random.Next(choices.Length)];
         }
@@ -92,7 +100,7 @@ namespace EnglishTypingPractice
             if (word == null || !HasSkill(role))
                 return false;
             return role == SnakeRole.Fearless ? word.Length >= 11 && Contains(word) :
-                word.Length >= 15 && word.Length <= 20 && (Contains(word) || SkillPhrases.ContainsKey(word));
+                word.Length >= 15 && word.Length <= 20 && (Contains(word) || SpokenPhrases.ContainsKey(word));
         }
 
         internal static bool Contains(string word)

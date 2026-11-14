@@ -24,6 +24,7 @@ namespace EnglishTypingPractice
         public bool MatchCase { get; set; }
         public bool IncludePunctuation { get; set; }
         public bool TypingFeedback { get; set; }
+        public bool SnakeVoiceEnabled { get; set; }
         public bool PlayMusic { get; set; }
         public string Folder { get; set; }
         public PlaybackMode MusicMode { get; set; }

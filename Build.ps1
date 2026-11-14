@@ -9,6 +9,7 @@ $references = @(
     'WPF/WindowsBase.dll'
     'WPF/PresentationCore.dll'
     'WPF/PresentationFramework.dll'
+    'WPF/System.Speech.dll'
 ) | ForEach-Object { '/reference:' + (Join-Path $framework $_) }
 
 & (Join-Path $framework 'csc.exe') /nologo /target:winexe /platform:anycpu /codepage:65001 /optimize+ `
@@ -23,6 +24,7 @@ $references = @(
     ("/resource:{0},LICENSE" -f (Join-Path $PSScriptRoot 'LICENSE')) `
     (Join-Path $PSScriptRoot 'Program.cs') (Join-Path $PSScriptRoot 'PracticeSettings.cs') `
     (Join-Path $PSScriptRoot 'TypingEffects.cs') (Join-Path $PSScriptRoot 'SnakeModes.cs') `
+    (Join-Path $PSScriptRoot 'SnakeWordVoice.cs') `
     (Join-Path $PSScriptRoot 'SnakeTeams.cs') (Join-Path $PSScriptRoot 'RoomMusic.cs') `
     (Join-Path $PSScriptRoot 'MusicPlayback.cs') (Join-Path $PSScriptRoot 'SnakeGame.cs') (Join-Path $PSScriptRoot 'SnakeWords.cs') `
     (Join-Path $PSScriptRoot 'SnakePractice.cs') (Join-Path $PSScriptRoot 'SnakeMatch.cs') `
