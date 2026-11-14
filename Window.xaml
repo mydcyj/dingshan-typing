@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="鼎山打字通 v2.2.2" Width="1160" Height="815" MinWidth="565" MinHeight="420"
+        Title="鼎山打字通 v2.3.0" Width="1160" Height="815" MinWidth="565" MinHeight="420"
         WindowStartupLocation="CenterScreen" Background="#101C24"
         Foreground="#EDF4F2" FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="14"
         UseLayoutRounding="True">
@@ -549,6 +549,55 @@
               Stroke="#754A9F" StrokeThickness="2.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity=".53" />
       </Canvas>
     </Viewbox>
+    <Viewbox x:Name="ConstructivistBackground" Visibility="Collapsed" Stretch="Fill">
+      <Canvas Width="1200" Height="800">
+        <Path Data="M0,565 L1200,345 V482 L0,790 Z" Fill="#CB825E" Opacity=".42" />
+        <Path Data="M0,727 L1200,515 V552 L0,800 Z M860,0 H1006 L1200,198 V275 Z" Fill="#A12C25" Opacity=".78" />
+        <Path Data="M0,764 L1200,553 M0,779 L1200,570 M90,800 L1200,594 M0,217 L973,0"
+              Stroke="#62352B" StrokeThickness="1.2" Opacity=".46" />
+        <Ellipse Canvas.Left="926" Canvas.Top="470" Width="330" Height="330" Fill="#604235" Opacity=".13" />
+        <Path Data="M60,661 L146,646 V675 L60,690 Z M158,643 L194,637 V666 L158,673 Z M203,636 L220,633 V661 L203,664 Z"
+              Fill="#F4D9A8" Opacity=".87" />
+      </Canvas>
+    </Viewbox>
+    <Viewbox x:Name="Persona5Background" Visibility="Collapsed" Stretch="Fill">
+      <Canvas Width="1200" Height="800">
+        <Path Data="M0,0 H1200 V132 L901,52 L641,102 L388,63 L0,165 Z M0,607 L195,664 L402,612 L635,704 L838,616 L1200,664 V800 H0 Z"
+              Fill="#A40C28" />
+        <Path Data="M0,747 L202,674 L404,683 L488,647 L657,736 L829,661 L1005,680 L1200,633 V655
+                    L994,706 L838,688 L672,768 L487,676 L414,707 L207,701 L0,781 Z"
+              Fill="#F9F0E9" />
+        <Path Data="M0,763 L223,686 L390,701 L489,662 L655,751 L836,676 L1009,692 L1200,650"
+              Stroke="#171018" StrokeThickness="8" />
+        <Path Data="M-85,451 L-16,424 L8,348 L28,425 L105,447 L29,473 L4,551 L-15,473 Z
+                    M1141,391 L1174,348 L1189,377 L1234,376 L1204,410 L1219,446 L1174,430 L1141,451 L1145,416 L1116,397 Z"
+              Fill="#DB1734" Stroke="#F9F0E9" StrokeThickness="3" />
+      </Canvas>
+    </Viewbox>
+    <Viewbox x:Name="ChineseStyleBackground" Visibility="Collapsed" Height="425" Stretch="Fill" VerticalAlignment="Bottom">
+      <Canvas Width="1200" Height="425">
+        <Canvas.Resources>
+          <LinearGradientBrush x:Key="InkWash" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#69958A" Offset="0" /><GradientStop Color="#007B9C8E" Offset="1" />
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="InkRidge" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#406D61" Offset="0" /><GradientStop Color="#00628572" Offset="1" />
+          </LinearGradientBrush>
+        </Canvas.Resources>
+        <Ellipse Canvas.Left="846" Canvas.Top="67" Width="85" Height="85" Fill="#BB4737" Opacity=".25" />
+        <Path Data="M0,263 Q69,173 118,127 L172,75 Q190,63 207,87 L284,171 Q316,196 347,180 L421,130 Q434,115 455,150
+                    L531,195 Q615,236 692,123 L771,58 Q784,44 804,76 L873,141 Q892,161 924,140 L986,84
+                    Q1012,55 1034,84 L1117,156 L1200,204 V382 H0 Z"
+              Fill="{StaticResource InkWash}" Opacity=".53" />
+        <Path Data="M0,245 Q49,229 91,157 Q116,120 145,156 L207,216 Q227,237 257,228 Q302,223 337,276
+                    Q380,315 483,299 Q572,300 636,269 L711,222 Q732,208 769,250 Q817,289 883,259
+                    Q916,232 951,244 L1017,187 Q1044,163 1070,183 L1200,237 V420 H0 Z"
+              Fill="{StaticResource InkRidge}" Opacity=".67" />
+        <Path Data="M36,331 C154,315 219,315 318,329 M365,352 C471,340 556,344 636,349 M679,379 C799,360 895,367 1012,375
+                    M42,391 C146,384 206,390 263,390 M845,323 C957,313 1049,313 1158,326"
+              Stroke="#668B79" StrokeThickness="1.6" Opacity=".43" />
+      </Canvas>
+    </Viewbox>
     <Border x:Name="BackgroundPatternTop" Background="{StaticResource Halftone}" Height="176" VerticalAlignment="Top">
       <Border.OpacityMask><LinearGradientBrush StartPoint="1,0" EndPoint="0.36,1">
         <GradientStop Color="#DFFFFFFF" Offset="0" /><GradientStop Color="#00FFFFFF" Offset="1" />
@@ -637,6 +686,50 @@
         </Viewbox>
         <Border x:Name="VaporwaveTitleBar" Grid.RowSpan="2" Grid.ColumnSpan="2" Height="4" VerticalAlignment="Top"
                 Background="#A163C5" Visibility="Collapsed" IsHitTestVisible="False" />
+        <Viewbox x:Name="ConstructivistArtwork" Visibility="Collapsed" IsHitTestVisible="False" Grid.RowSpan="2" Grid.ColumnSpan="2"
+                 Width="405" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Canvas Width="405" Height="120">
+            <Ellipse Canvas.Left="232" Canvas.Top="14" Width="113" Height="113" Fill="#B53328" />
+            <Path Data="M34,109 L213,19 L331,79 L405,35 V120 H0 Z" Fill="#6D4734" Opacity=".28" />
+            <Path Data="M0,108 L236,20 L262,40 L40,120 H0 Z M97,120 L313,44 L341,54 L164,120 Z"
+                  Fill="#B53124" />
+            <Path Data="M178,120 L270,38 L343,23 V69 L306,98 L281,120 Z" Fill="#36251F" />
+            <Path Data="M255,88 L341,39 M250,98 L341,49 M244,109 L335,60 M304,8 V31 M282,15 L299,31"
+                  Stroke="#F5D4A7" StrokeThickness="2" />
+            <Path Data="M16,89 L177,29 M16,95 L132,52" Stroke="#452C23" StrokeThickness="1.2" />
+          </Canvas>
+        </Viewbox>
+        <Viewbox x:Name="Persona5Artwork" Visibility="Collapsed" IsHitTestVisible="False" Grid.RowSpan="2" Grid.ColumnSpan="2"
+                 Width="407" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Canvas Width="407" Height="120">
+            <Path Data="M0,116 L127,50 L230,52 L332,3 L407,9 V120 Z" Fill="#E51736" />
+            <Path Data="M12,119 L158,41 L243,52 L328,15 L407,42 L339,70 L316,62 L259,83 L224,64 L185,80 L125,80 Z"
+                  Fill="#FFF7EE" />
+            <Path Data="M99,118 L181,65 L248,72 L305,40 L291,76 L390,95 L299,113 L270,104 L246,120 Z" Fill="#1A1218" />
+            <Path Data="M193,11 L204,38 L237,33 L212,54 L223,84 L196,66 L169,83 L177,54 L150,35 L181,37 Z"
+                  Fill="#151015" Stroke="#FFF7EE" StrokeThickness="3" />
+            <Path Data="M193,26 L201,44 L220,42 L205,55 L212,74 L195,63 L178,73 L183,55 L167,44 L187,45 Z" Fill="#F52244" />
+            <Path Data="M89,65 L110,51 M103,74 L125,60 M312,116 L348,104 M361,113 L405,99"
+                  Stroke="#FFF7EE" StrokeThickness="2" />
+          </Canvas>
+        </Viewbox>
+        <Viewbox x:Name="ChineseStyleArtwork" Visibility="Collapsed" IsHitTestVisible="False" Grid.RowSpan="2" Grid.ColumnSpan="2"
+                 Width="405" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Canvas Width="405" Height="120">
+            <Ellipse Canvas.Left="257" Canvas.Top="13" Width="56" Height="56" Fill="#B53B2D" Opacity=".65" />
+            <Path Data="M0,119 Q74,81 112,57 L158,27 Q169,18 179,36 L212,62 Q234,74 259,62 L292,48
+                        Q307,43 326,55 L354,88 L405,99 V120 Z"
+                  Fill="#93AF9C" />
+            <Path Data="M0,120 Q45,108 65,82 L105,49 Q116,39 129,52 L174,91 Q200,112 240,95
+                        L281,74 Q297,68 322,86 L349,97 Q375,107 405,105 V120 Z"
+                  Fill="#507F70" />
+            <Path Data="M144,102 Q173,100 197,104 M199,110 Q229,105 259,108 M337,105 Q362,99 387,102
+                        M215,32 Q222,25 229,31 Q236,24 242,29 M234,42 Q242,32 249,37 Q258,30 264,35"
+                  Stroke="#F9F1DE" StrokeThickness="1.4" />
+            <Path Data="M348,13 H374 V39 H348 Z M353,20 H369 M353,26 H369 M353,32 H359 M361,30 V34 M362,33 H369"
+                  Stroke="#A4352C" StrokeThickness="1.5" />
+          </Canvas>
+        </Viewbox>
         <Border Grid.ColumnSpan="2" Width="97" Height="3" Background="{StaticResource Accent}"
                 HorizontalAlignment="Left" VerticalAlignment="Top" />
         <StackPanel Grid.RowSpan="2" Margin="18,14,6,16" VerticalAlignment="Center">
@@ -1280,36 +1373,56 @@
       <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="13">
         <StackPanel>
           <TextBlock Text="界面风格" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
-          <RadioButton x:Name="ThemeModern" GroupName="Theme" Padding="8,6" Margin="0,0,0,6">
+          <UniformGrid Columns="2">
+          <RadioButton x:Name="ThemeModern" GroupName="Theme" Padding="8,6" Margin="0,0,5,6">
             <StackPanel Orientation="Horizontal">
               <Border Width="27" Height="19" Background="#263946" BorderBrush="#EEF767" BorderThickness="2" Margin="0,0,9,0" />
               <TextBlock Text="现代" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
-          <RadioButton x:Name="ThemeMinimal" GroupName="Theme" Padding="8,6" Margin="0,0,0,6">
+          <RadioButton x:Name="ThemeMinimal" GroupName="Theme" Padding="8,6" Margin="5,0,0,6">
             <StackPanel Orientation="Horizontal">
               <Border Width="27" Height="19" Background="#F0EEE7" BorderBrush="#557469" BorderThickness="2" Margin="0,0,9,0" />
               <TextBlock Text="极简" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
-          <RadioButton x:Name="ThemeCyberpunk" GroupName="Theme" Padding="8,6" Margin="0,0,0,6">
+          <RadioButton x:Name="ThemeCyberpunk" GroupName="Theme" Padding="8,6" Margin="0,0,5,6">
             <StackPanel Orientation="Horizontal">
               <Border Width="27" Height="19" Background="#261735" BorderBrush="#52F2E8" BorderThickness="2" Margin="0,0,9,0" />
               <TextBlock Text="赛博朋克" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
-          <RadioButton x:Name="ThemeSteampunk" GroupName="Theme" Padding="8,6" Margin="0,0,0,6">
+          <RadioButton x:Name="ThemeSteampunk" GroupName="Theme" Padding="8,6" Margin="5,0,0,6">
             <StackPanel Orientation="Horizontal">
               <Border Width="27" Height="19" Background="#412F23" BorderBrush="#E0B36E" BorderThickness="2" Margin="0,0,9,0" />
               <TextBlock Text="蒸汽朋克" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
-          <RadioButton x:Name="ThemeVaporwave" GroupName="Theme" Padding="8,6">
+          <RadioButton x:Name="ThemeVaporwave" GroupName="Theme" Padding="8,6" Margin="0,0,5,6">
             <StackPanel Orientation="Horizontal">
               <Border Width="27" Height="19" Background="#F8A9DE" BorderBrush="#67D4CD" BorderThickness="2" Margin="0,0,9,0" />
               <TextBlock Text="蒸汽波" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
+          <RadioButton x:Name="ThemeConstructivist" GroupName="Theme" Padding="8,6" Margin="5,0,0,6">
+            <StackPanel Orientation="Horizontal">
+              <Border Width="27" Height="19" Background="#DBC8AC" BorderBrush="#A72722" BorderThickness="2" Margin="0,0,9,0" />
+              <TextBlock Text="构成主义" VerticalAlignment="Center" />
+            </StackPanel>
+          </RadioButton>
+          <RadioButton x:Name="ThemePersona5" GroupName="Theme" Padding="8,6" Margin="0,0,5,0">
+            <StackPanel Orientation="Horizontal">
+              <Border Width="27" Height="19" Background="#1C121A" BorderBrush="#F62845" BorderThickness="2" Margin="0,0,9,0" />
+              <TextBlock Text="P5 风格" VerticalAlignment="Center" />
+            </StackPanel>
+          </RadioButton>
+          <RadioButton x:Name="ThemeChineseStyle" GroupName="Theme" Padding="8,6" Margin="5,0,0,0">
+            <StackPanel Orientation="Horizontal">
+              <Border Width="27" Height="19" Background="#EEF0D8" BorderBrush="#57796F" BorderThickness="2" Margin="0,0,9,0" />
+              <TextBlock Text="国风" VerticalAlignment="Center" />
+            </StackPanel>
+          </RadioButton>
+          </UniformGrid>
         </StackPanel>
       </Border>
       <DockPanel Margin="0,8,0,0">

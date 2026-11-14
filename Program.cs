@@ -20,7 +20,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.2.2.0")]
+[assembly: System.Reflection.AssemblyVersion("2.3.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -180,7 +180,7 @@ namespace EnglishTypingPractice
             settingsNotice = (TextBlock)window.FindName("SettingsNotice");
             var feedback = (CheckBox)window.FindName("TypingFeedback");
             feedback.IsChecked = settings.TypingFeedback;
-            effects = new TypingEffects(window, passage, (Canvas)window.FindName("WordEcho"));
+            effects = new TypingEffects(window, passage, (Canvas)window.FindName("WordEcho"), settings.Theme);
             feedback.Click += (sender, e) =>
             {
                 settings.TypingFeedback = feedback.IsChecked == true;
@@ -413,7 +413,10 @@ namespace EnglishTypingPractice
                 { UiTheme.Minimal, (RadioButton)window.FindName("ThemeMinimal") },
                 { UiTheme.Steampunk, (RadioButton)window.FindName("ThemeSteampunk") },
                 { UiTheme.Modern, (RadioButton)window.FindName("ThemeModern") },
-                { UiTheme.Vaporwave, (RadioButton)window.FindName("ThemeVaporwave") }
+                { UiTheme.Vaporwave, (RadioButton)window.FindName("ThemeVaporwave") },
+                { UiTheme.Constructivist, (RadioButton)window.FindName("ThemeConstructivist") },
+                { UiTheme.Persona5, (RadioButton)window.FindName("ThemePersona5") },
+                { UiTheme.ChineseStyle, (RadioButton)window.FindName("ThemeChineseStyle") }
             };
             bool resume = false;
             Func<UiTheme> selected = () => options.First(item => item.Value.IsChecked == true).Key;
@@ -595,12 +598,12 @@ namespace EnglishTypingPractice
             if (settings.TypingFeedback)
             {
                 if (IsChinese)
-                    effects.Play(null, null, complete);
+                    effects.Play(null, null, complete, letters[length - 1]);
                 else
                 {
                     int wordStart = -1, wordEnd = -1;
                     bool letterTyped = FindFeedbackWord(sample, previousLength, length, ref wordStart, ref wordEnd);
-                    PlayFeedback(wordStart, wordEnd, letterTyped, complete);
+                    PlayFeedback(wordStart, wordEnd, letterTyped, complete, length - 1);
                 }
             }
             if (complete)
@@ -778,7 +781,7 @@ namespace EnglishTypingPractice
                 if (IsChinese)
                 {
                     if (complete || inputChanged && (change == null || change.Changes.Any(item => item.AddedLength > 0)))
-                        effects.Play(null, null, complete);
+                        effects.Play(null, null, complete, input.Length > 0 ? letters[Math.Min(input.Length, letters.Length) - 1] : null);
                 }
                 else
                     PlayFeedback(change, complete);
@@ -885,7 +888,7 @@ namespace EnglishTypingPractice
                 }
                 letterTyped |= FindFeedbackWord(input, startOffset, Math.Min(input.Length, endOffset), ref wordStart, ref wordEnd);
             }
-            PlayFeedback(wordStart, wordEnd, letterTyped, complete);
+            PlayFeedback(wordStart, wordEnd, letterTyped, complete, input.Length - 1);
         }
 
         private bool FindFeedbackWord(string input, int startOffset, int endOffset, ref int wordStart, ref int wordEnd)
@@ -909,11 +912,12 @@ namespace EnglishTypingPractice
             return letterTyped;
         }
 
-        private void PlayFeedback(int wordStart, int wordEnd, bool letterTyped, bool complete)
+        private void PlayFeedback(int wordStart, int wordEnd, bool letterTyped, bool complete, int hit)
         {
             if (letterTyped || complete)
                 effects.Play(wordStart < 0 ? null : letters[wordStart],
-                    wordStart < 0 ? null : target.Substring(wordStart, wordEnd - wordStart + 1), complete);
+                    wordStart < 0 ? null : target.Substring(wordStart, wordEnd - wordStart + 1), complete,
+                    hit >= 0 && hit < letters.Length ? letters[hit] : null);
         }
 
         private bool IsWordCharacter(int index)

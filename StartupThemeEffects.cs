@@ -23,6 +23,21 @@ namespace EnglishTypingPractice
             "M-6,1 Q7,-28 0,-58 Q-10,-72 -29,-59 Q-22,-76 -3,-66 Q-6,-80 -24,-80 " +
             "Q-5,-87 4,-70 Q17,-88 33,-73 Q14,-77 8,-66 Q29,-73 39,-53 Q22,-65 8,-62 " +
             "Q26,-62 28,-46 Q17,-56 8,-58 Q16,-27 3,1 Z");
+        private static readonly Brush Paper = new SolidColorBrush(Color.FromRgb(251, 236, 211));
+        private static readonly Brush Cinnabar = new SolidColorBrush(Color.FromRgb(177, 43, 37));
+        private static readonly Brush JadeInk = new SolidColorBrush(Color.FromArgb(168, 41, 93, 83));
+        private static readonly Brush FadedInk = new SolidColorBrush(Color.FromArgb(104, 81, 114, 100));
+        private static readonly Geometry PrintWedge = Geometry.Parse("M-215,83 L-92,-63 -107,-7 -211,115 Z");
+        private static readonly Geometry PrintCut = Geometry.Parse("M94,-74 L208,3 208,23 101,-48 Z");
+        private static readonly Geometry ComicLeft = Geometry.Parse("M-219,70 L-142,-47 -168,22 -121,-8 -151,43 -102,25 -185,100 Z");
+        private static readonly Geometry ComicRight = Geometry.Parse("M212,-83 L130,0 177,-21 143,30 192,12 157,53 216,24 Z");
+        private static readonly Geometry ComicStar = Geometry.Parse("M0,-16 L5,-6 16,-5 8,3 10,15 0,10 -11,15 -9,3 -17,-5 -5,-6 Z");
+        private static readonly Geometry MountainFar = Geometry.Parse(
+            "M-213,81 Q-184,54 -171,49 Q-157,49 -134,26 Q-117,38 -104,48 Q-73,60 -61,87 " +
+            "Q-35,90 -17,107 L-213,107 Z M211,107 H47 Q64,77 89,66 Q105,42 127,30 Q149,48 164,49 Q182,62 211,72 Z");
+        private static readonly Geometry MountainNear = Geometry.Parse(
+            "M-213,92 Q-193,93 -160,72 Q-142,53 -132,60 Q-121,72 -99,78 Q-76,100 -64,107 L-213,107 Z " +
+            "M210,107 H84 Q102,97 121,79 Q141,72 168,55 Q184,64 210,78 Z");
         private readonly UiTheme theme;
         private readonly Brush accent;
         private readonly Pen fine, bold;
@@ -94,6 +109,12 @@ namespace EnglishTypingPractice
                 DrawMinimal(drawing, arrive);
             else if (theme == UiTheme.Vaporwave)
                 DrawVaporwave(drawing, t);
+            else if (theme == UiTheme.Constructivist)
+                DrawConstructivist(drawing, t);
+            else if (theme == UiTheme.Persona5)
+                DrawComic(drawing, t);
+            else if (theme == UiTheme.ChineseStyle)
+                DrawInk(drawing, t);
             else
                 DrawModern(drawing, t);
             drawing.Pop();
@@ -238,6 +259,74 @@ namespace EnglishTypingPractice
             }
         }
 
+        private void DrawConstructivist(DrawingContext drawing, double t)
+        {
+            double settle = 1 - Math.Min(1, t * 4.5);
+            drawing.PushTransform(new TranslateTransform(-62 * settle, 25 * settle));
+            drawing.DrawGeometry(accent, null, PrintWedge);
+            drawing.DrawLine(fine, new Point(-211, 53), new Point(-128, -41));
+            drawing.DrawLine(fine, new Point(-210, 35), new Point(-160, -21));
+            drawing.Pop();
+
+            drawing.PushTransform(new TranslateTransform(62 * settle, -25 * settle));
+            drawing.DrawGeometry(accent, null, PrintCut);
+            drawing.DrawLine(fine, new Point(119, -71), new Point(211, -9));
+            drawing.DrawEllipse(null, bold, new Point(157, 48), 24, 24);
+            drawing.DrawLine(fine, new Point(137, 67), new Point(182, 26));
+            drawing.Pop();
+            drawing.DrawRectangle(accent, null, new Rect(-75, 92, 150 * Math.Min(1, t * 3.5), 4));
+        }
+
+        private void DrawComic(DrawingContext drawing, double t)
+        {
+            double bounce = Math.Sin(t * 16) * Math.Max(0, 1 - t * 2) * 5;
+            drawing.PushTransform(new TranslateTransform(-bounce, bounce));
+            drawing.DrawGeometry(Paper, bold, ComicLeft);
+            drawing.Pop();
+            drawing.PushTransform(new TranslateTransform(bounce, -bounce));
+            drawing.DrawGeometry(accent, null, ComicRight);
+            drawing.Pop();
+            DrawComicStar(drawing, -143, 62, .92, 16 + bounce, Paper);
+            DrawComicStar(drawing, 143, -54, .65, -16 - bounce, Paper);
+            DrawComicStar(drawing, 184, 40, .45, bounce, accent);
+            double sweep = Math.Min(1, t * 3.4);
+            drawing.DrawLine(bold, new Point(-186, 96), new Point(-186 + 113 * sweep, 88));
+            drawing.DrawLine(bold, new Point(79, 85), new Point(79 + 131 * sweep, 71));
+        }
+
+        private void DrawComicStar(DrawingContext drawing, double x, double y, double scale, double angle, Brush fill)
+        {
+            drawing.PushTransform(new TranslateTransform(x, y));
+            drawing.PushTransform(new ScaleTransform(scale, scale));
+            drawing.PushTransform(new RotateTransform(angle));
+            drawing.DrawGeometry(fill, bold, ComicStar);
+            drawing.Pop();
+            drawing.Pop();
+            drawing.Pop();
+        }
+
+        private void DrawInk(DrawingContext drawing, double t)
+        {
+            double spread = Math.Min(1, t * 3.5);
+            drawing.PushClip(new RectangleGeometry(new Rect(-213, 21, 426, 89)));
+            drawing.PushTransform(new TranslateTransform(0, (1 - spread) * 24));
+            drawing.DrawGeometry(FadedInk, null, MountainFar);
+            drawing.DrawGeometry(JadeInk, null, MountainNear);
+            drawing.Pop();
+            drawing.Pop();
+            drawing.DrawLine(fine, new Point(-206, 114), new Point(-65, 114));
+            drawing.DrawLine(fine, new Point(65, 114), new Point(205, 114));
+            double sealY = -70 - 27 * Math.Max(0, 1 - t * 4);
+            var seal = new Rect(151, sealY, 31, 31);
+            drawing.DrawRectangle(Cinnabar, null, seal);
+            var carving = new Pen(Paper, 1.35);
+            drawing.DrawRectangle(null, carving, new Rect(154, sealY + 3, 25, 25));
+            drawing.DrawLine(carving, new Point(166, sealY + 7), new Point(166, sealY + 24));
+            drawing.DrawLine(carving, new Point(158, sealY + 16), new Point(175, sealY + 16));
+            drawing.DrawLine(carving, new Point(158, sealY + 7), new Point(175, sealY + 7));
+            drawing.DrawLine(carving, new Point(158, sealY + 24), new Point(175, sealY + 24));
+        }
+
         internal static MemoryStream CreateCue(UiTheme theme, bool confirmation)
         {
             const int sampleRate = 22050;
@@ -288,6 +377,28 @@ namespace EnglishTypingPractice
                         sample = SoftSynth(t, first * sway) * .15 + SoftSynth(t - .082, middle * sway) * .13 +
                             SoftSynth(t - .165, last * sway) * .13 + Tone(t - .247, last / 2, .14) * .08;
                     }
+                    else if (theme == UiTheme.Constructivist)
+                    {
+                        double strike = confirmation ? .10 : .13;
+                        sample = PrintStamp(t, 112 * root) * .28 + PrintStamp(t - strike, 148 * root) * .24 +
+                            Tone(t - strike * 2, 278 * root, .077) * .16 + Tone(t - strike * 2, 607 * root, .044) * .10;
+                    }
+                    else if (theme == UiTheme.Persona5)
+                    {
+                        double riff = confirmation ? 1.122 : 1;
+                        double snare = random.NextDouble() * 2 - 1;
+                        double hit = t - .15;
+                        double snap = hit < 0 ? 0 : Math.Min(1, hit * 1100) * Math.Exp(-hit / .018);
+                        sample = PrintStamp(t, 83 * riff) * .24 + SoftSynth(t - .071, 220 * riff) * .136 +
+                            snare * snap * .208 + Tone(t - .19, 293.66 * riff, .095) * .18 +
+                            Tone(t - .249, 415.30 * riff, .092) * .14;
+                    }
+                    else if (theme == UiTheme.ChineseStyle)
+                    {
+                        double first = confirmation ? 392 : 329.63;
+                        sample = Zither(t, first) * .21 + Zither(t - .11, first * 1.4983) * .14 +
+                            Zither(t - .209, first * 2) * .14 + Tone(t - .215, 109 * root, .102) * .10;
+                    }
                     else
                         sample = Tone(t, 230 * root, .10) * .19 + Tone(t - .075, 413 * root, .11) * .14 +
                             Tone(t - .19, 620 * root, .11) * .12;
@@ -310,6 +421,19 @@ namespace EnglishTypingPractice
                 return 0;
             double envelope = Math.Min(1, time * 72) * Math.Exp(-time / .18);
             return (Math.Sin(2 * Math.PI * frequency * time) + .24 * Math.Sin(4 * Math.PI * frequency * time)) * envelope;
+        }
+
+        private static double PrintStamp(double time, double pitch)
+        {
+            if (time <= 0)
+                return 0;
+            return Tone(time, pitch + 38 * Math.Exp(-time * 85), .043) + Tone(time, pitch * 4.7, .011) * .32;
+        }
+
+        private static double Zither(double time, double pitch)
+        {
+            return Tone(time, pitch, .13) + Tone(time, pitch * 2.01, .059) * .33 +
+                Tone(time, pitch * 3.02, .024) * .17;
         }
     }
 }

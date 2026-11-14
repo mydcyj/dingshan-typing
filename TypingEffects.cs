@@ -16,6 +16,7 @@ namespace EnglishTypingPractice
         private readonly Window window;
         private readonly Canvas echo;
         private readonly TextBlock passage;
+        private readonly UiTheme theme;
         private readonly Brush[] echoBrushes;
         private readonly TranslateTransform shake = new TranslateTransform();
         private readonly SoundPlayer[] sounds = new SoundPlayer[3];
@@ -25,9 +26,10 @@ namespace EnglishTypingPractice
         private double windowStrength;
         private double windowDuration;
 
-        internal TypingEffects(Window window, TextBlock passage, Canvas echo)
+        internal TypingEffects(Window window, TextBlock passage, Canvas echo, UiTheme theme)
         {
             this.window = window;
+            this.theme = theme;
             ((FrameworkElement)window.Content).RenderTransform = shake;
             this.echo = echo;
             this.passage = passage;
@@ -37,16 +39,46 @@ namespace EnglishTypingPractice
             window.StateChanged += (sender, e) => StopWindowShake();
         }
 
-        internal void Play(Run firstLetter, string word, bool complete)
+        internal void Play(Run firstLetter, string word, bool complete, Run hitLetter = null)
         {
             int level = complete ? 2 : word != null ? 1 : 0;
             if (sounds[level] == null)
-                sounds[level] = new SoundPlayer(CreateSound(level));
+                sounds[level] = new SoundPlayer(ThemedTypingAudio.CreateSound(theme, level));
             sounds[level].Play();
+            if (!SystemParameters.ClientAreaAnimation)
+                return;
             if (word != null)
                 Echo(firstLetter, word);
+            DrawImpact(hitLetter ?? firstLetter, level);
             if (level > 0)
                 ShakeWindow(complete ? 11 : 3.5, complete ? 390 : 160);
+        }
+
+        private void DrawImpact(Run hitLetter, int level)
+        {
+            if (echo.ActualWidth <= 0 || echo.ActualHeight <= 0)
+                return;
+            var center = new Point(echo.ActualWidth / 2, echo.ActualHeight / 2);
+            if (hitLetter != null)
+            {
+                Rect bounds = hitLetter.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+                if (!bounds.IsEmpty)
+                    center = passage.TranslatePoint(new Point(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2), echo);
+            }
+            double width = Math.Min(echo.ActualWidth, level == 2 ? 186 : level == 1 ? 107 : 46);
+            double height = Math.Min(echo.ActualHeight, level == 2 ? 104 : level == 1 ? 73 : 41);
+            var shape = new TypingEffectVisuals(theme, level, echoBrushes[0], echoBrushes[1])
+            {
+                Width = width,
+                Height = height,
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(shape, Math.Max(0, Math.Min(echo.ActualWidth - width, center.X - width / 2)));
+            Canvas.SetTop(shape, Math.Max(0, Math.Min(echo.ActualHeight - height, center.Y - height / 2)));
+            echo.Children.Add(shape);
+            var life = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(level == 2 ? 435 : level == 1 ? 265 : 112));
+            life.Completed += (sender, e) => echo.Children.Remove(shape);
+            shape.BeginAnimation(TypingEffectVisuals.ProgressProperty, life);
         }
 
         internal void ShakeWindow(double strength, double duration)

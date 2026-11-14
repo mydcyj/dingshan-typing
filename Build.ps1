@@ -44,6 +44,7 @@ try {
         (Join-Path $PSScriptRoot 'InteractionMotion.cs') (Join-Path $PSScriptRoot 'SnakeBot.cs') `
         (Join-Path $PSScriptRoot 'TypingRound.cs') (Join-Path $PSScriptRoot 'SnakeTutorial.cs') `
         (Join-Path $PSScriptRoot 'TypingEffects.cs') (Join-Path $PSScriptRoot 'SnakeModes.cs') `
+        (Join-Path $PSScriptRoot 'ThemedTypingAudio.cs') (Join-Path $PSScriptRoot 'TypingEffectVisuals.cs') `
         (Join-Path $PSScriptRoot 'SnakeRace.cs') (Join-Path $PSScriptRoot 'SnakePower.cs') `
         (Join-Path $PSScriptRoot 'SnakeHotspot.cs') (Join-Path $PSScriptRoot 'SnakeRelay.cs') `
         (Join-Path $PSScriptRoot 'SnakeWordVoice.cs') `
