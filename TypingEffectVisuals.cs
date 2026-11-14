@@ -47,7 +47,7 @@ namespace EnglishTypingPractice
                 case UiTheme.ChineseStyle: DrawInk(drawing, time); break;
                 case UiTheme.Windows98: DrawDesktop(drawing, time); break;
                 case UiTheme.CassetteFuturism: DrawDeck(drawing, time); break;
-                case UiTheme.Magritte: DrawImpossibleShadow(drawing, time); break;
+                case UiTheme.Magritte: DrawDaylight(drawing, time); break;
                 case UiTheme.Atompunk: DrawOrbit(drawing, time); break;
                 default: DrawBrackets(drawing, time); break;
             }
@@ -198,16 +198,14 @@ namespace EnglishTypingPractice
                     null, new Rect(66, 47 - 7 * i, 18, 3));
         }
 
-        private void DrawImpossibleShadow(DrawingContext drawing, double time)
+        private void DrawDaylight(DrawingContext drawing, double time)
         {
-            // The object rises from the paper while its shadow climbs in front of it.
-            var frame = new Rect(28, 10, 37, 43);
-            drawing.DrawRectangle(null, thin, frame);
-            var center = new Point(46, 40 - time * 20);
-            drawing.DrawEllipse(secondary, null, center, 10, 7);
-            drawing.PushOpacity(.45);
-            drawing.DrawEllipse(primary, null, new Point(54 + 15 * time, center.Y - 3 - 10 * time),
-                11 + level * 2, 3);
+            double opening = Math.Sin(Math.PI * time);
+            double scale = level == 0 ? .31 : .44;
+            drawing.PushTransform(new TranslateTransform(60, level == 0 ? 17 : 7));
+            drawing.PushTransform(new ScaleTransform(scale, scale));
+            StartupThemeEffects.DrawDaylightDoor(drawing, .24 + opening * (level == 0 ? .30 : .75));
+            drawing.Pop();
             drawing.Pop();
         }
 

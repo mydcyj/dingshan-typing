@@ -32,8 +32,28 @@ namespace EnglishTypingPractice
         private static readonly Brush DeckCase = FrozenBrush(38, 52, 49);
         private static readonly Brush DeckGlass = FrozenBrush(23, 32, 29);
         private static readonly Brush DeckAmber = FrozenBrush(231, 180, 100);
-        private static readonly Brush GallerySky = FrozenBrush(149, 193, 211);
-        private static readonly Brush GalleryFrame = FrozenBrush(95, 82, 65);
+        private static readonly Brush NightWall = FrozenGradient(Color.FromRgb(35, 50, 59), Color.FromRgb(24, 33, 40));
+        private static readonly Brush NightFloor = FrozenGradient(Color.FromRgb(47, 47, 41), Color.FromRgb(25, 30, 33));
+        private static readonly Brush NightWindow = FrozenBrush(15, 25, 39);
+        private static readonly Brush NightSea = FrozenBrush(32, 52, 65);
+        private static readonly Brush NightTrim = FrozenBrush(47, 61, 65);
+        private static readonly Brush Moon = FrozenBrush(220, 225, 210);
+        private static readonly Brush DoorFrame = FrozenBrush(122, 111, 88);
+        private static readonly Brush DoorInterior = FrozenBrush(75, 118, 142);
+        private static readonly Brush DoorSea = FrozenBrush(111, 156, 167);
+        private static readonly Brush DoorSand = FrozenBrush(222, 198, 149);
+        private static readonly Brush DoorLeaf = FrozenBrush(50, 64, 61);
+        private static readonly Brush DoorPanel = FrozenBrush(42, 55, 54);
+        private static readonly Brush DoorLight = FrozenBrush(238, 214, 164);
+        private static readonly Brush DoorSky = FrozenGradient(Color.FromRgb(109, 169, 208), Color.FromRgb(236, 223, 191));
+        private static readonly Brush DoorLightSpill = FrozenGradient(Color.FromArgb(133, 238, 214, 164), Color.FromArgb(22, 238, 214, 164));
+        private static readonly Geometry NightCliff = Geometry.Parse(
+            "M-272,13 V-10 L-261,-12 -253,-16 -248,-12 -236,-13 -222,-5 -218,2 -206,3 -199,7 -189,13 Z");
+        private static readonly Geometry DoorCloud = Geometry.Parse(
+            "M3,35 C5,31 9,30 13,30 C14,26 18,23 23,24 C26,19 34,20 38,24 " +
+            "C44,23 49,27 51,30 C56,30 59,32 61,36 C52,39 39,39 30,38 C24,40 11,39 3,35 Z");
+        private static readonly Geometry DoorDune = Geometry.Parse(
+            "M0,86 C15,88 23,87 33,85 C44,83 54,82 60,83 V100 H0 Z");
         private static readonly Brush AtomicCoral = FrozenBrush(220, 86, 58);
         private static readonly Brush AtomicTeal = FrozenBrush(50, 135, 128);
         private static readonly Geometry AtomicSpark = Geometry.Parse("M0,-27 Q3,-5 27,0 Q3,5 0,27 Q-3,5 -27,0 Q-3,-5 0,-27 Z");
@@ -130,7 +150,7 @@ namespace EnglishTypingPractice
             else if (theme == UiTheme.CassetteFuturism)
                 DrawDeck(drawing, t);
             else if (theme == UiTheme.Magritte)
-                DrawGallery(drawing, t);
+                DrawNightRoom(drawing, t, ActualWidth / scale, ActualHeight / scale);
             else if (theme == UiTheme.Atompunk)
                 DrawAtomic(drawing, t);
             else
@@ -388,19 +408,83 @@ namespace EnglishTypingPractice
             }
         }
 
-        private void DrawGallery(DrawingContext drawing, double t)
+        private static void DrawNightRoom(DrawingContext drawing, double t, double width, double height)
         {
-            // One physically impossible detail: the same cloud continues outside a picture frame.
-            var frame = new Rect(89, -83, 110, 158);
-            drawing.PushOpacity(.23);
-            drawing.DrawRectangle(GalleryFrame, null, new Rect(frame.X + 9, frame.Y + 7, frame.Width, frame.Height));
+            const double floor = 110;
+            drawing.DrawRectangle(NightWall, null, new Rect(-width / 2, -height / 2, width, height));
+            drawing.DrawRectangle(NightTrim, null, new Rect(-width / 2, floor - 6, width, 6));
+            drawing.DrawRectangle(NightFloor, null, new Rect(-width / 2, floor, width, height / 2 - floor));
+
+            double spread = Math.Min(1, Math.Max(0, (width - 440) / 290));
+            drawing.PushTransform(new TranslateTransform(70 * (1 - spread), 0));
+            drawing.DrawRectangle(NightTrim, null, new Rect(-276, -93, 128, 128));
+            drawing.DrawRectangle(NightWindow, null, new Rect(-272, -89, 120, 120));
+            drawing.DrawEllipse(Moon, null, new Point(-188, -61), 11, 11);
+            drawing.DrawRectangle(NightSea, null, new Rect(-272, -3, 120, 34));
+            drawing.DrawGeometry(NightWindow, null, NightCliff);
+            drawing.DrawRectangle(NightTrim, null, new Rect(-213, -89, 3, 120));
+            drawing.DrawRectangle(NightTrim, null, new Rect(-281, 31, 138, 5));
             drawing.Pop();
-            drawing.DrawRectangle(GalleryFrame, null, frame);
-            drawing.DrawRectangle(GallerySky, null, new Rect(96, -76, 96, 144));
-            var cloud = new Point(183 + Math.Min(1, t * 2.1) * 13, -16);
-            drawing.DrawEllipse(Brushes.Ivory, null, cloud, 23, 9.5);
-            drawing.DrawEllipse(Brushes.Ivory, null, new Point(cloud.X + 3, cloud.Y - 8), 12, 8);
-            drawing.DrawLine(fine, new Point(-194, 103), new Point(202, 103));
+
+            double progress = Math.Min(1, t / .36);
+            double swing = progress * progress * (3 - 2 * progress);
+            double doorScale = 1.3 + .8 * spread;
+            drawing.PushTransform(new TranslateTransform(100 + 37 * spread, floor - 100 * doorScale));
+            drawing.PushTransform(new ScaleTransform(doorScale, doorScale));
+            DrawDaylightDoor(drawing, .20 + .74 * swing);
+            drawing.Pop();
+            drawing.Pop();
+        }
+
+        internal static void DrawDaylightDoor(DrawingContext drawing, double opening)
+        {
+            double edge = 60 - opening * 88;
+            double depth = 5 * Math.Sin(opening * 2.3);
+            drawing.DrawGeometry(DoorLightSpill, null, DoorPolygon(new Point(Math.Max(0, edge), 100),
+                new Point(60, 100), new Point(74, 125), new Point(-28 + Math.Max(0, edge), 125)));
+
+            drawing.DrawRectangle(DoorFrame, null, new Rect(-4, -4, 68, 104));
+            var doorway = new Rect(0, 0, 60, 100);
+            drawing.PushClip(new RectangleGeometry(doorway));
+            drawing.DrawRectangle(DoorSky, null, doorway);
+            drawing.DrawGeometry(Brushes.FloralWhite, null, DoorCloud);
+            drawing.DrawRectangle(DoorInterior, null, new Rect(0, 68, 60, 32));
+            drawing.DrawRectangle(DoorSea, null, new Rect(0, 79, 60, 21));
+            drawing.DrawGeometry(DoorSand, null, DoorDune);
+            drawing.Pop();
+
+            var topHinge = new Point(0, 0);
+            var bottomHinge = new Point(0, 100);
+            var topEdge = new Point(edge, -depth);
+            var bottomEdge = new Point(edge, 100 + depth);
+            drawing.DrawGeometry(DoorLeaf, null, DoorPolygon(topHinge, topEdge, bottomEdge, bottomHinge));
+            double inset = edge * .14;
+            double outer = edge * .86;
+            drawing.DrawGeometry(DoorPanel, null, DoorPolygon(new Point(inset, 10),
+                new Point(outer, 8 - depth), new Point(outer, 65), new Point(inset, 64)));
+            drawing.DrawGeometry(DoorPanel, null, DoorPolygon(new Point(inset, 72),
+                new Point(outer, 73), new Point(outer, 93 + depth), new Point(inset, 92)));
+            drawing.DrawEllipse(DoorLight, null, new Point(outer, 67), Math.Max(.3, Math.Abs(edge) * .028), 1.6);
+        }
+
+        private static Geometry DoorPolygon(Point a, Point b, Point c, Point d)
+        {
+            var shape = new StreamGeometry();
+            using (var path = shape.Open())
+            {
+                path.BeginFigure(a, true, true);
+                path.LineTo(b, true, false);
+                path.LineTo(c, true, false);
+                path.LineTo(d, true, false);
+            }
+            return shape;
+        }
+
+        private static Brush FrozenGradient(Color start, Color end)
+        {
+            var brush = new LinearGradientBrush(start, end, 90);
+            brush.Freeze();
+            return brush;
         }
 
         private void DrawAtomic(DrawingContext drawing, double t)

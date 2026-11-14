@@ -49,7 +49,23 @@ namespace EnglishTypingPractice
             nickname = (TextBox)window.FindName("StartupNickname");
             confirm = (Button)window.FindName("StartupConfirm");
             skip = (Button)window.FindName("StartupSkip");
-            ((Image)window.FindName("StartupIcon")).Source = window.Icon;
+            var icon = (Image)window.FindName("StartupIcon");
+            icon.Source = window.Icon;
+            if (settings.Theme == UiTheme.Magritte)
+            {
+                ((Panel)overlay).Background = new SolidColorBrush(Color.FromRgb(25, 39, 48));
+                foreach (UIElement ornament in ((Panel)panels).Children)
+                    ornament.Visibility = Visibility.Collapsed;
+                icon.Visibility = Visibility.Collapsed;
+                var caption = (TextBlock)((Panel)brand).Children[1];
+                caption.Foreground = Brushes.FloralWhite;
+                orbitText.Foreground = Brushes.FloralWhite;
+                foreach (UIElement ornament in ((Panel)orbit).Children)
+                {
+                    if (ornament != orbitText)
+                        ornament.Visibility = Visibility.Collapsed;
+                }
+            }
             themeEffects = new StartupThemeEffects(window, settings.Theme);
             var startupLayers = (Grid)overlay;
             startupLayers.Children.Insert(startupLayers.Children.IndexOf(brand), themeEffects);
@@ -190,7 +206,7 @@ namespace EnglishTypingPractice
                 orbitText.Text = "准备就绪";
                 themeEffects.Play(true);
                 Animate(orbit, UIElement.OpacityProperty, 0, 1, 160);
-                if (settings.Theme != UiTheme.Minimal)
+                if (settings.Theme != UiTheme.Minimal && settings.Theme != UiTheme.Magritte)
                     Animate(orbitRotation, RotateTransform.AngleProperty, -32, 106, 450);
                 Sweep(410);
                 After(480, () =>
@@ -220,6 +236,8 @@ namespace EnglishTypingPractice
 
         private void Sweep(int milliseconds)
         {
+            if (settings.Theme == UiTheme.Magritte)
+                return;
             double offset = overlay.ActualHeight / 2 + scanBeam.ActualHeight;
             Animate(scan, TranslateTransform.YProperty, -offset, offset, milliseconds);
             var fade = new DoubleAnimationUsingKeyFrames();

@@ -55,9 +55,9 @@
 
 ### 主题设计
 
-十二种风格共享练习及游戏逻辑，界面控件按主题重新排列。现代为工作区与数据侧栏，极简为居中阅读带，赛博朋克为街区终端，蒸汽朋克为机械操作台，蒸汽波为错落复古窗口，构成主义为非对称印刷版面，P5 为阶梯菜单和黑白剪纸，国风为册页与题签。Windows 98 使用复古桌面和立体边框，磁带未来主义使用录音机面板，马格利特式采用展陈式布局，原子朋克采用太空时代控制台造型。
+十二种风格共享练习及游戏逻辑，界面控件按主题重新排列。现代为工作区与数据侧栏，极简为居中阅读带，赛博朋克为街区终端，蒸汽朋克为机械操作台，蒸汽波为错落复古窗口，构成主义为非对称印刷版面，P5 为阶梯菜单和黑白剪纸，国风为册页与题签。Windows 98 使用复古桌面和立体边框，磁带未来主义使用录音机面板，原子朋克采用太空时代控制台造型。马格利特式将午夜海岸与门内白昼放在同一幅画里，练习区沿用画廊式留白。
 
-新增四套主题的视觉参考来自 [Windows 98 欢迎界面存档](https://www.justice.gov/sites/default/files/atr/legacy/2006/03/03/792.pdf)、[索尼 Walkman 设计档案](https://www.sony.com/en/SonyInfo/design/bside/01_throwback_walkman/)、[MoMA 马格利特展览](https://www.moma.org/interactives/exhibitions/2013/magritte/) 和 [美国国会图书馆 Googie 建筑档案](https://tile.loc.gov/storage-services/master/pnp/habshaer/ca/ca3200/ca3275/data/ca3275data.pdf)。
+四套主题的视觉参考包括 [Windows 98 欢迎界面存档](https://www.justice.gov/sites/default/files/atr/legacy/2006/03/03/792.pdf)、[索尼 Walkman 设计档案](https://www.sony.com/en/SonyInfo/design/bside/01_throwback_walkman/)、[MoMA 马格利特展览](https://www.moma.org/interactives/exhibitions/2013/magritte/)、[佩姬·古根海姆美术馆收藏的《光之帝国》](https://www.guggenheim-venice.it/en/art/works/empire-of-light/) 和 [美国国会图书馆 Googie 建筑档案](https://tile.loc.gov/storage-services/master/pnp/habshaer/ca/ca3200/ca3275/data/ca3275data.pdf)。
 
 标题和短按钮使用原生矢量艺术字：P5 逐字黑白拼贴、蒸汽朋克铸铜衬线、国风墨色楷字等。它们是程序绘制的展示字效果，并非另外发布八套字体文件；练习正文仍支持用户所选字体。背景主体也是原创矢量绘图，没有将参考视频或商业游戏图片装入 EXE。
 

@@ -98,6 +98,19 @@ namespace EnglishTypingPractice
                 actions.Background = Brush("Raised");
                 options.Background = Brush("Raised");
             }
+            else if (theme == UiTheme.Magritte)
+            {
+                hero.Background = new SolidColorBrush(Color.FromRgb(21, 31, 41));
+                foreach (Border layer in hero.Children.OfType<Border>())
+                    layer.Visibility = Visibility.Collapsed;
+
+                var lettering = brand.Children.OfType<TextBlock>().ToArray();
+                lettering[0].Foreground = new SolidColorBrush(Color.FromRgb(192, 211, 207));
+                lettering[1].Foreground = new SolidColorBrush(Color.FromRgb(247, 239, 221));
+                lettering[1].Margin = new Thickness(0, 6, 0, 10);
+                lettering[2].Foreground = new SolidColorBrush(Color.FromRgb(212, 222, 219));
+                hero.SizeChanged += (sender, e) => ArrangeMagritteHero(e.NewSize.Width);
+            }
 
             // Settings is a gallery of miniature compositions, not a list of color swatches.
             var settingsPage = Find<ScrollViewer>("SettingsPage");
@@ -167,11 +180,6 @@ namespace EnglishTypingPractice
                 hero.MinHeight = 120;
                 actions.HorizontalAlignment = HorizontalAlignment.Stretch;
             }
-            else if (theme == UiTheme.Magritte)
-            {
-                display.FontSize = 36;
-                hero.MinHeight = 128;
-            }
             else if (theme == UiTheme.CassetteFuturism)
                 display.FontSize = 32;
 
@@ -183,7 +191,7 @@ namespace EnglishTypingPractice
                     : theme == UiTheme.Vaporwave ? new FrameworkElement[] { hero, options, sheet, statistics, actions, music, ranking, notice }
                     : theme == UiTheme.Windows98 ? new FrameworkElement[] { hero, actions, options, sheet, statistics, music, ranking, notice }
                     : theme == UiTheme.CassetteFuturism ? new FrameworkElement[] { hero, actions, options, statistics, sheet, music, ranking, notice }
-                    : theme == UiTheme.Magritte ? new FrameworkElement[] { hero, options, actions, sheet, statistics, ranking, music, notice }
+                    : theme == UiTheme.Magritte ? new FrameworkElement[] { hero, actions, options, sheet, statistics, ranking, music, notice }
                     : new FrameworkElement[] { hero, actions, options, sheet, statistics, ranking, music, notice };
                 for (int i = 0; i < sequence.Length; i++) Place(sequence[i], i, 0);
                 brand.Margin = new Thickness(16, 12, 12, 12);
@@ -272,8 +280,8 @@ namespace EnglishTypingPractice
                         break;
                     case UiTheme.Magritte:
                         Columns(desk, -1, -1);
-                        Place(hero, 0, 0, 2); Place(options, 1, 0, 2);
-                        Place(actions, 2, 0, 2); Place(sheet, 3, 0, 2);
+                        Place(hero, 0, 0, 2); Place(actions, 1, 0, 2);
+                        Place(options, 2, 0, 2); Place(sheet, 3, 0, 2);
                         Place(statistics, 4, 0, 2); Place(ranking, 5, 0); Place(music, 5, 1);
                         break;
                     case UiTheme.Atompunk:
@@ -293,10 +301,21 @@ namespace EnglishTypingPractice
                 }
                 Place(notice, 7, 0, desk.ColumnDefinitions.Count);
             }
+            if (theme == UiTheme.Magritte)
+                ArrangeMagritteHero(hero.ActualWidth > 0 ? hero.ActualWidth : window.Width - 60);
             // All navigation and live input remain horizontal and scrollable on small screens.
             ReflowSettings(spacious);
             ReflowSnake(spacious);
             ReflowSecondaryPages(spacious);
+        }
+
+        private void ArrangeMagritteHero(double width)
+        {
+            double inset = width < 650 ? 18 : 35;
+            brand.Margin = new Thickness(inset, 12, 0, 12);
+            brand.Width = Math.Max(0, width * .43 - inset);
+            ((TextBlock)brand.Children[1]).FontSize = Math.Min(49, Math.Max(28, width / 20));
+            hero.MinHeight = Math.Max(146, Math.Min(640, width * .57) * 190 / 440);
         }
 
         private void Rail(double width, bool stagger)
@@ -363,7 +382,7 @@ namespace EnglishTypingPractice
                 UiTheme.Constructivist, UiTheme.Persona5, UiTheme.ChineseStyle, UiTheme.Windows98, UiTheme.CassetteFuturism,
                 UiTheme.Magritte, UiTheme.Atompunk };
             var descriptions = new[] { "坐标 · 几何 · 光轨", "留白 · 阅读 · 专注", "街区终端 · 飞行交通", "黄铜仪表 · 蒸汽机械", "梦境桌面 · 复古窗口", "斜向构图 · 红黑印版", "阶梯菜单 · 拼贴纸片", "山水册页 · 朱印题签",
-                "青绿桌面 · 经典窗口", "磁带转轴 · 模拟仪表", "留白画廊 · 反常晴空", "流线火箭 · 轨道星芒" };
+                "青绿桌面 · 经典窗口", "磁带转轴 · 模拟仪表", "午夜海边 · 门内白昼", "流线火箭 · 轨道星芒" };
             for (int i = 0; i < themes.Length; i++)
             {
                 var choice = Find<RadioButton>("Theme" + themes[i]);
@@ -574,10 +593,17 @@ namespace EnglishTypingPractice
             }
             if (theme == UiTheme.Magritte)
             {
-                dc.DrawRectangle(accent, null, new Rect(w * .5 - 17, 8, 34, 44));
-                dc.DrawRectangle(Brushes.SkyBlue, null, new Rect(w * .5 - 15, 10, 30, 40));
-                dc.DrawEllipse(Brushes.White, null, new Point(w * .5 - 5, 25), 8, 3);
-                dc.DrawEllipse(Brushes.White, null, new Point(w * .5 + 6, 23), 7, 4);
+                var night = new SolidColorBrush(Color.FromRgb(21, 31, 41));
+                var light = new SolidColorBrush(Color.FromRgb(241, 226, 192));
+                double center = w * .53;
+                dc.DrawRectangle(night, null, new Rect(5, 5, w - 10, h - 10));
+                dc.DrawEllipse(light, null, new Point(w * .24, 19), 3, 3);
+                dc.DrawLine(outline, new Point(8, 42), new Point(w - 8, 42));
+                dc.DrawGeometry(light, null, ThemePlate.Polygon(center - 10, 46, center + 15, 46, center + 21, 55, center - 25, 55));
+                dc.DrawRectangle(light, null, new Rect(center - 13, 11, 31, 36));
+                dc.DrawRectangle(Brushes.SkyBlue, null, new Rect(center - 10, 14, 25, 31));
+                dc.DrawEllipse(Brushes.White, null, new Point(center + 6, 25), 7, 3);
+                dc.DrawGeometry(accent, null, ThemePlate.Polygon(center - 10, 14, center - 22, 17, center - 22, 49, center - 10, 45));
                 return;
             }
             if (theme == UiTheme.Atompunk)
