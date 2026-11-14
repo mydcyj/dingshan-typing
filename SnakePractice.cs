@@ -25,6 +25,9 @@ namespace EnglishTypingPractice
         private readonly FrameworkElement soloMapControls;
         private readonly FrameworkElement overview;
         private readonly TextBlock overviewSize;
+        private readonly TextBlock cameraLookHint;
+        private readonly TextBlock cameraMode;
+        private readonly System.Collections.Generic.HashSet<Key> lookKeys = new System.Collections.Generic.HashSet<Key>();
         private readonly FrameworkElement setup;
         private readonly FrameworkElement playArea;
         private readonly TextBlock roleGuide;
@@ -82,6 +85,8 @@ namespace EnglishTypingPractice
             ((Border)window.FindName("SnakeBoardHost")).Child = board;
             overview = (FrameworkElement)window.FindName("SnakeOverview");
             overviewSize = (TextBlock)window.FindName("SnakeOverviewSize");
+            cameraLookHint = (TextBlock)window.FindName("SnakeCameraLookHint");
+            cameraMode = (TextBlock)window.FindName("SnakeCameraMode");
             playArea = (FrameworkElement)window.FindName("SnakePlayArea");
             setup = (FrameworkElement)window.FindName("SnakeSetup");
             var boardSlot = (FrameworkElement)window.FindName("SnakeBoardSlot");
@@ -155,6 +160,27 @@ namespace EnglishTypingPractice
             };
             page.PreviewKeyDown += (sender, e) =>
             {
+                Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+                if (key == Key.LeftAlt || key == Key.RightAlt)
+                {
+                    if (!e.IsRepeat)
+                    {
+                        ClearLook();
+                        board.ToggleCamera();
+                        UpdateOverview(board.MapSize);
+                    }
+                    e.Handled = true;
+                    return;
+                }
+                if (board.CameraLocked && (command.IsKeyboardFocusWithin || chargeInput.IsKeyboardFocusWithin ||
+                    (online == null ? game.IsRunning : online.Phase == MatchPhase.Playing)) &&
+                    (key == Key.Left || key == Key.Right || key == Key.Up || key == Key.Down))
+                {
+                    if (!e.IsRepeat && lookKeys.Add(key))
+                        UpdateLook();
+                    e.Handled = true;
+                    return;
+                }
                 if ((e.Key == Key.LeftShift || e.Key == Key.RightShift) && !e.IsRepeat && online != null &&
                     online.Mode == SnakeMode.Teams && online.Phase == MatchPhase.Playing)
                 {
@@ -180,15 +206,28 @@ namespace EnglishTypingPractice
             };
             window.PreviewKeyUp += (sender, e) =>
             {
+                Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+                if (lookKeys.Remove(key))
+                {
+                    UpdateLook();
+                    e.Handled = true;
+                }
                 if ((e.Key == Key.LeftShift || e.Key == Key.RightShift) &&
                     !Keyboard.IsKeyDown(Key.LeftShift) && !Keyboard.IsKeyDown(Key.RightShift))
                     StopSprint();
             };
-            window.Deactivated += (sender, e) => StopSprint();
+            window.Deactivated += (sender, e) =>
+            {
+                StopSprint();
+                ClearLook();
+            };
             page.IsVisibleChanged += (sender, e) =>
             {
                 if (!page.IsVisible)
+                {
                     StopSprint();
+                    ClearLook();
+                }
             };
             timer.Tick += Tick;
             command.TextChanged += OnCommandChanged;
@@ -295,6 +334,7 @@ namespace EnglishTypingPractice
 
         private void Start()
         {
+            ClearLook();
             board.ResetCamera();
             wordFlash.BeginAnimation(UIElement.OpacityProperty, null);
             online = null;
@@ -563,8 +603,13 @@ namespace EnglishTypingPractice
         private void ApplyRoomState(SnakeMatchState state, int slot)
         {
             var previous = online;
-            if (previous == null || previous.Round != state.Round)
+            var own = state.Players.First(player => player.Slot == slot);
+            var previousOwn = previous == null ? null : previous.Players.FirstOrDefault(player => player.Slot == slot);
+            if (previousOwn == null || previous.Round != state.Round || own.Respawns != previousOwn.Respawns)
+            {
+                ClearLook();
                 board.ResetCamera();
+            }
             ownSlot = slot;
             online = state;
             if (modePicker.SelectedIndex != (int)state.NextMode)
@@ -573,13 +618,11 @@ namespace EnglishTypingPractice
                 modePicker.SelectedIndex = (int)state.NextMode;
                 updatingMode = false;
             }
-            var own = state.Players.First(player => player.Slot == slot);
-            if (previous != null && previous.Round == state.Round &&
-                own.WordCount > previous.Players.First(player => player.Slot == slot).WordCount)
+            if (previousOwn != null && previous.Round == state.Round && own.WordCount > previousOwn.WordCount)
             {
                 FlashWord(own.LastWord);
                 if (previous.WordGroup != state.WordGroup &&
-                    previous.Players.First(player => player.Slot == slot).Respawns == own.Respawns)
+                    previousOwn.Respawns == own.Respawns)
                     PulseDirection(own.Direction);
             }
             if (state.Phase == MatchPhase.Playing && rolePicker.SelectedIndex != (int)own.Role)
@@ -590,8 +633,8 @@ namespace EnglishTypingPractice
             }
             bool running = state.Phase == MatchPhase.Playing && own.Result == SnakeResult.Running;
             bool restoreCommandFocus = running && (previous == null || previous.Round != state.Round);
-            if (previous == null || previous.Round != state.Round || previous.Phase != state.Phase ||
-                previous.Players.First(player => player.Slot == slot).Result != own.Result)
+            if (previousOwn == null || previous.Round != state.Round || previous.Phase != state.Phase ||
+                previousOwn.Result != own.Result)
             {
                 command.Clear();
                 chargeInput.Clear();
@@ -610,9 +653,8 @@ namespace EnglishTypingPractice
             }
             if (previous != null && previous.ChargeGroup != state.ChargeGroup)
                 chargeInput.Clear();
-            if (previous != null && previous.Round == state.Round)
+            if (previousOwn != null && previous.Round == state.Round)
             {
-                var previousOwn = previous.Players.First(player => player.Slot == slot);
                 if (own.StunRemaining > 0 && previousOwn.StunRemaining == 0)
                 {
                     command.Clear();
@@ -664,8 +706,24 @@ namespace EnglishTypingPractice
 
         private void UpdateOverview(int size)
         {
-            overview.Visibility = size > SnakeGame.BaseSize ? Visibility.Visible : Visibility.Collapsed;
+            overview.Visibility = size > SnakeGame.BaseSize || board.CameraLocked ? Visibility.Visible : Visibility.Collapsed;
             overviewSize.Text = size + " × " + size + " 格";
+            cameraMode.Text = board.CameraLocked ? "锁定视角 · Alt 切换" : "自由视角 · Alt 切换";
+            cameraLookHint.Visibility = board.CameraLocked ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void UpdateLook()
+        {
+            board.SetLook(new Vector((lookKeys.Contains(Key.Right) ? 1 : 0) - (lookKeys.Contains(Key.Left) ? 1 : 0),
+                (lookKeys.Contains(Key.Down) ? 1 : 0) - (lookKeys.Contains(Key.Up) ? 1 : 0)));
+        }
+
+        private void ClearLook()
+        {
+            if (lookKeys.Count == 0)
+                return;
+            lookKeys.Clear();
+            UpdateLook();
         }
 
         private void UpdateSetup()
@@ -768,6 +826,7 @@ namespace EnglishTypingPractice
         private static readonly Brush ChargeGlow = MakeBrush(129, 230, 238);
         private static readonly Brush StunFill = MakeBrush(149, 154, 167);
         private static readonly Brush ClosedZone = MakeBrush(47, 58, 66);
+        private static readonly Brush OutsideMap = MakeBrush(9, 16, 23);
         private static readonly Brush ShotFill = MakeBrush(255, 149, 99);
         private static readonly Pen BurstOutline = MakeBurstPen();
         private static readonly Brush Obstacle = MakeBrush(93, 118, 127);
@@ -810,6 +869,9 @@ namespace EnglishTypingPractice
         private Int32Rect viewport = new Int32Rect(0, 0, SnakeGame.BaseSize, SnakeGame.BaseSize);
         private bool resetCamera;
         private int respawns;
+        private bool cameraLocked;
+        private Point cameraHead = new Point(16.5, 16.5);
+        private Vector lookOffset;
 
         internal SnakeBoard()
         {
@@ -817,6 +879,23 @@ namespace EnglishTypingPractice
         }
 
         internal FrameworkElement Minimap { get; private set; }
+        internal bool CameraLocked { get { return cameraLocked; } }
+        internal int MapSize { get { return size; } }
+
+        internal void ToggleCamera()
+        {
+            cameraLocked = !cameraLocked;
+            lookOffset = new Vector();
+            PositionCamera(size, true);
+        }
+
+        internal void SetLook(Vector direction)
+        {
+            if (!cameraLocked)
+                return;
+            lookOffset = direction * CameraStep;
+            PositionCamera(size, false);
+        }
 
         internal void SetLocalTyping(string text, bool skill)
         {
@@ -842,9 +921,8 @@ namespace EnglishTypingPractice
             if (reset || own != null)
             {
                 int head = own == null ? (size / 2) * (size + 1) : own.Body[0];
-                var next = new Point(CameraOrigin(head % size, viewport.X, size, reset),
-                    CameraOrigin(head / size, viewport.Y, size, reset));
-                MoveCamera(next, reset);
+                cameraHead = new Point(head % size + .5, head / size + .5);
+                PositionCamera(size, reset);
             }
             if (own != null)
                 respawns = own.Respawns;
@@ -866,6 +944,20 @@ namespace EnglishTypingPractice
             this.showNames = showNames;
             InvalidateVisual();
             Minimap.InvalidateVisual();
+        }
+
+        private void PositionCamera(int size, bool reset)
+        {
+            if (cameraLocked)
+            {
+                var next = cameraHead - new Vector(viewport.Width / 2.0, viewport.Height / 2.0) + lookOffset;
+                if (reset)
+                    BeginAnimation(CameraOffsetProperty, null);
+                SetValue(CameraOffsetProperty, next);
+                return;
+            }
+            MoveCamera(new Point(CameraOrigin((int)cameraHead.X, viewport.X, size, reset),
+                CameraOrigin((int)cameraHead.Y, viewport.Y, size, reset)), reset);
         }
 
         private static int CameraOrigin(int position, int origin, int size, bool reset)
@@ -910,21 +1002,24 @@ namespace EnglishTypingPractice
             double cell = side / SnakeGame.BaseSize;
             var offset = (Point)GetValue(CameraOffsetProperty);
             var world = new Rect(area.X - offset.X * cell, area.Y - offset.Y * cell, size * cell, size * cell);
-            int left = (int)Math.Floor(offset.X), top = (int)Math.Floor(offset.Y);
+            int left = Math.Max(0, (int)Math.Floor(offset.X)), top = Math.Max(0, (int)Math.Floor(offset.Y));
             var visible = new Int32Rect(left, top,
                 Math.Min(size, (int)Math.Ceiling(offset.X + viewport.Width)) - left,
                 Math.Min(size, (int)Math.Ceiling(offset.Y + viewport.Height)) - top);
             drawing.PushClip(new RectangleGeometry(area));
+            if (cameraLocked)
+                drawing.DrawRectangle(OutsideMap, null, area);
             DrawTerrain(drawing, world, cell, visible, true);
+            var gridArea = Rect.Intersect(area, world);
             for (int x = visible.X + 1; x < visible.X + visible.Width; x++)
             {
                 double line = world.X + x * cell;
-                drawing.DrawLine(Grid, new Point(line, area.Top), new Point(line, area.Bottom));
+                drawing.DrawLine(Grid, new Point(line, gridArea.Top), new Point(line, gridArea.Bottom));
             }
             for (int y = visible.Y + 1; y < visible.Y + visible.Height; y++)
             {
                 double line = world.Y + y * cell;
-                drawing.DrawLine(Grid, new Point(area.Left, line), new Point(area.Right, line));
+                drawing.DrawLine(Grid, new Point(gridArea.Left, line), new Point(gridArea.Right, line));
             }
             DrawPieces(drawing, world, cell, visible);
             DrawBubbles(drawing, area, world, cell);
@@ -1081,9 +1176,12 @@ namespace EnglishTypingPractice
                     if (ball.Cell >= 0)
                         DrawMapItem(drawing, TerritoryColors[ball.Team], ball.Cell, world, cell);
             var offset = (Point)GetValue(CameraOffsetProperty);
-            var view = new Rect(offset.X * cell, offset.Y * cell, viewport.Width * cell, viewport.Height * cell);
-            view.Inflate(-Math.Min(.65, view.Width / 4), -Math.Min(.65, view.Height / 4));
-            drawing.DrawRectangle(null, ViewOutline, view);
+            var view = Rect.Intersect(world, new Rect(offset.X * cell, offset.Y * cell, viewport.Width * cell, viewport.Height * cell));
+            if (!view.IsEmpty)
+            {
+                view.Inflate(-Math.Min(.65, view.Width / 4), -Math.Min(.65, view.Height / 4));
+                drawing.DrawRectangle(null, ViewOutline, view);
+            }
             foreach (var player in players.OrderBy(item => item.Slot == ownSlot))
             {
                 if (player.Body.Length == 0)

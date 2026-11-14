@@ -550,7 +550,7 @@
       <StackPanel>
         <Border Width="66" Height="3" Background="{StaticResource Accent}" HorizontalAlignment="Left" Margin="0,0,0,4" />
         <TextBlock Text="贪吃蛇" Style="{StaticResource DisplayTitle}" />
-        <TextBlock Text="打完方向词就转向，按空格清空当前输入。" Margin="0,3,0,0"
+        <TextBlock x:Name="SnakeCameraMode" Text="自由视角 · Alt 切换" Margin="0,3,0,0"
                    Foreground="{StaticResource Muted}" />
       </StackPanel>
     </DockPanel>
@@ -571,6 +571,8 @@
               <TextBlock Text="小地图" Style="{StaticResource SectionTitle}" />
               <TextBlock x:Name="SnakeOverviewSize" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,2,0,3" />
               <TextBlock Text="黄框视野 · 黄点自己" Foreground="{StaticResource Muted}" FontSize="11" />
+              <TextBlock x:Name="SnakeCameraLookHint" Text="按住方向键查看" Visibility="Collapsed"
+                         Foreground="{StaticResource Muted}" FontSize="11" Margin="0,2,0,0" />
             </StackPanel>
           </DockPanel>
           <Grid Grid.Row="1" x:Name="SnakeBoardSlot" ClipToBounds="True">
@@ -858,7 +860,7 @@
 
           <TextBlock Text="四种玩法" Style="{StaticResource RuleHeading}" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="经典　" FontWeight="Bold" /><Run Text="打方向词和吃果都得分。单人开局前可调地图边长。每分钟缩小 5 格，圈外视为撞墙。" /></TextBlock>
-          <TextBlock Style="{StaticResource RuleText}" Text="主棋盘固定显示 32 × 32 格。较大的地图会显示小地图，黄框标出当前视野，黄点标出自己，其他颜色的点标出对手。" />
+          <TextBlock Style="{StaticResource RuleText}" Text="主棋盘显示 32 × 32 格。按 Alt 切换自由和锁定视角。锁定时蛇头居中，按住方向键可查看周围，松开回到蛇头。小地图黄框标出视野覆盖的地图范围，黄点标出自己。" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="障碍赛　" FontWeight="Bold" /><Run Text="开局随机生成四格方块障碍，绕开障碍去吃果。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="圈地战　" FontWeight="Bold" /><Run Text="走回自己的轨迹闭合圈地。对手蛇头被圈住就回出生点。每分钟提速 20%，5 分钟后占地最多者获胜。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="团战　" FontWeight="Bold" /><Run Text="仅限联机，房主选 2–4 队。可穿过己方球，碰到敌队球会捡起。带球回己方区域按 Shift 放下一颗，每带一颗球扣 10% 移速。空手按住 Shift 提速 25%。死亡后等 15 秒复活，8 分钟后按落地球数排名。" /></TextBlock>
