@@ -107,7 +107,7 @@ namespace EnglishTypingPractice
 
         internal static bool HasSkill(SnakeRole role, SnakeMode mode)
         {
-            return HasSkill(role) && ((mode != SnakeMode.Race && mode != SnakeMode.Power) ||
+            return HasSkill(role) && ((mode != SnakeMode.Race && mode != SnakeMode.Power && mode != SnakeMode.Relay) ||
                 (role != SnakeRole.Hunter && role != SnakeRole.Bard));
         }
 

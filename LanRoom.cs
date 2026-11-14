@@ -137,6 +137,7 @@ namespace EnglishTypingPractice
         private readonly object sync = new object();
         private readonly HashSet<TcpClient> clients = new HashSet<TcpClient>();
         private readonly SnakeMatch match;
+        private readonly SnakeBotSession bots = new SnakeBotSession();
         private readonly string room;
         private readonly TcpListener listener;
         private readonly UdpClient discovery;
@@ -184,8 +185,11 @@ namespace EnglishTypingPractice
         private SnakeMatchState Snapshot(int slot)
         {
             var state = match.Snapshot(room, slot);
-            state.ReadySlots = new[] { 0 }.Concat(Enumerable.Range(1, 3).Where(i => seats[i] != null && seats[i].Ready)).ToArray();
+            state.ReadySlots = new[] { 0 }.Concat(Enumerable.Range(1, 3).Where(i => seats[i] != null && seats[i].Ready))
+                .Concat(bots.Slots).ToArray();
             state.ReconnectingSlots = Enumerable.Range(1, 3).Where(i => seats[i] != null && seats[i].Connection == null).ToArray();
+            state.BotSlots = bots.Slots.ToArray();
+            state.BotDifficulty = bots.Difficulty;
             state.Music = new RoomMusicState { Volume = musicVolume };
             if (musicFile != null && state.Phase == MatchPhase.Playing)
             {
@@ -215,6 +219,20 @@ namespace EnglishTypingPractice
                 musicVolume = percent;
         }
 
+        internal void SetBots(int count, SnakeBotDifficulty difficulty)
+        {
+            lock (sync)
+            {
+                if (closed || match.Phase != MatchPhase.Lobby || !Enum.IsDefined(typeof(SnakeBotDifficulty), difficulty))
+                    return;
+                if (bots.Slots.Count() == count && bots.Difficulty == difficulty)
+                    return;
+                bots.Difficulty = difficulty;
+                bots.SetCount(match, Math.Max(0, Math.Min(count, 3 - seats.Count(seat => seat != null))));
+                ClearReadiness();
+            }
+        }
+
         internal bool Start()
         {
             string failure;
@@ -241,7 +259,9 @@ namespace EnglishTypingPractice
                 }
                 if (!match.Start())
                 {
-                    failure = match.NextMode == SnakeMode.Power ? "四区供电至少需要两名玩家。" : "团战人数至少要达到队伍数。";
+                    failure = match.NextMode == SnakeMode.Power ? "四区供电至少需要两名玩家。" :
+                        match.NextMode == SnakeMode.Hotspot ? "热点争夺至少需要两名玩家。" :
+                        match.NextMode == SnakeMode.Relay ? "词牌接力需要四个席位，可以添加人机。" : "团战人数至少要达到队伍数。";
                     return false;
                 }
                 clock.Restart();
@@ -347,7 +367,9 @@ namespace EnglishTypingPractice
                 if (closed)
                     return;
                 ExpireSeats();
-                match.Step(clock.ElapsedMilliseconds);
+                long elapsed = clock.ElapsedMilliseconds;
+                match.Step(elapsed);
+                bots.Step(match, elapsed);
                 if (match.Phase != MatchPhase.Playing && !match.HasBurst)
                     timer.Change(1000, 1000);
             }
@@ -849,6 +871,8 @@ namespace EnglishTypingPractice
             if (state == null || !LanWire.IsName(state.Room, 24) ||
                 (state.Mode == SnakeMode.Race ? state.Size != SnakeRace.Size :
                     state.Mode == SnakeMode.Power ? state.Size != SnakePower.Size :
+                    state.Mode == SnakeMode.Hotspot ? state.Size != SnakeHotspot.Size :
+                    state.Mode == SnakeMode.Relay ? state.Size != SnakeRelay.Size :
                     state.Mode == SnakeMode.Teams ? state.Size != SnakeTeams.Size : state.Size < 32 ||
                     state.Size > 80 || (state.Size - 32) % 16 != 0) || !Enum.IsDefined(typeof(MatchPhase), state.Phase) ||
                 !Enum.IsDefined(typeof(SnakeMode), state.Mode) || !Enum.IsDefined(typeof(SnakeMode), state.NextMode) ||
@@ -856,6 +880,7 @@ namespace EnglishTypingPractice
                 state.Rankings == null || state.Rankings.Length > 4 ||
                 state.ReadySlots == null || state.ReadySlots.Length > 4 ||
                 state.ReconnectingSlots == null || state.ReconnectingSlots.Length > 3 ||
+                state.BotSlots == null || state.BotSlots.Length > 3 || !Enum.IsDefined(typeof(SnakeBotDifficulty), state.BotDifficulty) ||
                 state.Music == null || !state.Music.IsValid ||
                 state.Words == null || (state.Words.Length != 0 && state.Words.Length != 4 && state.Words.Length != 12))
                 return false;
@@ -886,6 +911,21 @@ namespace EnglishTypingPractice
             bool territory = state.Mode == SnakeMode.Territory && state.Phase != MatchPhase.Lobby;
             bool race = state.Mode == SnakeMode.Race && state.Phase != MatchPhase.Lobby;
             bool power = state.Mode == SnakeMode.Power && state.Phase != MatchPhase.Lobby;
+            bool hotspot = state.Mode == SnakeMode.Hotspot && state.Phase != MatchPhase.Lobby;
+            bool relay = state.Mode == SnakeMode.Relay && state.Phase != MatchPhase.Lobby;
+            if (state.HotspotTarget < -1 || state.HotspotTarget >= cells || state.HotspotUpcoming < -1 || state.HotspotUpcoming >= cells ||
+                (!hotspot && (state.HotspotTarget != -1 || state.HotspotUpcoming != -1)) ||
+                state.RelayTarget < -1 || state.RelayTarget >= cells || (!relay && state.RelayTarget != -1) ||
+                state.RelayWinner < -1 || state.RelayWinner > (relay ? 1 : -1) ||
+                state.RelayTeams == null || state.RelayTeams.Length != (relay ? 2 : 0) ||
+                (state.RelayHandoffWord != null && (!relay || state.Phase != MatchPhase.Playing ||
+                    (state.RelayHandoffWord.Length != 6 && state.RelayHandoffWord.Length != 7) || !SnakeWords.Contains(state.RelayHandoffWord))))
+                return false;
+            foreach (var relayTeam in state.RelayTeams)
+                if (relayTeam == null || relayTeam.Legs < 0 || relayTeam.Legs > SnakeRelay.LegCount ||
+                    relayTeam.TimeMs < 0 || relayTeam.PenaltyMs < 0 || relayTeam.FinishMs < -1 ||
+                    relayTeam.RunnerSlot < -1 || relayTeam.RunnerSlot > 3 || relayTeam.WaitingSlot < -1 || relayTeam.WaitingSlot > 3)
+                    return false;
             if (state.RaceTarget < -1 || state.RaceTarget >= cells || (!race && (state.RaceSeed != 0 || state.RaceTarget != -1)) ||
                 (race && state.RaceSeed <= 0) || state.PowerStations == null || state.PowerStations.Length != (power ? 4 : 0) ||
                 (state.PowerWon && !power))
@@ -896,7 +936,7 @@ namespace EnglishTypingPractice
                     return false;
             if (state.Obstacles == null || state.Obstacles.Length > cells ||
                 state.Remaining < 0 || state.Remaining > (teams ? SnakeTeams.Duration : race ? SnakeRace.Duration :
-                    power ? SnakePower.Duration : territory ? SnakeTerritory.Duration : 0) ||
+                    power ? SnakePower.Duration : territory ? SnakeTerritory.Duration : hotspot ? SnakeHotspot.Duration : relay ? SnakeRelay.Duration : 0) ||
                 (territory ? state.Land == null || state.Trails == null ||
                     state.Land.Length != cells || state.Trails.Length != cells
                     : state.Land != null || state.Trails != null))
@@ -930,9 +970,10 @@ namespace EnglishTypingPractice
                     !Enum.IsDefined(typeof(SnakeDirection), player.Direction) ||
                     !Enum.IsDefined(typeof(SnakeRole), player.Role))
                     return false;
-                if (player.Team < -1 || player.Team >= state.TeamCount || player.Carrying < 0 ||
+                if (player.Team < -1 || player.Team >= (relay ? 2 : state.TeamCount) || player.Carrying < 0 ||
                     player.Carrying > state.TeamBalls.Length || player.RespawnRemaining < 0 ||
-                    player.RespawnRemaining > (teams ? SnakeTeams.RespawnDelay : power ? SnakePower.RespawnDelay : 0))
+                    player.RespawnRemaining > (teams ? SnakeTeams.RespawnDelay : power ? SnakePower.RespawnDelay :
+                        hotspot ? SnakeHotspot.RespawnDelay : relay ? SnakeRelay.RespawnDelay : 0))
                     return false;
                 if (!SnakeTypingPreview.IsValidText(player.Typing, player.TypingSkill) ||
                     (player.TypingSkill && !SnakeWords.HasSkill(player.Role, state.Mode)))
@@ -961,13 +1002,16 @@ namespace EnglishTypingPractice
                     state.Words.Length != 4 * SnakeWords.Variants(player.Role))
                     return false;
                 if (player.Slot == slot && state.Phase == MatchPhase.Playing &&
-                    (SnakeWords.HasSkill(player.Role, state.Mode) ? !SnakeWords.IsSkillWord(state.ChargeWord, player.Role) :
+                    (SnakeWords.HasSkill(player.Role, state.Mode) && (!relay || player.Result == SnakeResult.Running) ?
+                        !SnakeWords.IsSkillWord(state.ChargeWord, player.Role) :
                         state.ChargeWord != null))
                     return false;
             }
             return slots.Contains(slot) && state.ReadySlots.Distinct().Count() == state.ReadySlots.Length &&
                 state.ReconnectingSlots.Distinct().Count() == state.ReconnectingSlots.Length &&
                 state.ReadySlots.Contains(0) && state.ReadySlots.All(slots.Contains) &&
+                state.BotSlots.Distinct().Count() == state.BotSlots.Length &&
+                state.BotSlots.All(item => item != 0 && slots.Contains(item) && state.ReadySlots.Contains(item) && !state.ReconnectingSlots.Contains(item)) &&
                 state.ReconnectingSlots.All(item => item != 0 && slots.Contains(item));
         }
 

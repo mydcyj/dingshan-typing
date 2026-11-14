@@ -31,6 +31,10 @@ namespace EnglishTypingPractice
         private readonly FrameworkElement masterControl;
         private readonly ComboBox teamPicker;
         private readonly CheckBox uniformRaceRole;
+        private readonly ComboBox botCount;
+        private readonly ComboBox botDifficulty;
+        private bool updatingBots;
+        private static readonly SnakeBotDifficulty[] Difficulties = { SnakeBotDifficulty.Easy, SnakeBotDifficulty.Normal, SnakeBotDifficulty.Hard };
         private readonly TextBlock teamLabel;
         private readonly RoomMusic music;
         private readonly Action entered;
@@ -81,6 +85,10 @@ namespace EnglishTypingPractice
             audioControls = (FrameworkElement)window.FindName("LanAudioControls");
             masterControl = (FrameworkElement)window.FindName("LanMasterControl");
             teamPicker = (ComboBox)window.FindName("LanTeamCount");
+            botCount = (ComboBox)window.FindName("SnakeBotCount");
+            botDifficulty = (ComboBox)window.FindName("SnakeBotDifficulty");
+            botCount.SelectionChanged += (sender, e) => ConfigureBots();
+            botDifficulty.SelectionChanged += (sender, e) => ConfigureBots();
             uniformRaceRole = (CheckBox)window.FindName("LanUniformRaceRole");
             uniformRaceRole.Click += (sender, e) =>
             {
@@ -117,9 +125,11 @@ namespace EnglishTypingPractice
             };
             toggle.Click += (sender, e) =>
             {
-                panel.Visibility = panel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
                 if (panel.Visibility == Visibility.Visible)
+                    panel.Visibility = Visibility.Collapsed;
+                else
                 {
+                    InteractionMotion.Reveal(panel, 12, settings.SnakeLowEffects);
                     RefreshNickname();
                     if (string.IsNullOrWhiteSpace(name.Text))
                         name.Focus();
@@ -259,6 +269,7 @@ namespace EnglishTypingPractice
                 host = new LanHost(room, player, role: selectedRole());
                 host.SetMode(selectedMode());
                 host.SetTeamCount(teamPicker.SelectedIndex + 2);
+                host.SetBots(botCount.SelectedIndex, SelectedBotDifficulty);
             }
             catch (SocketException)
             {
@@ -411,6 +422,14 @@ namespace EnglishTypingPractice
             if (ReferenceEquals(state, latest))
                 return;
             int slot = host != null ? 0 : client.Slot;
+            updatingBots = true;
+            botCount.SelectedIndex = state.BotSlots.Length;
+            botDifficulty.SelectedIndex = Array.IndexOf(Difficulties, state.BotDifficulty);
+            botCount.IsEnabled = botDifficulty.IsEnabled = host != null && state.Phase == MatchPhase.Lobby;
+            int available = 4 - (state.Players.Length - state.BotSlots.Length);
+            for (int i = 0; i < botCount.Items.Count; i++)
+                ((ComboBoxItem)botCount.Items[i]).IsEnabled = i <= available;
+            updatingBots = false;
             bool teamMode = state.NextMode == SnakeMode.Teams;
             uniformRaceRole.Visibility = state.NextMode == SnakeMode.Race ? Visibility.Visible : Visibility.Collapsed;
             uniformRaceRole.IsEnabled = host != null && state.Phase != MatchPhase.Playing;
@@ -428,10 +447,14 @@ namespace EnglishTypingPractice
             rules.Visibility = Visibility.Visible;
             rules.Text = "房主设置 · " + LanDiscovery.ModeName(state.NextMode) +
                 (teamMode ? " · " + state.NextTeamCount + " 队 · 每局随机分队" :
-                    state.NextMode == SnakeMode.Race && state.RaceUniformRole ? " · 统一职业" : "") + " · " + LanWire.AppVersion;
+                    state.NextMode == SnakeMode.Race && state.RaceUniformRole ? " · 统一职业" : "") +
+                (state.BotSlots.Length == 0 ? "" : " · 人机 " + state.BotSlots.Length + "（" +
+                    ((ComboBoxItem)botDifficulty.SelectedItem).Content + "）") + " · " + LanWire.AppVersion;
             if (latest == null || latest.Phase != state.Phase || latest.Round != state.Round || latest.Mode != state.Mode ||
                 !latest.Players.Select(PlayerLine).SequenceEqual(state.Players.Select(PlayerLine)) ||
                 !latest.ReadySlots.SequenceEqual(state.ReadySlots) || !latest.ReconnectingSlots.SequenceEqual(state.ReconnectingSlots) ||
+                !latest.BotSlots.SequenceEqual(state.BotSlots) ||
+                !latest.RelayTeams.Select(RelayLine).SequenceEqual(state.RelayTeams.Select(RelayLine)) ||
                 !latest.TeamScores.SequenceEqual(state.TeamScores))
                 RenderRoster(state, slot);
             music.Refresh(state, latest, client, slot);
@@ -441,6 +464,24 @@ namespace EnglishTypingPractice
 
         private void RenderRoster(SnakeMatchState state, int slot)
         {
+            if (state.Phase != MatchPhase.Lobby && state.Mode == SnakeMode.Relay)
+            {
+                var teams = state.RelayTeams;
+                int winner = state.RelayWinner;
+                roster.Text = state.Phase == MatchPhase.Playing ? state.Room :
+                    winner < 0 ? "词牌接力 · 并列" : SnakeBoard.TeamName(winner) + "获胜";
+                for (int i = 0; i < teams.Length; i++)
+                {
+                    var team = teams[i];
+                    roster.Text += "\n" + SnakeBoard.TeamName(i) + " · " + team.Legs + "/4 棒 · " +
+                        string.Join("、", state.Players.Where(player => player.Team == i).Select(player =>
+                            PlayerLabel(player, slot) + (state.BotSlots.Contains(player.Slot) ? "（人机）" : "")));
+                    var handoff = state.Players.FirstOrDefault(player => player.Slot == team.WaitingSlot);
+                    if (handoff != null && state.Phase == MatchPhase.Playing)
+                        roster.Text += " · 等待 " + handoff.Name + " 接棒";
+                }
+                return;
+            }
             if (state.Phase != MatchPhase.Lobby && (state.Mode == SnakeMode.Race || state.Mode == SnakeMode.Power))
             {
                 var players = state.Phase == MatchPhase.Finished ? state.Rankings : state.Players;
@@ -479,7 +520,7 @@ namespace EnglishTypingPractice
                 var dot = new System.Windows.Documents.Run("● ")
                     { Foreground = SnakeBoard.PlayerColor(player.Slot, slot, territory) };
                 roster.Inlines.Add(dot);
-                roster.Inlines.Add(new System.Windows.Documents.Run(PlayerLabel(player, slot) +
+                roster.Inlines.Add(new System.Windows.Documents.Run(PlayerLabel(player, slot) + (state.BotSlots.Contains(player.Slot) ? "（人机）" : "") +
                     " · " + SnakeWords.RoleName(player.Role) +
                     (state.Phase == MatchPhase.Playing ? "  " + player.Score + unit : "") +
                     (state.ReconnectingSlots.Contains(player.Slot) ? " · 重连中" :
@@ -527,6 +568,11 @@ namespace EnglishTypingPractice
                 " " + player.RacePenaltyMs + " " + player.PowerContribution;
         }
 
+        private static Tuple<int, int, int> RelayLine(SnakeRelayTeamState team)
+        {
+            return Tuple.Create(team.Legs, team.WaitingSlot, team.RunnerSlot);
+        }
+
         private static string PlayerLabel(SnakePlayerState player, int slot)
         {
             return player.Name + (player.Slot == slot ? "（你）" : player.Slot == 0 ? "（房主）" : "");
@@ -534,6 +580,9 @@ namespace EnglishTypingPractice
 
         internal void Close(bool intentional = true)
         {
+            botCount.IsEnabled = botDifficulty.IsEnabled = true;
+            foreach (ComboBoxItem item in botCount.Items)
+                item.IsEnabled = true;
             uniformRaceRole.Visibility = Visibility.Collapsed;
             action++;
             timer.Stop();
@@ -556,6 +605,19 @@ namespace EnglishTypingPractice
             panel.Visibility = Visibility.Collapsed;
             UpdateControls();
             exited();
+        }
+
+        internal SnakeBotDifficulty SelectedBotDifficulty
+        {
+            get { return Difficulties[Math.Max(0, Math.Min(Difficulties.Length - 1, botDifficulty.SelectedIndex))]; }
+        }
+
+        private void ConfigureBots()
+        {
+            if (updatingBots || host == null || botCount.SelectedIndex < 0 || botDifficulty.SelectedIndex < 0)
+                return;
+            host.SetBots(botCount.SelectedIndex, SelectedBotDifficulty);
+            RefreshRoom();
         }
 
         private void SetBusy(bool value)

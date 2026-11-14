@@ -54,6 +54,8 @@ namespace EnglishTypingPractice
                 case SnakeMode.Teams: return "团战";
                 case SnakeMode.Race: return "镜像竞速";
                 case SnakeMode.Power: return "四区供电";
+                case SnakeMode.Hotspot: return "热点争夺";
+                case SnakeMode.Relay: return "词牌接力";
                 default: return "经典";
             }
         }

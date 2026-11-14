@@ -441,12 +441,25 @@ namespace EnglishTypingPractice
         internal void RespawnAt(long now, int head, SnakeDirection direction)
         {
             Respawns++;
+            RestartBody(now, head, direction);
+        }
+
+        internal void BeginRelayLeg(long now, int head, SnakeDirection direction, string handoffWord)
+        {
+            LastWord = handoffWord;
+            WordCount++;
+            RestartBody(now, head, direction);
+        }
+
+        private void RestartBody(long now, int head, SnakeDirection direction)
+        {
             chargeUntil = stunUntil = stabilizationUntil = 0;
-            nextMoveAt = now + Interval(now);
             ResetBody(head, direction);
+            nextMoveAt = now + Interval(now);
         }
 
         internal int SpawnHead { get { return spawnY * Size + spawnX; } }
+        internal SnakeDirection SpawnDirection { get { return spawnDirection; } }
 
         internal void Leave()
         {

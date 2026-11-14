@@ -21,7 +21,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.2.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -165,17 +165,18 @@ namespace EnglishTypingPractice
             var practicePage = (FrameworkElement)window.FindName("PracticePage");
             var snakePage = (FrameworkElement)window.FindName("SnakePage");
             var rulesPage = (FrameworkElement)window.FindName("SnakeRules");
+            InteractionMotion.Attach(window, () => settings.SnakeLowEffects && (snakePage.IsVisible || rulesPage.IsVisible));
             var closeRules = (Button)window.FindName("CloseSnakeRules");
             Action returnToSnake = () =>
             {
                 rulesPage.Visibility = Visibility.Collapsed;
-                RevealPage(snakePage, -10);
+                InteractionMotion.Reveal(snakePage, -18, settings.SnakeLowEffects);
                 snake.Focus();
             };
             ((Button)window.FindName("OpenSnakeRules")).Click += (sender, e) =>
             {
                 snakePage.Visibility = Visibility.Collapsed;
-                RevealPage(rulesPage, 10);
+                InteractionMotion.Reveal(rulesPage, 14, settings.SnakeLowEffects);
                 ((ScrollViewer)window.FindName("SnakeRulesScroll")).ScrollToTop();
                 closeRules.Focus();
             };
@@ -196,14 +197,14 @@ namespace EnglishTypingPractice
                 timer.Stop();
                 music.SetPlaying(false);
                 practicePage.Visibility = Visibility.Collapsed;
-                RevealPage(snakePage, 10);
+                InteractionMotion.Reveal(snakePage, 18, settings.SnakeLowEffects);
                 snake.Focus();
             };
             ((Button)window.FindName("CloseSnake")).Click += (sender, e) =>
             {
                 snake.Leave();
                 snakePage.Visibility = Visibility.Collapsed;
-                RevealPage(practicePage, -10);
+                InteractionMotion.Reveal(practicePage, -18, settings.SnakeLowEffects);
                 if (resumePractice)
                 {
                     clock.Start();
@@ -292,21 +293,6 @@ namespace EnglishTypingPractice
             ChoosePassage();
             if (showStartup)
                 new StartupExperience(window, settings, () => typed.Focus());
-        }
-
-        private static void RevealPage(FrameworkElement page, double offset)
-        {
-            page.Visibility = Visibility.Visible;
-            if (!SystemParameters.ClientAreaAnimation)
-                return;
-            var slide = new TranslateTransform();
-            page.RenderTransform = slide;
-            var duration = TimeSpan.FromMilliseconds(190);
-            var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
-            slide.BeginAnimation(TranslateTransform.XProperty,
-                new DoubleAnimation(offset, 0, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
-            page.BeginAnimation(UIElement.OpacityProperty,
-                new DoubleAnimation(.86, 1, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
         }
 
         private void ConfigureBackgroundMotion(TranslateTransform drift, FrameworkElement practicePage)

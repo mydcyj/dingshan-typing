@@ -24,9 +24,11 @@ $references = @(
     ("/resource:{0},LICENSE" -f (Join-Path $PSScriptRoot 'LICENSE')) `
     (Join-Path $PSScriptRoot 'Program.cs') (Join-Path $PSScriptRoot 'PracticeSettings.cs') `
     (Join-Path $PSScriptRoot 'StartupExperience.cs') `
+    (Join-Path $PSScriptRoot 'InteractionMotion.cs') (Join-Path $PSScriptRoot 'SnakeBot.cs') `
     (Join-Path $PSScriptRoot 'TypingRound.cs') (Join-Path $PSScriptRoot 'SnakeTutorial.cs') `
     (Join-Path $PSScriptRoot 'TypingEffects.cs') (Join-Path $PSScriptRoot 'SnakeModes.cs') `
     (Join-Path $PSScriptRoot 'SnakeRace.cs') (Join-Path $PSScriptRoot 'SnakePower.cs') `
+    (Join-Path $PSScriptRoot 'SnakeHotspot.cs') (Join-Path $PSScriptRoot 'SnakeRelay.cs') `
     (Join-Path $PSScriptRoot 'SnakeWordVoice.cs') `
     (Join-Path $PSScriptRoot 'SnakeTeams.cs') (Join-Path $PSScriptRoot 'RoomMusic.cs') `
     (Join-Path $PSScriptRoot 'MusicPlayback.cs') (Join-Path $PSScriptRoot 'SnakeGame.cs') (Join-Path $PSScriptRoot 'SnakeWords.cs') `

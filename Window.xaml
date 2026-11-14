@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="鼎山打字通 v2.1.0" Width="1160" Height="815" MinWidth="565" MinHeight="420"
+        Title="鼎山打字通 v2.2.0" Width="1160" Height="815" MinWidth="565" MinHeight="420"
         WindowStartupLocation="CenterScreen" Background="#101C24"
         Foreground="#EDF4F2" FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="14"
         UseLayoutRounding="True">
@@ -54,6 +54,15 @@
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
+    <Style x:Key="ControlFocus" TargetType="Control">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate>
+            <Border Margin="2" BorderBrush="{StaticResource Accent}" BorderThickness="1" IsHitTestVisible="False" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style TargetType="Button">
       <Setter Property="Padding" Value="14,7" />
       <Setter Property="MinHeight" Value="34" />
@@ -62,25 +71,29 @@
       <Setter Property="Foreground" Value="{StaticResource Text}" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{StaticResource ControlFocus}" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="Chrome" Background="{TemplateBinding Background}"
-                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
-                    Padding="{TemplateBinding Padding}">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+            <Grid x:Name="Chrome" Background="Transparent" SnapsToDevicePixels="True">
+              <Border x:Name="Plate" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="1" />
+              <Border x:Name="Contact" Background="#00D9FFFF" IsHitTestVisible="False" />
+              <Path x:Name="Notch" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-1,-1,0"
+                    Fill="{StaticResource Field}" Data="M0,0 H8 V8 Z" IsHitTestVisible="False" />
+              <Border x:Name="ActivationEdge" Height="2" Margin="1,0,1,1" VerticalAlignment="Bottom" Background="#F7FFC7"
+                      Opacity="0" IsHitTestVisible="False" />
+              <ContentPresenter x:Name="Caption" Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                 RecognizesAccessKey="True" />
-            </Border>
+            </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
-                <Setter TargetName="Chrome" Property="Opacity" Value="0.87" />
+                <Setter TargetName="Plate" Property="BorderBrush" Value="{StaticResource Accent}" />
+                <Setter TargetName="Contact" Property="Background" Value="#22D9FFFF" />
               </Trigger>
               <Trigger Property="IsPressed" Value="True">
-                <Setter TargetName="Chrome" Property="Opacity" Value="0.74" />
-              </Trigger>
-              <Trigger Property="IsKeyboardFocused" Value="True">
-                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
+                <Setter TargetName="Contact" Property="Background" Value="#48070D10" />
+                <Setter TargetName="Caption" Property="RenderTransform"><Setter.Value><TranslateTransform Y="1" /></Setter.Value></Setter>
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="Chrome" Property="Opacity" Value="0.46" />
@@ -94,21 +107,33 @@
       <Setter Property="Background" Value="{StaticResource Accent}" />
       <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
       <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="FocusVisualStyle">
+        <Setter.Value>
+          <Style TargetType="Control">
+            <Setter Property="Template"><Setter.Value><ControlTemplate>
+              <Border Margin="3" BorderBrush="{StaticResource Ink}" BorderThickness="1" IsHitTestVisible="False" />
+            </ControlTemplate></Setter.Value></Setter>
+          </Style>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="CheckBox">
       <Setter Property="Foreground" Value="{StaticResource Text}" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FocusVisualStyle" Value="{StaticResource ControlFocus}" />
       <Setter Property="Padding" Value="5,0,0,0" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="CheckBox">
             <DockPanel Background="Transparent" LastChildFill="True">
-              <Border x:Name="Mark" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,5,0"
-                      Background="{StaticResource Field}" BorderBrush="{StaticResource Line}" BorderThickness="1">
-                <Path x:Name="Tick" Visibility="Hidden" Stroke="{StaticResource Ink}" StrokeThickness="2"
-                      Data="M2,6 L5,9 L11,3" VerticalAlignment="Center" HorizontalAlignment="Center" />
-              </Border>
+              <Grid Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,6,0">
+                <Border x:Name="Mark" Background="{StaticResource Field}" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                  <Path x:Name="Tick" Visibility="Hidden" Stroke="{StaticResource Ink}" StrokeThickness="2"
+                        Data="M2,6 L5,9 L11,3" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                </Border>
+                <Border x:Name="ActivationEdge" BorderBrush="#F7FFC7" BorderThickness="1" Opacity="0" IsHitTestVisible="False" />
+              </Grid>
               <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True" />
             </DockPanel>
             <ControlTemplate.Triggers>
@@ -119,6 +144,10 @@
               <Trigger Property="IsKeyboardFocused" Value="True">
                 <Setter TargetName="Mark" Property="BorderBrush" Value="{StaticResource Accent}" />
               </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Mark" Property="BorderBrush" Value="{StaticResource Accent}" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="Mark" Property="Opacity" Value=".68" /></Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".5" /></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -143,9 +172,13 @@
         </Setter.Value>
       </Setter>
       <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="BorderBrush" Value="{StaticResource Active}" />
+        </Trigger>
         <Trigger Property="IsKeyboardFocusWithin" Value="True">
           <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
         </Trigger>
+        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".55" /></Trigger>
       </Style.Triggers>
     </Style>
     <Style x:Key="ScrollStep" TargetType="RepeatButton">
@@ -194,24 +227,36 @@
     </Style>
     <Style TargetType="Slider">
       <Setter Property="MinHeight" Value="17" />
+      <Setter Property="FocusVisualStyle" Value="{StaticResource ControlFocus}" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Slider">
             <Grid Background="Transparent">
-              <Border Height="4" VerticalAlignment="Center" Background="{StaticResource Line}" />
+              <Border Height="3" VerticalAlignment="Center" Background="{StaticResource Line}" />
               <Track x:Name="PART_Track" VerticalAlignment="Center">
                 <Track.DecreaseRepeatButton>
                   <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
                     <RepeatButton.Template>
                       <ControlTemplate TargetType="RepeatButton">
-                        <Grid Background="Transparent"><Border Height="4" VerticalAlignment="Center" Background="{StaticResource Accent}" /></Grid>
+                        <Grid Background="Transparent"><Border Height="3" VerticalAlignment="Center" Background="{StaticResource Accent}" /></Grid>
                       </ControlTemplate>
                     </RepeatButton.Template>
                   </RepeatButton>
                 </Track.DecreaseRepeatButton>
                 <Track.Thumb>
-                  <Thumb Width="8" Height="15">
-                    <Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{StaticResource Accent}" /></ControlTemplate></Thumb.Template>
+                  <Thumb Width="12" Height="15" Cursor="SizeWE">
+                    <Thumb.Template>
+                      <ControlTemplate TargetType="Thumb">
+                        <Grid Background="Transparent">
+                          <Path x:Name="CursorMark" Data="M0,0 H7 L10,3 V14 H3 L0,11 Z" Stretch="Fill"
+                                Fill="{StaticResource Accent}" Margin="1,0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CursorMark" Property="Fill" Value="#F7FFC7" /></Trigger>
+                          <Trigger Property="IsDragging" Value="True"><Setter TargetName="CursorMark" Property="Fill" Value="#AEB748" /></Trigger>
+                        </ControlTemplate.Triggers>
+                      </ControlTemplate>
+                    </Thumb.Template>
                   </Thumb>
                 </Track.Thumb>
                 <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource ScrollStep}" /></Track.IncreaseRepeatButton>
@@ -228,6 +273,31 @@
       <Setter Property="Background" Value="{StaticResource Field}" />
       <Setter Property="Foreground" Value="{StaticResource Text}" />
       <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="FocusVisualStyle" Value="{StaticResource ControlFocus}" />
+    </Style>
+    <Style TargetType="ListBoxItem">
+      <Setter Property="Padding" Value="9,4" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="FocusVisualStyle" Value="{StaticResource ControlFocus}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Border x:Name="Entry" Background="Transparent" BorderThickness="2,0,0,0" BorderBrush="Transparent"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Entry" Property="Background" Value="{StaticResource Raised}" /></Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Entry" Property="Background" Value="{StaticResource Active}" />
+                <Setter TargetName="Entry" Property="BorderBrush" Value="{StaticResource Accent}" />
+                <Setter Property="Foreground" Value="{StaticResource Text}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".55" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="ComboBoxItem">
       <Setter Property="Foreground" Value="{StaticResource Text}" />
@@ -235,12 +305,16 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ComboBoxItem">
-            <Border x:Name="Item" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <Border x:Name="Item" Background="Transparent" Padding="{TemplateBinding Padding}"
+                    BorderThickness="2,0,0,0" BorderBrush="Transparent">
               <ContentPresenter />
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{StaticResource Active}" /></Trigger>
-              <Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="{StaticResource Accent}" /></Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Item" Property="BorderBrush" Value="{StaticResource Accent}" />
+                <Setter Property="Foreground" Value="{StaticResource Accent}" />
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -249,6 +323,7 @@
     <Style TargetType="ComboBox">
       <Setter Property="Foreground" Value="{StaticResource Text}" />
       <Setter Property="MinHeight" Value="30" />
+      <Setter Property="FocusVisualStyle" Value="{StaticResource ControlFocus}" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ComboBox">
@@ -258,11 +333,17 @@
                 <ToggleButton.Template>
                   <ControlTemplate TargetType="ToggleButton">
                     <Border x:Name="Box" BorderBrush="{StaticResource Line}" BorderThickness="1" Background="{StaticResource Raised}">
-                      <Path Data="M0,0 H8 L4,5 Z" Fill="{StaticResource Accent}" HorizontalAlignment="Right"
-                            VerticalAlignment="Center" Margin="0,0,10,0" />
+                      <Path x:Name="Caret" Data="M0,0 L4,4 L8,0" Stroke="{StaticResource Accent}" StrokeThickness="1.5"
+                            HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" RenderTransformOrigin=".5,.5" />
                     </Border>
                     <ControlTemplate.Triggers>
                       <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}" /></Trigger>
+                      <Trigger Property="IsPressed" Value="True"><Setter TargetName="Box" Property="Background" Value="{StaticResource Field}" /></Trigger>
+                      <Trigger Property="IsChecked" Value="True">
+                        <Setter TargetName="Box" Property="Background" Value="{StaticResource Active}" />
+                        <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}" />
+                        <Setter TargetName="Caret" Property="RenderTransform"><Setter.Value><RotateTransform Angle="180" /></Setter.Value></Setter>
+                      </Trigger>
                     </ControlTemplate.Triggers>
                   </ControlTemplate>
                 </ToggleButton.Template>
@@ -270,6 +351,8 @@
               <ContentPresenter IsHitTestVisible="False" Margin="9,0,27,0" VerticalAlignment="Center"
                                 Content="{TemplateBinding SelectionBoxItem}"
                                 ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+              <Border x:Name="ActivationEdge" Height="2" Margin="1,0,1,1" VerticalAlignment="Bottom" Background="{StaticResource Accent}"
+                      Opacity="0" IsHitTestVisible="False" />
               <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
                      Focusable="False" AllowsTransparency="True">
                 <Border Background="{StaticResource Field}" BorderBrush="{StaticResource Line}" BorderThickness="1"
@@ -279,6 +362,49 @@
               </Popup>
             </Grid>
             <ControlTemplate.Triggers>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".55" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="Expander">
+      <Setter Property="Foreground" Value="{StaticResource Text}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Expander">
+            <StackPanel>
+              <ToggleButton x:Name="HeaderSite" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                            Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
+                            FocusVisualStyle="{StaticResource ControlFocus}" Foreground="{TemplateBinding Foreground}"
+                            Cursor="Hand" Padding="8,4" AutomationProperties.Name="{Binding Header, RelativeSource={RelativeSource TemplatedParent}}">
+                <ToggleButton.Template>
+                  <ControlTemplate TargetType="ToggleButton">
+                    <Grid>
+                      <Border x:Name="Plate" Background="{StaticResource Field}" BorderBrush="{StaticResource Line}" BorderThickness="1" />
+                      <Border x:Name="ActivationEdge" Width="2" HorizontalAlignment="Left" Margin="1" Background="{StaticResource Accent}"
+                              Opacity="0" IsHitTestVisible="False" />
+                      <DockPanel Margin="{TemplateBinding Padding}">
+                        <Path x:Name="Caret" DockPanel.Dock="Right" Margin="7,0,1,0" VerticalAlignment="Center"
+                              Data="M0,0 L4,4 L8,0" Stroke="{StaticResource Accent}" StrokeThickness="1.5" RenderTransformOrigin=".5,.5" />
+                        <ContentPresenter RecognizesAccessKey="True" VerticalAlignment="Center" />
+                      </DockPanel>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Plate" Property="BorderBrush" Value="{StaticResource Accent}" /></Trigger>
+                      <Trigger Property="IsPressed" Value="True"><Setter TargetName="Plate" Property="Opacity" Value=".68" /></Trigger>
+                      <Trigger Property="IsChecked" Value="True">
+                        <Setter TargetName="Plate" Property="Background" Value="{StaticResource Raised}" />
+                        <Setter TargetName="Caret" Property="RenderTransform"><Setter.Value><RotateTransform Angle="180" /></Setter.Value></Setter>
+                      </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </ToggleButton.Template>
+              </ToggleButton>
+              <ContentPresenter x:Name="Details" Visibility="Collapsed" />
+            </StackPanel>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsExpanded" Value="True"><Setter TargetName="Details" Property="Visibility" Value="Visible" /></Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".55" /></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -701,6 +827,8 @@
                 <ComboBoxItem Content="团战" />
                 <ComboBoxItem Content="镜像竞速" />
                 <ComboBoxItem Content="四区供电" />
+                <ComboBoxItem Content="热点争夺" />
+                <ComboBoxItem Content="词牌接力" />
               </ComboBox>
             </DockPanel>
             <DockPanel x:Name="SoloMapControls" Margin="0,5,0,0">
@@ -712,6 +840,20 @@
                       AutomationProperties.Name="单人经典模式地图边长" />
             </DockPanel>
             <CheckBox x:Name="LanUniformRaceRole" Visibility="Collapsed" Content="统一使用房主职业" Margin="0,6,0,0" />
+            <StackPanel x:Name="SnakeBotSettings" Margin="0,6,0,0">
+              <DockPanel>
+                <TextBlock Text="人机数量" VerticalAlignment="Center" Margin="0,0,9,0" />
+                <ComboBox x:Name="SnakeBotCount" SelectedIndex="0" MinHeight="27" AutomationProperties.Name="人机数量">
+                  <ComboBoxItem Content="不添加" /><ComboBoxItem Content="1 个" /><ComboBoxItem Content="2 个" /><ComboBoxItem Content="3 个" />
+                </ComboBox>
+              </DockPanel>
+              <DockPanel Margin="0,5,0,0">
+                <TextBlock Text="人机强度" VerticalAlignment="Center" Margin="0,0,9,0" />
+                <ComboBox x:Name="SnakeBotDifficulty" SelectedIndex="1" MinHeight="27" AutomationProperties.Name="人机强度">
+                  <ComboBoxItem Content="简单" /><ComboBoxItem Content="普通" /><ComboBoxItem Content="困难" />
+                </ComboBox>
+              </DockPanel>
+            </StackPanel>
             <DockPanel Margin="0,5,0,0">
               <TextBlock x:Name="LanTeamsLabel" Visibility="Collapsed" Text="队伍数量" VerticalAlignment="Center"
                          Margin="0,0,9,0" FontWeight="SemiBold" />
@@ -914,7 +1056,7 @@
             <Run Text="3. 有技能的职业按 Tab 切换输入框。技能短语连写。蛇头气泡显示正在输入的字母，联机时也显示昵称。" />
           </TextBlock>
 
-          <TextBlock Text="六种玩法" Style="{StaticResource RuleHeading}" />
+          <TextBlock Text="八种玩法" Style="{StaticResource RuleHeading}" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="经典　" FontWeight="Bold" /><Run Text="打方向词和吃果都得分。单人开局前可调地图边长。每分钟缩小 5 格，圈外视为撞墙。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}" Text="主棋盘显示 32 × 32 格。按 Alt 切换自由和锁定视角。锁定时蛇头居中，按住方向键可查看周围，松开回到蛇头。小地图黄框标出视野覆盖的地图范围，黄点标出自己。棋盘上的橙色箭头指向大果。" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="障碍赛　" FontWeight="Bold" /><Run Text="开局随机生成四格方块障碍，绕开障碍去吃果。" /></TextBlock>
@@ -922,6 +1064,9 @@
           <TextBlock Style="{StaticResource RuleText}"><Run Text="团战　" FontWeight="Bold" /><Run Text="仅限联机，房主选 2–4 队。可穿过己方球，碰到敌队球会捡起。带球回己方区域按 Shift 放下一颗，每带一颗球扣 10% 移速。空手按住 Shift 提速 25%。死亡后等 15 秒复活，8 分钟后按落地球数排名。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="镜像竞速　" FontWeight="Bold" /><Run Text="单人计时或 2–4 人联机。同一场比赛各自跑同一张地图，按顺序经过 6 个检查点。撞车回到最近通过的检查点，计时加 5 秒。3 分钟内先比完赛用时，未完赛先比检查点数，再比到达最后一站的用时。单人在固定赛道按职业保存最佳成绩。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="四区供电　" FontWeight="Bold" /><Run Text="2–4 人联机合作。蛇头在 5×5 供电区内时，完成一次转向可充 1 格。每 45 秒停用一座站 10 秒，提前 5 秒提示。队友可以互相穿过，撞车后 5 秒复活。5 分钟内充满四座站即可通关。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="热点争夺　" FontWeight="Bold" /><Run Text="2–4 人争夺 7×7 热点。独占时每秒加 1 分，多人同在时暂停计分。热点每 30 秒更换，提前 5 秒预告。撞车 5 秒后复活，4 分钟后按热点积分排名。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="词牌接力　" FontWeight="Bold" /><Run Text="4 人分成两队，各队在独立赛道跑四棒。前一棒到交接区后，队友打完接力词才出发。撞车等 5 秒回本棒起点。先完成四棒的队伍获胜。4 分钟内都未完赛时，先比完成棒数，再比最近一次到达交接区的时间。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}" Text="单人和局域网房主均可添加人机，选择简单、普通或困难。人机占用普通玩家席位。" />
 
           <TextBlock Text="九个职业" Style="{StaticResource RuleHeading}" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="平凡者　" FontWeight="Bold" /><Run Text="基础移速，使用 6–7 字母方向词。" /></TextBlock>
