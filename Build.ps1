@@ -38,6 +38,8 @@ try {
         (Join-Path $PSScriptRoot 'Program.cs') (Join-Path $PSScriptRoot 'PracticeSettings.cs') `
         (Join-Path $PSScriptRoot 'PracticeLeaderboard.cs') `
         (Join-Path $PSScriptRoot 'ThemePalette.cs') `
+        (Join-Path $PSScriptRoot 'ThemeLayout.cs') (Join-Path $PSScriptRoot 'ThemeControlDesign.cs') `
+        (Join-Path $PSScriptRoot 'ThemeWorldMotion.cs') (Join-Path $PSScriptRoot 'KeyboardMappingPractice.cs') `
         (Join-Path $PSScriptRoot 'DenseCityArtwork.cs') `
         (Join-Path $PSScriptRoot 'StartupExperience.cs') `
         (Join-Path $PSScriptRoot 'StartupThemeEffects.cs') `

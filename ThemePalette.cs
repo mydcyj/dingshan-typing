@@ -263,6 +263,7 @@ namespace EnglishTypingPractice
                 Find(window, "BackgroundLight").Visibility = Visibility.Collapsed;
             }
             DenseCityArtwork.Apply(window, theme);
+            ThemeControlDesign.Apply(window, theme);
             return window;
         }
 

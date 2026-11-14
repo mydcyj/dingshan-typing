@@ -20,7 +20,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.3.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.4.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -62,6 +62,7 @@ namespace EnglishTypingPractice
         private readonly DispatcherTimer musicTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         private readonly SnakePractice snake;
         private readonly TypingEffects effects;
+        private readonly KeyboardMappingPractice keyboardMapping;
         private bool resumePractice;
         private bool? manualMusic;
         private bool syncingMusicPosition;
@@ -137,6 +138,7 @@ namespace EnglishTypingPractice
                 passages = new JavaScriptSerializer().Deserialize<string[][]>(reader.ReadToEnd());
 
             practiceKind = (ComboBox)window.FindName("PracticeKind");
+            practiceKind.Items.Add(new ComboBoxItem { Content = "键位映射", Tag = "mapping" });
             practiceFont = (ComboBox)window.FindName("PracticeFont");
             codeExerciseKind = (ComboBox)window.FindName("CodeExerciseKind");
             reviewLevel = (ComboBox)window.FindName("ReviewLevel");
@@ -151,22 +153,12 @@ namespace EnglishTypingPractice
             recordOverlay = (FrameworkElement)window.FindName("PracticeRecordOverlay");
             recordDetails = (TextBlock)window.FindName("PracticeRecordDetails");
             dismissRecord = (Button)window.FindName("DismissPracticeRecord");
-            var workbench = (Grid)window.FindName("PracticeWorkbench");
-            var sidebar = (FrameworkElement)window.FindName("PracticeSidebar");
-            var sidebarColumn = (ColumnDefinition)window.FindName("PracticeSidebarColumn");
-            workbench.SizeChanged += (sender, e) =>
-            {
-                bool wide = e.NewSize.Width >= 900;
-                sidebarColumn.Width = new GridLength(wide ? 349 : 0);
-                Grid.SetRow(sidebar, wide ? 0 : 1);
-                Grid.SetColumn(sidebar, wide ? 1 : 0);
-                sidebar.Margin = wide ? new Thickness(13, 0, 0, 0) : new Thickness(0, 10, 0, 0);
-            };
             matchCase = (CheckBox)window.FindName("MatchCase");
             includePunctuation = (CheckBox)window.FindName("IncludePunctuation");
             playMusic = (CheckBox)window.FindName("PlayMusic");
             passage = (TextBlock)window.FindName("Passage");
             typed = (TextBox)window.FindName("Typed");
+            keyboardMapping = new KeyboardMappingPractice(window, typed);
             progress = (ProgressBar)window.FindName("Progress");
             progressGlint = (Border)window.FindName("ProgressGlint");
             count = (TextBlock)window.FindName("Count");
@@ -396,6 +388,8 @@ namespace EnglishTypingPractice
                 effects.Dispose();
             };
             ConfigureBackgroundMotion((TranslateTransform)window.FindName("BackgroundDrift"), practicePage);
+            ThemeLayout.Attach(window, settings.Theme);
+            ThemeWorldMotion.Attach(window, settings.Theme, () => settings.SnakeLowEffects);
             ChoosePassage();
             if (showStartup)
                 new StartupExperience(window, settings, () => typed.Focus());
@@ -495,7 +489,7 @@ namespace EnglishTypingPractice
             ClockGroup motion = null;
             Action update = () =>
             {
-                if (!SystemParameters.ClientAreaAnimation || (!practicePage.IsVisible && settings.SnakeLowEffects))
+                if (!SystemParameters.ClientAreaAnimation || settings.SnakeLowEffects)
                 {
                     drift.ApplyAnimationClock(TranslateTransform.XProperty, null);
                     drift.ApplyAnimationClock(TranslateTransform.YProperty, null);
@@ -543,6 +537,21 @@ namespace EnglishTypingPractice
         {
             priorRoundResult = null;
             string[] choices;
+            if (IsMapping)
+            {
+                var words = ReviewBank(0).Where(word => word.Length >= 3 && word.Length <= 8 &&
+                    word.All(character => character >= 'a' && character <= 'z')).ToList();
+                var selected = new List<string>();
+                for (int i = 0; i < 20 && words.Count > 0; i++)
+                {
+                    int wordIndex = random.Next(words.Count);
+                    selected.Add(words[wordIndex]);
+                    words.RemoveAt(wordIndex);
+                }
+                original = string.Join(" ", selected);
+                ResetRound();
+                return;
+            }
             if (IsReview)
             {
                 int level = reviewLevel.SelectedIndex;
@@ -635,7 +644,8 @@ namespace EnglishTypingPractice
         }
 
         private bool IsReview { get { return practiceKind.SelectedIndex == passages.Length; } }
-        private bool IsCode { get { return practiceKind.SelectedIndex >= 2 && !IsReview; } }
+        private bool IsMapping { get { return practiceKind.SelectedItem is ComboBoxItem && (string)((ComboBoxItem)practiceKind.SelectedItem).Tag == "mapping"; } }
+        private bool IsCode { get { return practiceKind.SelectedIndex >= 2 && practiceKind.SelectedIndex < passages.Length; } }
         private bool IsChinese { get { return practiceKind.SelectedIndex == 1; } }
         private bool MatchExactCase { get { return IsCode || settings.MatchCase; } }
 
@@ -687,18 +697,21 @@ namespace EnglishTypingPractice
             lastRoundResult = null;
             codeExerciseKind.Visibility = IsCode ? Visibility.Visible : Visibility.Collapsed;
             reviewLevel.Visibility = IsReview ? Visibility.Visible : Visibility.Collapsed;
-            newPassage.Content = IsReview ? "换个词" : IsCode ? "换一题" : "换一篇";
-            retry.Content = IsReview ? "重练本词" : IsCode ? "重练本题" : "重练本篇";
+            newPassage.Content = IsMapping ? "换组词" : IsReview ? "换个词" : IsCode ? "换一题" : "换一篇";
+            retry.Content = IsMapping ? "重练本组" : IsReview ? "重练本词" : IsCode ? "重练本题" : "重练本篇";
 
             matchCase.IsEnabled = !IsCode && !IsChinese;
-            includePunctuation.IsEnabled = !IsCode && !IsReview;
+            includePunctuation.IsEnabled = !IsCode && !IsReview && !IsMapping;
             typed.AcceptsReturn = IsCode;
             InputMethod.SetIsInputMethodEnabled(typed, IsChinese);
             ApplyPracticeFont();
             passage.FontSize = typed.FontSize = IsCode ? 18 : 20;
-            typed.Height = IsCode ? 155 : 96;
-            ((TextBlock)window.FindName("PracticeTitle")).Text = IsReview ? "复习单词" : IsCode ? "练习代码" : "练习短文";
-            ((TextBlock)window.FindName("PracticeHint")).Text = IsCode
+            typed.Height = IsCode ? 155 : IsMapping ? 66 : 96;
+            keyboardMapping.SetVisible(IsMapping);
+            ((TextBlock)window.FindName("PracticeTitle")).Text = IsMapping ? "键位映射 · 四级词组" : IsReview ? "复习单词" : IsCode ? "练习代码" : "练习短文";
+            ((TextBlock)window.FindName("PracticeHint")).Text = IsMapping
+                ? "跟随高亮键位输入词组，空格分词。打错后用 Backspace 订正；F / J 为食指定位键。"
+                : IsCode
                 ? "照着示例输入，保留大小写、符号和换行。Tab 输入 4 个空格。"
                 : IsChinese ? "用中文输入法照着短文输入，汉字上屏后开始计时。"
                 : IsReview ? "复习本机贪吃蛇里打错或清空的词。拼写正确后揭晓中文释义。"
@@ -773,7 +786,7 @@ namespace EnglishTypingPractice
             int previousCorrect = correctCount;
             bool inputChanged = round.Observe(input, clock.Elapsed.TotalSeconds);
             RefreshProgress();
-            bool complete = input.Length >= target.Length && (!IsReview || correctCount == target.Length);
+            bool complete = input.Length >= target.Length && (!(IsReview || IsMapping) || correctCount == target.Length);
             if (correctCount > previousCorrect)
                 HighlightProgress(complete);
             if (settings.TypingFeedback)
@@ -953,6 +966,8 @@ namespace EnglishTypingPractice
             count.Text = input.Length + " / " + target.Length;
             progress.Value = input.Length;
             accuracy.Text = round.Accuracy;
+            if (IsMapping)
+                keyboardMapping.Update(target, input, MatchExactCase);
         }
 
         private string ReadInput()
