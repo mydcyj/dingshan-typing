@@ -853,7 +853,7 @@
             <Run Text="2. 蛇会一直前进。照着十字面板打完目标方向的英文词，蛇就会转向。× 表示禁止掉头。按空格清空当前输入框。" />
           </TextBlock>
           <TextBlock Style="{StaticResource RuleText}">
-            <Run Text="3. 有技能的职业按 Tab 切换输入框。技能短语连写。联机时，蛇头气泡显示昵称和当前正在输入的字母。" />
+            <Run Text="3. 有技能的职业按 Tab 切换输入框。技能短语连写。蛇头气泡显示正在输入的字母，联机时也显示昵称。" />
           </TextBlock>
 
           <TextBlock Text="四种玩法" Style="{StaticResource RuleHeading}" />

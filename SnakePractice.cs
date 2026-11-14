@@ -211,22 +211,28 @@ namespace EnglishTypingPractice
             command.Focus();
         }
 
-        private void PublishTyping()
+        private void PublishTyping(bool publish = true)
         {
-            if (online == null || soloMatch != null || online.Phase != MatchPhase.Playing)
-                return;
-            var own = online.Players.First(player => player.Slot == ownSlot);
-            if (own.Result != SnakeResult.Running || own.StunRemaining > 0)
-                return;
-            bool skill = chargeInput.IsKeyboardFocusWithin && chargePanel.Visibility == Visibility.Visible;
-            string text = skill ? chargeInput.Text : command.Text;
-            lobby.SetPreview(new SnakeTypingPreview
+            var own = online == null ? null : online.Players.First(player => player.Slot == ownSlot);
+            bool active = own == null ? game.IsRunning :
+                online.Phase == MatchPhase.Playing && own.Result == SnakeResult.Running;
+            bool canType = active && (own == null || own.StunRemaining == 0);
+            bool skill = canType && chargeInput.IsKeyboardFocusWithin && chargePanel.Visibility == Visibility.Visible;
+            string text = canType ? (skill ? chargeInput.Text : command.Text) : "";
+            if (!SnakeTypingPreview.IsValidText(text, skill))
+                text = new string(text.Where(c => c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z')
+                    .Take(skill ? chargeInput.MaxLength : command.MaxLength).ToArray());
+            board.SetLocalTyping(active ? text : null, skill);
+            if (publish && canType && own != null && soloMatch == null)
             {
-                Round = online.Round,
-                Respawns = own.Respawns,
-                Skill = skill,
-                Text = new string(text.Where(c => c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z').ToArray())
-            });
+                lobby.SetPreview(new SnakeTypingPreview
+                {
+                    Round = online.Round,
+                    Respawns = own.Respawns,
+                    Skill = skill,
+                    Text = text
+                });
+            }
         }
 
         internal void Leave()
@@ -380,6 +386,7 @@ namespace EnglishTypingPractice
             }, SelectedMode == SnakeMode.Obstacles ? game.Obstacles.ToArray() : null,
                 safeStart: game.Bounds.Start, safeEnd: size == game.Size ? game.Bounds.End : size);
             UpdateOverview(size);
+            PublishTyping(false);
             score.Text = (territory ? 0 : game.Score).ToString(CultureInfo.CurrentCulture);
         }
 
@@ -651,6 +658,7 @@ namespace EnglishTypingPractice
                 state.Trails, state.SafeStart, state.SafeEnd, state.Shots, state.Bursts,
                 state.TeamCount, state.TeamBalls, soloMatch == null);
             UpdateOverview(size);
+            PublishTyping(false);
             UpdateMusic(running && soloMatch != null);
         }
 
@@ -766,6 +774,12 @@ namespace EnglishTypingPractice
         private static readonly Pen ObstacleOutline = MakeObstaclePen();
         private static readonly Pen Grid = MakeGridPen();
         private static readonly Pen ViewOutline = MakePen(Head, 1.25);
+        private static readonly Brush[] Stars =
+        {
+            MakeBrush(255, 255, 255, 82),
+            MakeBrush(255, 255, 255, 135),
+            MakeBrush(255, 255, 255, 197)
+        };
         private static readonly Brush[] Rivals =
         {
             MakeBrush(103, 189, 239), MakeBrush(209, 146, 241), MakeBrush(247, 193, 93)
@@ -791,6 +805,8 @@ namespace EnglishTypingPractice
         private int teams;
         private TeamBall[] teamBalls;
         private bool showNames;
+        private string localTyping;
+        private bool localTypingSkill;
         private Int32Rect viewport = new Int32Rect(0, 0, SnakeGame.BaseSize, SnakeGame.BaseSize);
         private bool resetCamera;
         private int respawns;
@@ -801,6 +817,15 @@ namespace EnglishTypingPractice
         }
 
         internal FrameworkElement Minimap { get; private set; }
+
+        internal void SetLocalTyping(string text, bool skill)
+        {
+            if (localTyping == text && localTypingSkill == skill)
+                return;
+            localTyping = text;
+            localTypingSkill = skill;
+            InvalidateVisual();
+        }
 
         internal void ResetCamera()
         {
@@ -890,7 +915,7 @@ namespace EnglishTypingPractice
                 Math.Min(size, (int)Math.Ceiling(offset.X + viewport.Width)) - left,
                 Math.Min(size, (int)Math.Ceiling(offset.Y + viewport.Height)) - top);
             drawing.PushClip(new RectangleGeometry(area));
-            DrawTerrain(drawing, world, cell, visible);
+            DrawTerrain(drawing, world, cell, visible, true);
             for (int x = visible.X + 1; x < visible.X + visible.Width; x++)
             {
                 double line = world.X + x * cell;
@@ -902,12 +927,11 @@ namespace EnglishTypingPractice
                 drawing.DrawLine(Grid, new Point(area.Left, line), new Point(area.Right, line));
             }
             DrawPieces(drawing, world, cell, visible);
-            if (showNames)
-                DrawNames(drawing, area, world, cell);
+            DrawBubbles(drawing, area, world, cell);
             drawing.Pop();
         }
 
-        private void DrawTerrain(DrawingContext drawing, Rect area, double cell, Int32Rect region)
+        private void DrawTerrain(DrawingContext drawing, Rect area, double cell, Int32Rect region, bool drawStars = false)
         {
             drawing.DrawRectangle(Board, null, area);
             if (teams > 0)
@@ -935,9 +959,35 @@ namespace EnglishTypingPractice
                             drawing.DrawRectangle(LandColors[land[i] - 1], null, CellBounds(i, area, cell));
                     }
 
+            if (drawStars)
+                DrawStars(drawing, area, cell, region);
             if (obstacles != null)
                 foreach (int obstacle in obstacles)
                     drawing.DrawRectangle(Obstacle, ObstacleOutline, CellBounds(obstacle, area, cell));
+        }
+
+        private static void DrawStars(DrawingContext drawing, Rect world, double cell, Int32Rect visible)
+        {
+            for (int y = visible.Y; y < visible.Y + visible.Height; y++)
+            {
+                for (int x = visible.X; x < visible.X + visible.Width; x++)
+                {
+                    // Derive position and brightness from world coordinates so stars move with the map.
+                    uint star = unchecked((uint)x * 0x9E3779B9u ^ (uint)y * 0x85EBCA6Bu);
+                    star = unchecked((star ^ (star >> 16)) * 0x7FEB352Du);
+                    star ^= star >> 15;
+                    if (star % 19 != 0)
+                        continue;
+
+                    int rank = (int)((star >> 24) & 7);
+                    int style = rank == 0 ? 2 : rank <= 2 ? 1 : 0;
+                    double dx = .20 + ((star >> 5) & 15) * .04;
+                    double dy = .20 + ((star >> 13) & 15) * .04;
+                    var point = new Point(world.X + (x + dx) * cell, world.Y + (y + dy) * cell);
+                    double radius = Math.Max(.55, Math.Min(2.7, cell * (.052 + style * .033)));
+                    drawing.DrawEllipse(Stars[style], null, point, radius, radius);
+                }
+            }
         }
 
         private void DrawPieces(DrawingContext drawing, Rect area, double cell, Int32Rect visible)
@@ -1063,29 +1113,36 @@ namespace EnglishTypingPractice
                 y >= visible.Y && y < visible.Y + visible.Height;
         }
 
-        private void DrawNames(DrawingContext drawing, Rect area, Rect world, double cell)
+        private void DrawBubbles(DrawingContext drawing, Rect area, Rect world, double cell)
         {
             var placed = new System.Collections.Generic.List<Rect>();
-            foreach (var player in players.Where(item => item.Body.Length > 0 && !string.IsNullOrEmpty(item.Name)))
+            double textWidth = Math.Max(1, Math.Min(190, area.Width - 14));
+            foreach (var player in players)
             {
+                if (player.Body.Length == 0)
+                    continue;
+                bool own = player.Slot == ownSlot;
+                string name = showNames ? player.Name : null;
+                string input = own ? localTyping : player.Result == SnakeResult.Running ? player.Typing ?? "" : null;
+                bool skill = own ? localTypingSkill : player.TypingSkill;
+                if (string.IsNullOrEmpty(name) && input == null)
+                    continue;
                 var head = CellBounds(player.Body[0], world, cell);
                 var center = new Point(head.X + cell / 2, head.Y + cell / 2);
                 if (!area.Contains(center))
                     continue;
-                var label = new FormattedText(player.Name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                    new Typeface("Segoe UI, Microsoft YaHei UI"), 11, Label, VisualTreeHelper.GetDpi(this).PixelsPerDip)
-                    { MaxTextWidth = Math.Max(1, Math.Min(138, area.Width - 14)), MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+                FormattedText label = string.IsNullOrEmpty(name) ? null : BubbleText(name,
+                    "Segoe UI, Microsoft YaHei UI", Label, Math.Min(138, textWidth));
                 FormattedText typing = null;
-                if (!string.IsNullOrEmpty(player.Typing) || player.TypingSkill)
+                if (input != null)
                 {
-                    string text = player.TypingSkill ? "技能 " + (player.Typing == "" ? "…" : player.Typing) : player.Typing;
-                    typing = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                        new Typeface("Consolas, Microsoft YaHei UI"), 11, player.TypingSkill ? ChargeGlow : Head,
-                        VisualTreeHelper.GetDpi(this).PixelsPerDip)
-                        { MaxTextWidth = Math.Max(1, area.Width - 14), MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+                    string text = (skill ? "技能 " : "") + (input.Length == 0 ? "…" : input);
+                    typing = BubbleText(text, "Consolas, Microsoft YaHei UI",
+                        skill ? ChargeGlow : input.Length == 0 ? Quiet : Head, textWidth);
                 }
-                double width = Math.Max(label.Width, typing == null ? 0 : typing.Width) + 12;
-                double height = label.Height + 6 + (typing == null ? 0 : typing.Height + 1);
+                double width = Math.Max(label == null ? 0 : label.Width, typing == null ? 0 : typing.Width) + 12;
+                double labelHeight = label == null ? 0 : label.Height + 1;
+                double height = labelHeight + 6 + (typing == null ? 0 : typing.Height);
                 double x = Math.Max(area.Left + 1, Math.Min(area.Right - width - 1, center.X - width / 2));
                 Rect bubble = Rect.Empty;
                 for (int i = 0; i <= placed.Count; i++)
@@ -1098,15 +1155,24 @@ namespace EnglishTypingPractice
                         break;
                 }
                 placed.Add(bubble);
-                Brush color = player.Team >= 0 ? TerritoryColors[player.Team] : PlayerColor(player.Slot, ownSlot, land != null);
+                Brush color = player.Team >= 0 ? TerritoryColors[player.Team] :
+                    own ? Head : PlayerColor(player.Slot, ownSlot, land != null);
                 var pen = new Pen(color, 1);
                 drawing.DrawLine(pen, center, new Point(bubble.X + bubble.Width / 2,
                     bubble.Y < head.Top ? bubble.Bottom : bubble.Top));
                 drawing.DrawRectangle(Bubble, pen, bubble);
-                drawing.DrawText(label, new Point(bubble.X + 6, bubble.Y + 3));
+                if (label != null)
+                    drawing.DrawText(label, new Point(bubble.X + 6, bubble.Y + 3));
                 if (typing != null)
-                    drawing.DrawText(typing, new Point(bubble.X + 6, bubble.Y + label.Height + 4));
+                    drawing.DrawText(typing, new Point(bubble.X + 6, bubble.Y + labelHeight + 3));
             }
+        }
+
+        private FormattedText BubbleText(string text, string font, Brush brush, double width)
+        {
+            return new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                new Typeface(font), 11, brush, VisualTreeHelper.GetDpi(this).PixelsPerDip)
+                { MaxTextWidth = width, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
         }
 
         internal static string TeamName(int team)
@@ -1140,9 +1206,9 @@ namespace EnglishTypingPractice
             return pen;
         }
 
-        private static Brush MakeBrush(byte red, byte green, byte blue)
+        private static Brush MakeBrush(byte red, byte green, byte blue, byte alpha = 255)
         {
-            var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+            var brush = new SolidColorBrush(Color.FromArgb(alpha, red, green, blue));
             brush.Freeze();
             return brush;
         }
