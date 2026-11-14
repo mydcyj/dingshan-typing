@@ -44,8 +44,7 @@ namespace EnglishTypingPractice
         internal const int StateLimit = 65536;
         internal const int MusicLimit = 64 * 1024 * 1024;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
-        internal static readonly string AppVersion = "v" + typeof(LanWire).Assembly.GetName().Version.ToString(
-            typeof(LanWire).Assembly.GetName().Version.Build == 0 ? 2 : 3);
+        internal static readonly string AppVersion = "v" + typeof(LanWire).Assembly.GetName().Version.ToString(3);
 
         internal static string VersionMismatch(string hostVersion, string guestVersion)
         {
