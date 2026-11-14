@@ -7,6 +7,8 @@ namespace EnglishTypingPractice
     internal sealed class TypingEffectVisuals : FrameworkElement
     {
         private static readonly Brush Steam = MakeSteamBrush();
+        private static readonly Geometry DesktopCursor = MakeGeometry("M0,0 L0,18 5,13 8,21 11,20 8,12 15,12 Z");
+        private static readonly Geometry Spark = MakeGeometry("M0,-13 Q1,-2 14,0 Q1,2 0,13 Q-1,2 -14,0 Q-1,-2 0,-13 Z");
 
         internal static readonly DependencyProperty ProgressProperty = DependencyProperty.Register(
             "Progress", typeof(double), typeof(TypingEffectVisuals),
@@ -43,6 +45,10 @@ namespace EnglishTypingPractice
                 case UiTheme.Constructivist: DrawStamp(drawing, time); break;
                 case UiTheme.Persona5: DrawComic(drawing, time); break;
                 case UiTheme.ChineseStyle: DrawInk(drawing, time); break;
+                case UiTheme.Windows98: DrawDesktop(drawing, time); break;
+                case UiTheme.CassetteFuturism: DrawDeck(drawing, time); break;
+                case UiTheme.Magritte: DrawImpossibleShadow(drawing, time); break;
+                case UiTheme.Atompunk: DrawOrbit(drawing, time); break;
                 default: DrawBrackets(drawing, time); break;
             }
             drawing.Pop();
@@ -156,6 +162,73 @@ namespace EnglishTypingPractice
                 drawing.DrawRectangle(null, bold, new Rect(78, 16 + 4 * time, 11, 11));
         }
 
+        private void DrawDesktop(DrawingContext drawing, double time)
+        {
+            int rise = (int)(time * 5) * 2;
+            var window = new Rect(20, 12 - rise, 51, 34);
+            drawing.DrawRectangle(secondary, thin, window);
+            drawing.DrawRectangle(primary, null, new Rect(window.X + 3, window.Y + 3, 45, 8));
+            drawing.DrawRectangle(Brushes.WhiteSmoke, null, new Rect(window.Right - 10, window.Y + 5, 5, 4));
+            if (level > 0)
+            {
+                for (int i = 0; i < 3 + level; i++)
+                {
+                    if (i <= time * 5 + 1)
+                        drawing.DrawRectangle(primary, null, new Rect(25 + i * 8, window.Y + 19, 6, 5));
+                }
+            }
+            drawing.PushTransform(new TranslateTransform(69 + rise * .5, 37 - rise));
+            drawing.DrawGeometry(Brushes.WhiteSmoke, thin, DesktopCursor);
+            drawing.Pop();
+        }
+
+        private void DrawDeck(DrawingContext drawing, double time)
+        {
+            var tape = new Rect(12, 18, 49, 31);
+            drawing.DrawRoundedRectangle(null, thin, tape, 3, 3);
+            for (int i = 0; i < 2; i++)
+            {
+                var reel = new Point(25 + i * 23, 32);
+                drawing.DrawEllipse(null, thin, reel, 8, 8);
+                double phase = time * 11 + i;
+                drawing.DrawLine(bold, reel, new Point(reel.X + 5 * Math.Cos(phase), reel.Y + 5 * Math.Sin(phase)));
+            }
+            for (int i = 0; i < 5; i++)
+                drawing.DrawRectangle(i < Math.Ceiling((1 - time) * (2 + level)) ? primary : secondary,
+                    null, new Rect(66, 47 - 7 * i, 18, 3));
+        }
+
+        private void DrawImpossibleShadow(DrawingContext drawing, double time)
+        {
+            // The object rises from the paper while its shadow climbs in front of it.
+            var frame = new Rect(28, 10, 37, 43);
+            drawing.DrawRectangle(null, thin, frame);
+            var center = new Point(46, 40 - time * 20);
+            drawing.DrawEllipse(secondary, null, center, 10, 7);
+            drawing.PushOpacity(.45);
+            drawing.DrawEllipse(primary, null, new Point(54 + 15 * time, center.Y - 3 - 10 * time),
+                11 + level * 2, 3);
+            drawing.Pop();
+        }
+
+        private void DrawOrbit(DrawingContext drawing, double time)
+        {
+            var center = new Point(50, 34);
+            for (int i = 0; i < level + 1; i++)
+            {
+                double phase = i * 1.9 + time * 5;
+                double radius = 20 + time * 14;
+                drawing.PushTransform(new RotateTransform(-29 + i * 54, center.X, center.Y));
+                drawing.DrawEllipse(null, thin, center, radius, radius * .36);
+                drawing.DrawEllipse(secondary, null,
+                    new Point(center.X + radius * Math.Cos(phase), center.Y + radius * .36 * Math.Sin(phase)), 3, 3);
+                drawing.Pop();
+            }
+            drawing.PushTransform(new TranslateTransform(center.X, center.Y));
+            drawing.DrawGeometry(primary, null, Spark);
+            drawing.Pop();
+        }
+
         private void DrawBrackets(DrawingContext drawing, double time)
         {
             double spread = 11 + 29 * time;
@@ -189,6 +262,13 @@ namespace EnglishTypingPractice
             var brush = new RadialGradientBrush(Color.FromArgb(173, 253, 234, 203), Colors.Transparent);
             brush.Freeze();
             return brush;
+        }
+
+        private static Geometry MakeGeometry(string path)
+        {
+            var shape = Geometry.Parse(path);
+            shape.Freeze();
+            return shape;
         }
     }
 }

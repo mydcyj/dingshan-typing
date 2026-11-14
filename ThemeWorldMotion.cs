@@ -134,6 +134,7 @@ namespace EnglishTypingPractice
             private readonly bool hero;
             private readonly Dictionary<string, DrawingImage> art = new Dictionary<string, DrawingImage>();
             private readonly DrawingGroup scenery = new DrawingGroup();
+            private readonly Action<double> moveVignette;
             private readonly DrawingGroup[] traffic;
             private readonly TranslateTransform carrier = new TranslateTransform(), rescue = new TranslateTransform();
             private readonly DrawingGroup rescueLights = new DrawingGroup();
@@ -170,6 +171,14 @@ namespace EnglishTypingPractice
                     traffic = new DrawingGroup[hero ? 6 : 12];
                     BuildCyberpunk();
                 }
+                else if (theme == UiTheme.Windows98)
+                    moveVignette = BuildDesktop();
+                else if (theme == UiTheme.CassetteFuturism)
+                    moveVignette = BuildCassette();
+                else if (theme == UiTheme.Magritte)
+                    moveVignette = BuildImpossibleKey();
+                else if (theme == UiTheme.Atompunk)
+                    moveVignette = BuildAtomicStation();
                 Advance(0);
             }
 
@@ -184,6 +193,11 @@ namespace EnglishTypingPractice
                 if (theme == UiTheme.Cyberpunk)
                 {
                     MoveCyberpunk();
+                    return;
+                }
+                if (moveVignette != null)
+                {
+                    moveVignette(value);
                     return;
                 }
                 // Keep the drawing attached to the visual. A frame changes its content without invalidating layout.
@@ -208,6 +222,295 @@ namespace EnglishTypingPractice
                 dc.PushTransform(new ScaleTransform(ActualWidth / SceneWidth, ActualHeight / SceneHeight));
                 dc.DrawDrawing(scenery);
                 dc.Pop();
+            }
+
+            private Action<double> BuildDesktop()
+            {
+                var teal = Paint("008080");
+                var pale = Paint("E9E9D4");
+                var gray = Paint("C0C0C0");
+                var shade = Paint("777A7F");
+                var navy = Paint("000080");
+                var monitor = Paint("073F46");
+                var glass = Paint("17767A");
+                var text = Paint("92D5CA");
+                var shadow = Paint("184D53");
+                var panelEdge = Stroke(shade, 1.5);
+                var pixel = Stroke(pale, 1.5);
+                var scan = new TranslateTransform();
+                var cursor = new TranslateTransform();
+                if (!hero)
+                {
+                    AddSceneDrawing(scenery, null, dc =>
+                    {
+                        dc.DrawRectangle(teal, null, new Rect(0, 0, SceneWidth, SceneHeight));
+                        dc.DrawRectangle(gray, panelEdge, new Rect(0, 675, SceneWidth, 25));
+                        dc.DrawLine(pixel, new Point(0, 676), new Point(SceneWidth, 676));
+                        dc.DrawRectangle(gray, panelEdge, new Rect(8, 680, 89, 15));
+                        dc.DrawRectangle(gray, panelEdge, new Rect(SceneWidth - 102, 680, 91, 15));
+                        for (int i = 0; i < 4; i++)
+                        {
+                            double y = 36 + i * 74;
+                            dc.DrawRectangle(shadow, null, new Rect(23, y + 3, 27, 20));
+                            dc.DrawRectangle(gray, pixel, new Rect(20, y, 27, 20));
+                            dc.DrawRectangle(navy, null, new Rect(23, y + 4, 20, 11));
+                            dc.DrawRectangle(pale, null, new Rect(19, y + 28, 34, 2));
+                        }
+                    });
+                }
+                var deck = SceneVignette(hero ? 200 : 744, hero ? 12 : 477, hero ? .92 : 1.43);
+                AddSceneDrawing(deck, null, dc =>
+                {
+                    dc.DrawGeometry(shadow, null, Shape("M12,31 H218 V119 H27 L12,104 Z"));
+                    dc.DrawRectangle(gray, panelEdge, new Rect(85, 7, 135, 83));
+                    dc.DrawRectangle(navy, null, new Rect(88, 10, 129, 13));
+                    dc.DrawRectangle(pale, null, new Rect(94, 15, 42, 2));
+                    dc.DrawRectangle(pale, panelEdge, new Rect(90, 26, 127, 52));
+                    for (int i = 0; i < 4; i++)
+                    {
+                        dc.DrawRectangle(teal, null, new Rect(161, 34 + i * 9, 36 - (i * 7 % 21), 2));
+                        dc.DrawRectangle(gray, panelEdge, new Rect(180 + i * 10, 13, 6, 6));
+                    }
+                    dc.DrawGeometry(shade, null, Shape("M92,23 H112 L122,32 V85 L104,100 H91 Z"));
+                    dc.DrawGeometry(pale, panelEdge, Shape("M5,20 H100 V83 L95,90 H10 L5,85 Z"));
+                    dc.DrawRectangle(shade, null, new Rect(11, 27, 83, 53));
+                    dc.DrawRectangle(monitor, null, new Rect(15, 30, 75, 46));
+                    dc.DrawGeometry(glass, null, Shape("M15,30 H90 V42 L17,67 H15 Z"));
+                    dc.DrawRectangle(text, null, new Rect(19, 38, 22, 2));
+                    dc.DrawRectangle(text, null, new Rect(19, 46, 33, 2));
+                    dc.DrawRectangle(text, null, new Rect(19, 54, 27, 2));
+                    dc.DrawRectangle(teal, null, new Rect(84, 83, 3, 2));
+                    dc.DrawGeometry(gray, panelEdge, Shape("M41,90 H64 L68,102 82,108 V112 H21 V108 L38,102 Z"));
+                    dc.DrawGeometry(navy, panelEdge, Shape("M125,65 H159 L165,71 V107 H125 Z"));
+                    dc.DrawRectangle(gray, null, new Rect(132, 65, 23, 10));
+                    dc.DrawRectangle(pale, null, new Rect(131, 83, 27, 17));
+                    dc.DrawRectangle(teal, null, new Rect(133, 87, 21, 2));
+                });
+                AddSceneDrawing(deck, scan, dc => dc.DrawRectangle(text, null, new Rect(17, 34, 71, 1))).Opacity = .33;
+                AddSceneDrawing(deck, cursor, dc => dc.DrawGeometry(Brushes.White, Stroke(navy, 1), Shape("M0,0 V14 L4,10 8,17 11,15 7,8 H13 Z")));
+                return t =>
+                {
+                    scan.Y = Math.Floor(Wrap(t * 8, 39));
+                    cursor.X = Math.Round(159 + Math.Sin(t * .69) * 33);
+                    cursor.Y = Math.Round(67 + Math.Cos(t * .93) * 10);
+                };
+            }
+
+            private Action<double> BuildCassette()
+            {
+                var green = Paint("25423A");
+                var graphite = Paint("112421");
+                var panel = Paint("323C35");
+                var muted = Paint("829A83");
+                var amber = Paint("F4BC6C");
+                var rust = Paint("CD7248");
+                var stripe = Stroke(muted, 1);
+                var reels = new[] { new RotateTransform(0, 53, 63), new RotateTransform(0, 142, 63) };
+                var meters = new[] { new ScaleTransform(.6, 1, 201, 85), new ScaleTransform(.5, 1, 201, 98) };
+                if (!hero)
+                {
+                    AddSceneDrawing(scenery, null, dc =>
+                    {
+                        dc.DrawRectangle(graphite, null, new Rect(0, 0, SceneWidth, SceneHeight));
+                        dc.DrawGeometry(green, null, Shape("M0,471 H119 L234,569 H920 L1039,463 H1100 V700 H0 Z"));
+                        dc.DrawGeometry(null, stripe, Shape("M0,498 H105 L223,593 H928 L1048,491 H1100 M0,511 H94 L213,608 H941 L1060,506 H1100"));
+                        dc.DrawRectangle(panel, stripe, new Rect(24, 45, 49, 307));
+                        for (int i = 0; i < 18; i++)
+                            dc.DrawLine(stripe, new Point(37, 56 + i * 16), new Point(i % 4 == 0 ? 60 : 52, 56 + i * 16));
+                        dc.DrawLine(Stroke(amber, 2), new Point(35, 180), new Point(62, 180));
+                    });
+                }
+                var deck = SceneVignette(hero ? 154 : 690, hero ? 10 : 504, hero ? 1 : 1.6);
+                AddSceneDrawing(deck, null, dc =>
+                {
+                    dc.DrawGeometry(graphite, Stroke(muted, 1.5), Shape("M0,12 L12,0 H259 L274,15 V103 L261,124 H12 L0,109 Z"));
+                    dc.DrawGeometry(panel, null, Shape("M7,13 L15,6 H256 L267,16 V27 H7 Z"));
+                    dc.DrawRectangle(green, stripe, new Rect(11, 29, 179, 76));
+                    dc.DrawRectangle(graphite, null, new Rect(17, 34, 167, 57));
+                    dc.DrawRectangle(muted, null, new Rect(34, 53, 125, 21));
+                    dc.DrawRectangle(graphite, null, new Rect(53, 59, 89, 8));
+                    dc.DrawGeometry(null, stripe, Shape("M24,35 H144 L182,63 V87 H160 M21,93 H47 L59,101 H137 L149,93 H168"));
+                    dc.DrawRectangle(panel, stripe, new Rect(196, 29, 67, 81));
+                    dc.DrawRectangle(graphite, null, new Rect(200, 33, 59, 39));
+                    dc.DrawGeometry(null, Stroke(amber, 1.1), Shape("M205,57 L213,51 219,57 224,44 229,60 236,53 240,46 245,50 253,45"));
+                    dc.DrawRectangle(graphite, null, new Rect(201, 82, 56, 6));
+                    dc.DrawRectangle(graphite, null, new Rect(201, 95, 56, 6));
+                    dc.DrawRectangle(rust, null, new Rect(245, 12, 11, 4));
+                    dc.DrawRectangle(amber, null, new Rect(228, 12, 11, 4));
+                    dc.DrawRectangle(muted, null, new Rect(211, 12, 11, 4));
+                    for (int i = 0; i < 3; i++)
+                        dc.DrawRectangle(muted, stripe, new Rect(21 + 29 * i, 110, 23, 6));
+                });
+                for (int reel = 0; reel < reels.Length; reel++)
+                {
+                    double x = reel == 0 ? 53 : 142;
+                    AddSceneDrawing(deck, reels[reel], dc =>
+                    {
+                        dc.DrawEllipse(graphite, stripe, new Point(x, 63), 23, 23);
+                        dc.DrawEllipse(muted, stripe, new Point(x, 63), 15, 15);
+                        for (int i = 0; i < 3; i++)
+                        {
+                            double phase = i * Math.PI * 2 / 3;
+                            dc.DrawEllipse(graphite, null, new Point(x + 10 * Math.Cos(phase), 63 + 10 * Math.Sin(phase)), 3.4, 3.4);
+                        }
+                        dc.DrawEllipse(amber, null, new Point(x, 63), 3.2, 3.2);
+                    });
+                }
+                for (int meter = 0; meter < meters.Length; meter++)
+                {
+                    double y = 82 + meter * 13;
+                    AddSceneDrawing(deck, meters[meter], dc =>
+                    {
+                        for (int i = 0; i < 11; i++)
+                            dc.DrawRectangle(i > 8 ? rust : amber, null, new Rect(201 + i * 5, y, 3.2, 6));
+                    });
+                }
+                return t =>
+                {
+                    reels[0].Angle = Wrap(t * 69, 360);
+                    reels[1].Angle = Wrap(t * 53, 360);
+                    meters[0].ScaleX = .63 + .23 * Math.Sin(t * 3.1) + .12 * Math.Sin(t * 7);
+                    meters[1].ScaleX = .66 + .22 * Math.Sin(t * 4.2) + .09 * Math.Sin(t * 11);
+                };
+            }
+
+            private Action<double> BuildImpossibleKey()
+            {
+                var wall = Paint("EFE9DC");
+                var floor = Paint("D2C7B4");
+                var lead = Paint("493E33");
+                var frame = Paint("BBA68A");
+                var highlight = Paint("F7ECDB");
+                var mass = Paint("A28D73");
+                var sky = new LinearGradientBrush(Color.FromRgb(46, 108, 164), Color.FromRgb(172, 205, 214), 85);
+                sky.Freeze();
+                var cloud = Paint("F5F9F3");
+                var cloudGray = Paint("D9E9E8");
+                if (!hero)
+                {
+                    AddSceneDrawing(scenery, null, dc =>
+                    {
+                        dc.DrawRectangle(wall, null, new Rect(0, 0, SceneWidth, SceneHeight));
+                        dc.DrawGeometry(floor, null, Shape("M0,562 H1100 V700 H0 Z"));
+                        dc.DrawGeometry(Paint("E6DDD0"), null, Shape("M0,0 H165 V562 H0 Z"));
+                        dc.DrawGeometry(null, Stroke(Paint("B3A99B"), 1), Shape("M0,563 H1100 M165,0 V563 L118,700 M672,563 L855,700"));
+                    });
+                    // The room remains ordinary, leaving the sky inside the key as the only contradiction.
+                    var light = new TranslateTransform();
+                    AddSceneDrawing(scenery, light, dc =>
+                    {
+                        dc.DrawGeometry(Paint("F5EFE2"), null, Shape("M494,0 H560 L928,562 H773 Z"));
+                        dc.DrawGeometry(Paint("E4D8C3"), null, Shape("M773,562 H928 L1043,700 H851 Z"));
+                    }).Opacity = .58;
+                    return t => light.X = 16 * Math.Sin(t * .16);
+                }
+                var exhibit = SceneVignette(212, 8, .96);
+                AddSceneDrawing(exhibit, null, dc =>
+                {
+                    dc.DrawGeometry(Paint("C7BBAA"), null, Shape("M72,111 L149,119 205,110 216,115 168,132 90,130 Z"));
+                    dc.DrawGeometry(lead, null, Shape("M98,91 H125 V104 H131 V109 H123 V116 H103 V110 H94 V105 H98 Z"));
+                    dc.DrawGeometry(frame, null, Shape("M103,96 H119 V114 H104 V108 H98 V105 H103 Z"));
+                    dc.DrawGeometry(mass, null, Shape("M22,48 L48,14 176,12 201,45 L198,77 173,101 H47 L19,81 Z"));
+                    dc.DrawGeometry(frame, null, Shape("M22,64 L50,81 H173 L201,57 198,77 173,101 H47 L19,81 Z"));
+                    dc.DrawGeometry(lead, null, Shape("M26,62 L50,82 H170 L194,65 190,75 170,91 H51 L28,73 Z"));
+                    dc.DrawGeometry(highlight, Stroke(lead, .9), Shape("M22,48 L48,14 176,12 201,45 173,82 H50 Z"));
+                    Label(dc, "Esc", 148, 86, 8, lead);
+                });
+                var aperture = new DrawingGroup { ClipGeometry = Shape("M34,48 L54,22 169,20 188,45 167,73 H53 Z") };
+                exhibit.Children.Add(aperture);
+                AddSceneDrawing(aperture, null, dc =>
+                {
+                    dc.DrawRectangle(sky, null, new Rect(29, 18, 166, 60));
+                    dc.DrawGeometry(Paint("82AEB7"), null, Shape("M32,68 Q75,45 123,62 Q170,74 187,63 V75 H32 Z"));
+                    dc.DrawGeometry(Paint("4E797D"), null, Shape("M37,73 Q80,61 118,72 Q159,63 184,66 V77 H39 Z"));
+                });
+                var drift = new TranslateTransform();
+                AddSceneDrawing(aperture, drift, dc =>
+                {
+                    dc.DrawGeometry(cloudGray, null, Shape("M39,46 Q46,38 60,42 Q62,30 75,31 Q86,30 91,39 Q107,35 112,44 Q113,48 104,48 Z M129,42 Q136,37 143,39 Q145,34 153,36 Q159,34 166,40 Q177,39 182,45 H128 Z"));
+                    dc.DrawGeometry(cloud, null, Shape("M42,44 Q49,39 62,43 Q61,33 75,32 Q86,32 90,40 Q100,36 110,44 Z M135,40 Q141,37 145,40 Q148,34 154,37 Q163,36 172,42 Z"));
+                });
+                AddSceneDrawing(exhibit, null, dc =>
+                    dc.DrawGeometry(null, Stroke(lead, 1.1), Shape("M34,48 L54,22 169,20 188,45 167,73 H53 Z")));
+                return t => drift.X = 11 * Math.Sin(t * .25);
+            }
+
+            private Action<double> BuildAtomicStation()
+            {
+                var cream = Paint("FFF0CF");
+                var coral = Paint("E6674C");
+                var petrol = Paint("0C6063");
+                var tide = Paint("3F9D98");
+                var shadow = Paint("8DBDB1");
+                var glass = Paint("90C7BA");
+                var gold = Paint("E7AF59");
+                var rim = Stroke(petrol, 1.3);
+                if (!hero)
+                {
+                    AddSceneDrawing(scenery, null, dc =>
+                    {
+                        dc.DrawGeometry(shadow, null, Shape("M0,700 V545 Q125,430 332,545 Q690,725 1100,442 V700 Z"));
+                        dc.DrawGeometry(tide, null, Shape("M0,700 V602 Q226,526 399,570 Q716,679 1100,565 V700 Z"));
+                        dc.DrawGeometry(petrol, null, Shape("M0,700 V645 Q199,574 398,632 Q773,723 1100,623 V700 Z"));
+                        dc.DrawGeometry(null, Stroke(cream, 1.4), Shape("M0,676 Q202,601 398,652 Q765,744 1100,646"));
+                    });
+                }
+                var station = SceneVignette(hero ? 158 : 650, hero ? 4 : 445, hero ? .95 : 1.65);
+                AddSceneDrawing(station, null, dc =>
+                {
+                    dc.DrawEllipse(gold, null, new Point(216, 56), 42, 42);
+                    dc.DrawEllipse(null, Stroke(petrol, .7), new Point(143, 56), 131, 35);
+                    dc.DrawGeometry(coral, null, Shape("M245,18 L249,7 252,18 265,22 252,25 249,39 245,25 232,22 Z"));
+                    dc.DrawGeometry(cream, null, Shape("M35,22 L38,13 40,22 49,24 40,27 38,35 35,27 27,24 Z"));
+                    dc.DrawGeometry(shadow, null, Shape("M26,125 Q118,108 222,125 L245,132 H11 Z"));
+                    dc.DrawGeometry(petrol, rim, Shape("M94,78 H108 L92,126 H83 Z M150,76 H165 L171,126 H157 Z"));
+                    dc.DrawGeometry(coral, null, Shape("M98,78 H102 L87,124 H83 Z M159,75 H165 L171,126 H167 Z"));
+                    dc.DrawGeometry(glass, rim, Shape("M48,71 L197,68 187,99 Q126,116 63,102 Z"));
+                    for (int i = 0; i < 6; i++)
+                        dc.DrawLine(rim, new Point(62 + i * 24, 78), new Point(69 + i * 22, 102 + (i % 3) * 2));
+                    dc.DrawGeometry(petrol, null, Shape("M27,88 L98,70 205,74 223,68 210,85 135,92 H48 Z"));
+                    dc.DrawGeometry(cream, rim, Shape("M13,76 L81,67 Q98,36 140,37 Q181,34 196,63 L232,53 212,75 131,83 Z"));
+                    dc.DrawGeometry(tide, rim, Shape("M88,65 Q110,39 140,39 Q168,37 190,62 Z"));
+                    dc.DrawGeometry(cream, null, Shape("M105,55 Q137,37 166,46 Q134,42 105,57 Z"));
+                    dc.DrawGeometry(coral, null, Shape("M19,77 L131,84 213,76 207,79 131,88 36,81 Z"));
+                    dc.DrawGeometry(petrol, null, Shape("M157,43 L173,15 176,16 161,43 Z"));
+                    dc.DrawEllipse(coral, rim, new Point(175, 15), 3.6, 3.6);
+                });
+                var orbit = new TranslateTransform();
+                AddSceneDrawing(station, orbit, dc =>
+                {
+                    dc.DrawGeometry(coral, rim, Shape("M-8,0 L-2,-2 8,-1 10,1 5,3 H-3 Z"));
+                    dc.DrawGeometry(cream, rim, Shape("M-3,-2 Q1,-6 5,-2 Z"));
+                    dc.DrawRectangle(gold, null, new Rect(-11, 0, 3, 1.5));
+                });
+                return t =>
+                {
+                    double phase = t * .58 + .5;
+                    orbit.X = 143 + 128 * Math.Cos(phase);
+                    orbit.Y = 56 + 35 * Math.Sin(phase);
+                };
+            }
+
+            private DrawingGroup SceneVignette(double x, double y, double scale)
+            {
+                var position = new MatrixTransform(scale, 0, 0, scale, x, y);
+                position.Freeze();
+                var group = new DrawingGroup { Transform = position };
+                scenery.Children.Add(group);
+                return group;
+            }
+
+            private static DrawingGroup AddSceneDrawing(DrawingGroup parent, Transform motion, Action<DrawingContext> draw)
+            {
+                var group = new DrawingGroup();
+                using (var dc = group.Open())
+                    draw(dc);
+                if (motion != null)
+                    group.Transform = motion;
+                else
+                    group.Freeze();
+                parent.Children.Add(group);
+                return group;
             }
 
             private void BuildCyberpunk()

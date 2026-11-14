@@ -8,7 +8,8 @@ using System.Windows.Media;
 
 namespace EnglishTypingPractice
 {
-    public enum UiTheme { Cyberpunk, Minimal, Steampunk, Modern, Vaporwave, Constructivist, Persona5, ChineseStyle }
+    public enum UiTheme { Cyberpunk, Minimal, Steampunk, Modern, Vaporwave, Constructivist, Persona5, ChineseStyle,
+        Windows98, CassetteFuturism, Magritte, Atompunk }
 
     internal static class ThemePalette
     {
@@ -192,6 +193,78 @@ namespace EnglishTypingPractice
             { "193242", new[] { "E1B57D", "34232D", "D9E8D4" } },
         };
 
+        // Ordering matches the four themes appended to UiTheme. Existing saved numeric values stay stable.
+        private static readonly Dictionary<string, string[]> NewColors = new Dictionary<string, string[]>
+        {
+            { "101C24", new[] { "008080", "182423", "E7E3D7", "E7DDBE" } },
+            { "EDF4F2", new[] { "171717", "F4E7C7", "282A26", "193B37" } },
+            { "ECF664", new[] { "000080", "F0BD70", "325C58", "146B65" } },
+            { "182015", new[] { "FFFFFF", "1C241F", "FFFCF2", "FFFBEC" } },
+            { "B0C7CC", new[] { "353839", "CCC198", "565D55", "435F58" } },
+            { "52717B", new[] { "808080", "736B48", "A2A396", "709889" } },
+            { "192A34", new[] { "C0C0C0", "293531", "F7F3E8", "FFF1CF" } },
+            { "101D25", new[] { "FFFFFF", "10211E", "FFFCF4", "FFF8E5" } },
+            { "2B414B", new[] { "C0C0C0", "3F4840", "ECE8DB", "E7DDBE" } },
+            { "43626C", new[] { "A7BABD", "62533B", "D8E2D8", "B7D7C5" } },
+            { "FFAA98", new[] { "98171D", "FFC397", "88453B", "A1342A" } },
+            { "A0E0C8", new[] { "006045", "ACD39F", "275C4D", "167157" } },
+            { "FFBEB2", new[] { "8E131D", "FFD2A9", "923B37", "922721" } },
+            { "54282F", new[] { "FFDCDD", "653522", "F2DDD6", "F3D4BF" } },
+            { "535B23", new[] { "D2DDF7", "554826", "DCE8DE", "CBE5D7" } },
+            { "7ED1EF", new[] { "000080", "EAC06F", "315E72", "217C72" } },
+            { "E79AD5", new[] { "008080", "80A191", "92534C", "BB4636" } },
+            { "87C264", new[] { "008262", "A9C889", "507566", "25776C" } },
+            { "101E27", new[] { "E7ECEA", "142723", "EEEBDD", "E3EEDB" } },
+            { "313F2A", new[] { "D0DBF1", "4C4929", "D7E6DB", "CAE3D5" } },
+            { "9EB5BC", new[] { "3F4546", "D3CAA5", "565D55", "3E5B53" } },
+            { "E4F4ED", new[] { "171717", "F4E7C7", "282A26", "193B37" } },
+            { "354B55", new[] { "BAC7CB", "3D503D", "D4D4C9", "A6C5AC" } },
+            { "1E313A", new[] { "FFFFFF", "2D3F35", "FAF4E9", "FFF2D7" } },
+            { "091017", new[] { "889996", "14201D", "D9D5C7", "B6CABA" } },
+            { "2F3A42", new[] { "9CABA9", "35473C", "D4D4C3", "B7C9B8" } },
+            { "5D767F", new[] { "647674", "6A7D5D", "857E6D", "6C8475" } },
+            { "99ADB2", new[] { "3E4E50", "B8B392", "585445", "3F5C4E" } },
+            { "24402F", new[] { "AED8C1", "334C38", "B9D7C7", "AAD5B8" } },
+            { "223E53", new[] { "B6CBE6", "2D4345", "C4D6DF", "A8D1D7" } },
+            { "3F2E4E", new[] { "D8C1DB", "4D4355", "DCCDDC", "DEC9DD" } },
+            { "4B3C26", new[] { "E7D1A9", "634D2E", "E7D4A9", "F1D18A" } },
+            { "67BDEF", new[] { "2058A0", "8BC6DA", "356485", "2A6288" } },
+            { "D192F1", new[] { "774782", "D5A8D6", "815782", "875273" } },
+            { "F7C15D", new[] { "936013", "F3BD63", "9D6220", "8D5318" } },
+            { "0B1218", new[] { "008080", "121D1B", "E9E4D8", "E8CF9F" } },
+            { "14252E", new[] { "008080", "23332F", "F2EEE4", "F6E8C7" } },
+            { "3E626B", new[] { "008080", "354038", "E2E5DA", "BFD8C0" } },
+            { "5E9097", new[] { "357C7F", "53664C", "8A9B8B", "87A796" } },
+            { "7DABB1", new[] { "C0C0C0", "A99053", "A4A79C", "7FAF9C" } },
+            { "83B5BC", new[] { "C0C0C0", "56654D", "90998B", "85AD97" } },
+            { "D9FFFF", new[] { "FFFFFF", "FFF4D1", "FFFFFF", "FFFFFF" } },
+            { "F7FFC7", new[] { "FFFFFF", "F7D181", "A3BB9F", "B93327" } },
+            { "070D10", new[] { "000000", "101814", "29382D", "23443B" } },
+            { "AEB748", new[] { "141485", "DCA653", "527665", "B54032" } },
+            { "7BC5C7", new[] { "008080", "556554", "FFFFFF", "FFE6B1" } },
+            { "548E9E", new[] { "008080", "42554C", "FFFFFF", "E2F2D9" } },
+            { "192832", new[] { "C0C0C0", "24322E", "F5F0E4", "FFF0C9" } },
+            { "4D737B", new[] { "D4D0C8", "3B4840", "EBECE1", "DCE9CC" } },
+            { "FFF5B3", new[] { "FFFFFF", "EDBA69", "A4C5B5", "94CEB5" } },
+            { "21343D", new[] { "D4D0C8", "29342B", "F4F0E6", "F4E9C7" } },
+            { "5DB5D4", new[] { "184B94", "B1D5CE", "456C7C", "185C59" } },
+            { "D285AF", new[] { "973F6E", "D9A16F", "9C534C", "B23E32" } },
+            { "9DE4EB", new[] { "15496F", "C0D8CF", "446F68", "17645C" } },
+            { "FFD48C", new[] { "815617", "F7CA7E", "925921", "90450D" } },
+            { "091218", new[] { "23333C", "15221F", "665F52", "395F54" } },
+            { "0B141B", new[] { "008080", "17221F", "E9E4D8", "E8DAB6" } },
+            { "4D727D", new[] { "C0C0C0", "4C624D", "C6C7B7", "B1CDAD" } },
+            { "5E8C97", new[] { "008080", "626347", "ADBAAA", "9BAB85" } },
+            { "5A7B86", new[] { "C0C0C0", "5A6855", "CAC9B7", "BACDA9" } },
+            { "59A4B4", new[] { "0D5579", "96A17D", "647D75", "4B8D7C" } },
+            { "5F8890", new[] { "000080", "50604E", "929887", "A6BD92" } },
+            { "15232B", new[] { "FFFFFF", "27352E", "F7F3E8", "FFF0D0" } },
+            { "89B0B5", new[] { "008080", "9E8156", "A1AB96", "9CAD82" } },
+            { "7DAAB2", new[] { "538C8D", "5C7159", "B6B8A3", "A6C7A1" } },
+            { "A8D5D9", new[] { "224E5E", "A2B294", "658C7D", "408875" } },
+            { "193242", new[] { "C0C0C0", "283D32", "EAE9DD", "D0E3BF" } }
+        };
+
         internal static Window LoadWindow(UiTheme theme)
         {
             if (!System.Enum.IsDefined(typeof(UiTheme), theme))
@@ -208,6 +281,9 @@ namespace EnglishTypingPractice
                         return VaporwaveColors.TryGetValue(rgb, out vapor)
                             ? "#" + match.Groups["alpha"].Value + vapor : match.Value;
                     string[] variants;
+                    if (theme >= UiTheme.Windows98)
+                        return NewColors.TryGetValue(rgb, out variants)
+                            ? "#" + match.Groups["alpha"].Value + variants[theme - UiTheme.Windows98] : match.Value;
                     if (theme >= UiTheme.Constructivist)
                         return AdditionalColors.TryGetValue(rgb, out variants)
                             ? "#" + match.Groups["alpha"].Value + variants[theme - UiTheme.Constructivist] : match.Value;
@@ -252,6 +328,12 @@ namespace EnglishTypingPractice
                     Find(window, name).Visibility = Visibility.Visible;
                 Find(window, "BackgroundPatternTop").Visibility = Visibility.Collapsed;
                 Find(window, "BackgroundPatternBottom").Visibility = Visibility.Collapsed;
+            }
+            else if (theme >= UiTheme.Windows98)
+            {
+                foreach (string name in new[] { "BackgroundLight", "BackgroundPatternTop", "BackgroundPatternBottom",
+                    "BackgroundGrid", "StartupPattern" })
+                    Find(window, name).Visibility = Visibility.Collapsed;
             }
             else if (theme >= UiTheme.Constructivist)
             {

@@ -117,6 +117,38 @@ namespace EnglishTypingPractice
                             Pluck(t - .120, 784) * .25 + Pluck(t - .176, 587.3) * .22 +
                             Pluck(t - .240, 392) * .22;
                     return sample;
+                case UiTheme.Windows98:
+                    sample = DesktopPulse(t, 920, .015) * .25 + Tone(t, 235, .008) * .10;
+                    if (word)
+                        sample += DesktopPulse(t - .033, 1046.5, .030) * .26 + DesktopPulse(t - .068, 830.6, .035) * .20;
+                    if (complete)
+                        sample += DesktopPulse(t - .126, 698.5, .067) * .24 + DesktopPulse(t - .195, 932.3, .073) * .25 +
+                            DesktopPulse(t - .264, 1174.7, .075) * .20;
+                    return sample;
+                case UiTheme.CassetteFuturism:
+                    sample = TapeRelay(t, noise) * .64 + TapeRelay(t - .015, -noise) * .32;
+                    if (word)
+                        sample += TapeRelay(t - .049, noise) * .62 + Tone(t - .056, 185, .038) * .18;
+                    if (complete)
+                        sample += TapeRelay(t - .126, noise) * .63 + Sweep(t - .151, 310, -631, .086) * .30 +
+                            noise * Envelope(t - .155, .101) * .095 + TapeRelay(t - .311, -noise) * .42;
+                    return sample;
+                case UiTheme.Magritte:
+                    sample = FeltKey(t, 349.2) * .29;
+                    if (word)
+                        sample += FeltKey(t - .052, 523.25) * .23 + FeltKey(t - .096, 466.16) * .16;
+                    if (complete)
+                        sample += FeltKey(t - .137, 293.66) * .20 + FeltKey(t - .195, 440) * .18 +
+                            FeltKey(t - .206, 587.33) * .15;
+                    return sample;
+                case UiTheme.Atompunk:
+                    sample = OrbitTone(t, 440, 2400, .024) * .31;
+                    if (word)
+                        sample += OrbitTone(t - .038, 660, 940, .048) * .27 + Tone(t - .091, 1320, .025) * .13;
+                    if (complete)
+                        sample += OrbitTone(t - .125, 280, 3300, .098) * .30 + OrbitTone(t - .229, 925, -1090, .070) * .25 +
+                            Tone(t - .285, 1602, .054) * .14;
+                    return sample;
                 default:
                     return 0;
             }
@@ -162,6 +194,33 @@ namespace EnglishTypingPractice
             return Math.Sin(phase) * Envelope(t, .059) +
                 .32 * Math.Sin(phase * 2.01) * Envelope(t, .025) +
                 .13 * Math.Sin(phase * 3.03) * Envelope(t, .011);
+        }
+
+        private static double DesktopPulse(double t, double frequency, double decay)
+        {
+            if (t < 0)
+                return 0;
+            double phase = 2 * Math.PI * frequency * t;
+            return (Math.Sin(phase) + .21 * Math.Sin(phase * 3) + .075 * Math.Sin(phase * 5)) * Envelope(t, decay);
+        }
+
+        private static double TapeRelay(double t, double noise)
+        {
+            return Tone(t, 176, .009) * .33 + Tone(t, 836, .004) * .25 + noise * Envelope(t, .009) * .48;
+        }
+
+        private static double FeltKey(double t, double frequency)
+        {
+            return Tone(t, frequency, .105) + .21 * Tone(t, frequency * 2.003, .039) +
+                .08 * Tone(t, frequency * 3.014, .018);
+        }
+
+        private static double OrbitTone(double t, double frequency, double glide, double decay)
+        {
+            if (t < 0)
+                return 0;
+            double phase = 2 * Math.PI * t * (frequency + glide * t * .5);
+            return (Math.Sin(phase + .36 * Math.Sin(2 * Math.PI * 11 * t)) + .10 * Math.Sin(2 * phase)) * Envelope(t, decay);
         }
     }
 }

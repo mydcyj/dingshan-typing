@@ -47,6 +47,11 @@ namespace EnglishTypingPractice
             sounds[level].Play();
             if (!SystemParameters.ClientAreaAnimation)
                 return;
+            if (theme == UiTheme.Magritte)
+            {
+                DrawImpact(hitLetter ?? firstLetter, level);
+                return;
+            }
             if (word != null && firstLetter != null)
                 Echo(firstLetter, word);
             DrawImpact(hitLetter ?? firstLetter, level);

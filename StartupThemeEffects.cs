@@ -27,6 +27,16 @@ namespace EnglishTypingPractice
         private static readonly Brush Cinnabar = new SolidColorBrush(Color.FromRgb(177, 43, 37));
         private static readonly Brush JadeInk = new SolidColorBrush(Color.FromArgb(168, 41, 93, 83));
         private static readonly Brush FadedInk = new SolidColorBrush(Color.FromArgb(104, 81, 114, 100));
+        private static readonly Brush DesktopGray = FrozenBrush(193, 196, 197);
+        private static readonly Brush DesktopNavy = FrozenBrush(8, 36, 105);
+        private static readonly Brush DeckCase = FrozenBrush(38, 52, 49);
+        private static readonly Brush DeckGlass = FrozenBrush(23, 32, 29);
+        private static readonly Brush DeckAmber = FrozenBrush(231, 180, 100);
+        private static readonly Brush GallerySky = FrozenBrush(149, 193, 211);
+        private static readonly Brush GalleryFrame = FrozenBrush(95, 82, 65);
+        private static readonly Brush AtomicCoral = FrozenBrush(220, 86, 58);
+        private static readonly Brush AtomicTeal = FrozenBrush(50, 135, 128);
+        private static readonly Geometry AtomicSpark = Geometry.Parse("M0,-27 Q3,-5 27,0 Q3,5 0,27 Q-3,5 -27,0 Q-3,-5 0,-27 Z");
         private static readonly Geometry PrintWedge = Geometry.Parse("M-215,83 L-92,-63 -107,-7 -211,115 Z");
         private static readonly Geometry PrintCut = Geometry.Parse("M94,-74 L208,3 208,23 101,-48 Z");
         private static readonly Geometry ComicLeft = Geometry.Parse("M-219,70 L-142,-47 -168,22 -121,-8 -151,43 -102,25 -185,100 Z");
@@ -115,6 +125,14 @@ namespace EnglishTypingPractice
                 DrawComic(drawing, t);
             else if (theme == UiTheme.ChineseStyle)
                 DrawInk(drawing, t);
+            else if (theme == UiTheme.Windows98)
+                DrawDesktop(drawing, t);
+            else if (theme == UiTheme.CassetteFuturism)
+                DrawDeck(drawing, t);
+            else if (theme == UiTheme.Magritte)
+                DrawGallery(drawing, t);
+            else if (theme == UiTheme.Atompunk)
+                DrawAtomic(drawing, t);
             else
                 DrawModern(drawing, t);
             drawing.Pop();
@@ -327,6 +345,84 @@ namespace EnglishTypingPractice
             drawing.DrawLine(carving, new Point(158, sealY + 24), new Point(175, sealY + 24));
         }
 
+        private void DrawDesktop(DrawingContext drawing, double t)
+        {
+            // Rectangular highlights and recessed edges evoke the desktop from the late 1990s.
+            var dialog = new Rect(-199, -101, 398, 206);
+            drawing.DrawRectangle(DesktopGray, fine, dialog);
+            drawing.DrawRectangle(DesktopNavy, null, new Rect(-194, -95, 388, 18));
+            drawing.DrawRectangle(DesktopGray, null, new Rect(174, -93, 17, 13));
+            drawing.DrawRectangle(Brushes.WhiteSmoke, null, new Rect(-194, -70, 388, 137));
+            drawing.DrawLine(fine, new Point(-193, 68), new Point(194, 68));
+            drawing.DrawRectangle(Brushes.WhiteSmoke, fine, new Rect(-177, 79, 354, 12));
+            int steps = Math.Min(20, (int)(t * (confirmed ? 72 : 45)));
+            for (int i = 0; i < steps; i++)
+                drawing.DrawRectangle(DesktopNavy, null, new Rect(-175 + i * 17.5, 81, 14.5, 8));
+        }
+
+        private void DrawDeck(DrawingContext drawing, double t)
+        {
+            var body = new Rect(-211, -72, 422, 158);
+            drawing.DrawRoundedRectangle(DeckCase, fine, body, 10, 10);
+            drawing.DrawRoundedRectangle(DeckGlass, fine, new Rect(-196, -58, 392, 103), 6, 6);
+            for (int i = 0; i < 2; i++)
+            {
+                double x = i == 0 ? -137 : 137;
+                var hub = new Point(x, -7);
+                drawing.DrawEllipse(DeckCase, bold, hub, 35, 35);
+                drawing.DrawEllipse(DeckGlass, fine, hub, 21, 21);
+                drawing.PushTransform(new RotateTransform(t * (i == 0 ? 230 : -225), x, -7));
+                for (int j = 0; j < 6; j++)
+                {
+                    drawing.PushTransform(new RotateTransform(j * 60, x, -7));
+                    drawing.DrawRectangle(DeckAmber, null, new Rect(x - 2, -27, 4, 7));
+                    drawing.Pop();
+                }
+                drawing.Pop();
+                drawing.DrawEllipse(DeckAmber, null, hub, 5, 5);
+            }
+            for (int i = 0; i < 24; i++)
+            {
+                var light = i < 16 + (int)(4 * Math.Sin(t * 11)) ? DeckAmber : DeckGlass;
+                drawing.DrawRectangle(light, null, new Rect(-165 + 14 * i, 60, 9, 10));
+            }
+        }
+
+        private void DrawGallery(DrawingContext drawing, double t)
+        {
+            // One physically impossible detail: the same cloud continues outside a picture frame.
+            var frame = new Rect(89, -83, 110, 158);
+            drawing.PushOpacity(.23);
+            drawing.DrawRectangle(GalleryFrame, null, new Rect(frame.X + 9, frame.Y + 7, frame.Width, frame.Height));
+            drawing.Pop();
+            drawing.DrawRectangle(GalleryFrame, null, frame);
+            drawing.DrawRectangle(GallerySky, null, new Rect(96, -76, 96, 144));
+            var cloud = new Point(183 + Math.Min(1, t * 2.1) * 13, -16);
+            drawing.DrawEllipse(Brushes.Ivory, null, cloud, 23, 9.5);
+            drawing.DrawEllipse(Brushes.Ivory, null, new Point(cloud.X + 3, cloud.Y - 8), 12, 8);
+            drawing.DrawLine(fine, new Point(-194, 103), new Point(202, 103));
+        }
+
+        private void DrawAtomic(DrawingContext drawing, double t)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                double angle = -38 + 38 * i;
+                double phase = t * 5.6 + 1.7 * i;
+                drawing.PushTransform(new RotateTransform(angle));
+                drawing.DrawEllipse(null, fine, new Point(), 192, 37);
+                var electron = new Point(192 * Math.Cos(phase), 37 * Math.Sin(phase));
+                drawing.DrawEllipse(i == 0 ? AtomicCoral : AtomicTeal, null, electron, 5, 5);
+                drawing.Pop();
+            }
+            drawing.PushTransform(new TranslateTransform(-173, -70));
+            drawing.DrawGeometry(AtomicCoral, null, AtomicSpark);
+            drawing.Pop();
+            drawing.PushTransform(new TranslateTransform(163, 68));
+            drawing.DrawGeometry(AtomicTeal, null, AtomicSpark);
+            drawing.Pop();
+        }
+
         internal static MemoryStream CreateCue(UiTheme theme, bool confirmation)
         {
             const int sampleRate = 22050;
@@ -399,6 +495,24 @@ namespace EnglishTypingPractice
                         sample = Zither(t, first) * .21 + Zither(t - .11, first * 1.4983) * .14 +
                             Zither(t - .209, first * 2) * .14 + Tone(t - .215, 109 * root, .102) * .10;
                     }
+                    else if (theme == UiTheme.Windows98)
+                        sample = DesktopChime(t, 493.9 * root) * .22 + DesktopChime(t - .113, 740 * root) * .21 +
+                            DesktopChime(t - .221, 622.3 * root) * .17 + DesktopChime(t - .307, 831 * root) * .14;
+                    else if (theme == UiTheme.CassetteFuturism)
+                    {
+                        double white = random.NextDouble() * 2 - 1;
+                        double rotor = Math.Max(0, Math.Sin(Math.PI * (t - .057) / .401));
+                        sample = PrintStamp(t, 128) * .32 + PrintStamp(t - .064, 207) * .24 +
+                            (white - previousNoise * .75) * rotor * .064 + Tone(t - .122, 81 * root, .13) * .16 +
+                            PrintStamp(t - .358, 119 * root) * .18;
+                        previousNoise = white;
+                    }
+                    else if (theme == UiTheme.Magritte)
+                        sample = FeltChime(t, 349.2 * root) * .22 + FeltChime(t - .108, 523.25 * root) * .14 +
+                            FeltChime(t - .270, 466.16 * root) * .15;
+                    else if (theme == UiTheme.Atompunk)
+                        sample = Glide(t, 235 * root, 1050, .155) * .26 + Glide(t - .142, 740 * root, -370, .080) * .19 +
+                            Tone(t - .255, 1120 * root, .085) * .16 + Tone(t - .299, 1480 * root, .079) * .12;
                     else
                         sample = Tone(t, 230 * root, .10) * .19 + Tone(t - .075, 413 * root, .11) * .14 +
                             Tone(t - .19, 620 * root, .11) * .12;
@@ -434,6 +548,29 @@ namespace EnglishTypingPractice
         {
             return Tone(time, pitch, .13) + Tone(time, pitch * 2.01, .059) * .33 +
                 Tone(time, pitch * 3.02, .024) * .17;
+        }
+
+        private static Brush FrozenBrush(byte red, byte green, byte blue)
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+            brush.Freeze();
+            return brush;
+        }
+
+        private static double DesktopChime(double t, double frequency)
+        {
+            return Tone(t, frequency, .065) + .18 * Tone(t, frequency * 3, .022);
+        }
+
+        private static double FeltChime(double t, double frequency)
+        {
+            return Tone(t, frequency, .14) + .18 * Tone(t, frequency * 2.003, .056);
+        }
+
+        private static double Glide(double t, double frequency, double glide, double decay)
+        {
+            return t < 0 ? 0 : Math.Sin(2 * Math.PI * t * (frequency + glide * t * .5) +
+                .35 * Math.Sin(2 * Math.PI * t * 8)) * Math.Min(1, t * 25) * Math.Exp(-t / decay);
         }
     }
 }

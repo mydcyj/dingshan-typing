@@ -84,11 +84,20 @@ namespace EnglishTypingPractice
             foreach (FrameworkElement element in new[] { hero, options, actions, sheet, statistics, ranking, music, notice })
                 desk.Children.Add(element);
             stack.Margin = new Thickness(24, 20, 24, 28);
-            stack.MaxWidth = theme == UiTheme.Minimal ? 960 : 1390;
-            if (theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle)
+            stack.MaxWidth = theme == UiTheme.Minimal ? 960 : theme == UiTheme.Magritte ? 1110 : 1390;
+            if (theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle || theme == UiTheme.Magritte || theme == UiTheme.Windows98)
                 Find<FrameworkElement>("BackgroundGrid").Visibility = Visibility.Collapsed;
             foreach (Border panel in new[] { sheet, statistics, ranking, music }.Cast<Border>())
                 Frame(panel);
+            if (theme == UiTheme.Windows98)
+            {
+                var titleBar = (TextBlock)brand.Children[0];
+                titleBar.Background = new LinearGradientBrush(Color.FromRgb(0, 0, 128), Color.FromRgb(46, 102, 174), 0);
+                titleBar.Foreground = Brushes.White;
+                titleBar.Padding = new Thickness(8, 3, 8, 3);
+                actions.Background = Brush("Raised");
+                options.Background = Brush("Raised");
+            }
 
             // Settings is a gallery of miniature compositions, not a list of color swatches.
             var settingsPage = Find<ScrollViewer>("SettingsPage");
@@ -104,6 +113,11 @@ namespace EnglishTypingPractice
             settingsLayout.Children.Add(settingsPanel);
             settingsLayout.Children.Add(settingsFooter);
             Frame((Border)settingsPanel);
+            if (theme == UiTheme.Windows98)
+            {
+                ((DockPanel)settingsHeader).Background = Brush("Raised");
+                ((DockPanel)settingsFooter).Background = Brush("Raised");
+            }
             BuildThemeGallery();
             DecorateOtherPages();
             window.SizeChanged += (sender, e) => Reflow();
@@ -146,6 +160,20 @@ namespace EnglishTypingPractice
                 button.Margin = new Thickness(4);
                 button.RenderTransform = Transform.Identity;
             }
+            if (theme == UiTheme.Windows98)
+            {
+                display.FontSize = 30;
+                brand.HorizontalAlignment = HorizontalAlignment.Stretch;
+                hero.MinHeight = 120;
+                actions.HorizontalAlignment = HorizontalAlignment.Stretch;
+            }
+            else if (theme == UiTheme.Magritte)
+            {
+                display.FontSize = 36;
+                hero.MinHeight = 128;
+            }
+            else if (theme == UiTheme.CassetteFuturism)
+                display.FontSize = 32;
 
             if (!spacious)
             {
@@ -153,6 +181,9 @@ namespace EnglishTypingPractice
                 var sequence = theme == UiTheme.Minimal ? new FrameworkElement[] { hero, options, sheet, actions, statistics, ranking, music, notice }
                     : theme == UiTheme.Steampunk ? new FrameworkElement[] { hero, actions, statistics, options, sheet, ranking, music, notice }
                     : theme == UiTheme.Vaporwave ? new FrameworkElement[] { hero, options, sheet, statistics, actions, music, ranking, notice }
+                    : theme == UiTheme.Windows98 ? new FrameworkElement[] { hero, actions, options, sheet, statistics, music, ranking, notice }
+                    : theme == UiTheme.CassetteFuturism ? new FrameworkElement[] { hero, actions, options, statistics, sheet, music, ranking, notice }
+                    : theme == UiTheme.Magritte ? new FrameworkElement[] { hero, options, actions, sheet, statistics, ranking, music, notice }
                     : new FrameworkElement[] { hero, actions, options, sheet, statistics, ranking, music, notice };
                 for (int i = 0; i < sequence.Length; i++) Place(sequence[i], i, 0);
                 brand.Margin = new Thickness(16, 12, 12, 12);
@@ -222,6 +253,35 @@ namespace EnglishTypingPractice
                         brand.VerticalAlignment = VerticalAlignment.Top;
                         Find<FrameworkElement>("ChineseStyleArtwork").VerticalAlignment = VerticalAlignment.Bottom;
                         Find<FrameworkElement>("ChineseStyleArtwork").Opacity = .2;
+                        break;
+                    case UiTheme.Windows98:
+                        Columns(desk, -1, 324);
+                        Place(hero, 0, 0, 2);
+                        Place(actions, 1, 0, 2);
+                        Place(options, 2, 0, 2);
+                        Place(sheet, 3, 0); Place(statistics, 3, 1);
+                        Place(ranking, 3, 1); ranking.Margin = new Thickness(6, 92, 6, 6);
+                        Place(music, 4, 0, 2);
+                        break;
+                    case UiTheme.CassetteFuturism:
+                        Columns(desk, 318, -1);
+                        Place(hero, 0, 0, 2);
+                        Place(statistics, 1, 0); Place(actions, 1, 1);
+                        Place(options, 2, 1); Place(music, 3, 0); Place(sheet, 3, 1);
+                        Place(ranking, 4, 0);
+                        break;
+                    case UiTheme.Magritte:
+                        Columns(desk, -1, -1);
+                        Place(hero, 0, 0, 2); Place(options, 1, 0, 2);
+                        Place(actions, 2, 0, 2); Place(sheet, 3, 0, 2);
+                        Place(statistics, 4, 0, 2); Place(ranking, 5, 0); Place(music, 5, 1);
+                        break;
+                    case UiTheme.Atompunk:
+                        Columns(desk, -1, 318);
+                        Place(hero, 0, 0, 2); Place(actions, 1, 0, 2);
+                        Place(options, 2, 0); Place(statistics, 2, 1);
+                        Place(sheet, 3, 0); Place(music, 3, 1);
+                        Place(ranking, 4, 0, 2);
                         break;
                     default:
                         Columns(desk, -1, 342);
@@ -297,10 +357,13 @@ namespace EnglishTypingPractice
 
         private void BuildThemeGallery()
         {
-            var names = new[] { "现代", "极简", "赛博朋克", "蒸汽朋克", "蒸汽波", "构成主义", "P5 风格", "国风" };
+            var names = new[] { "现代", "极简", "赛博朋克", "蒸汽朋克", "蒸汽波", "构成主义", "P5 风格", "国风",
+                "Windows 98", "磁带未来主义", "马格利特式", "原子朋克" };
             var themes = new[] { UiTheme.Modern, UiTheme.Minimal, UiTheme.Cyberpunk, UiTheme.Steampunk, UiTheme.Vaporwave,
-                UiTheme.Constructivist, UiTheme.Persona5, UiTheme.ChineseStyle };
-            var descriptions = new[] { "坐标 · 几何 · 光轨", "留白 · 阅读 · 专注", "街区终端 · 飞行交通", "黄铜仪表 · 蒸汽机械", "梦境桌面 · 复古窗口", "斜向构图 · 红黑印版", "阶梯菜单 · 拼贴纸片", "山水册页 · 朱印题签" };
+                UiTheme.Constructivist, UiTheme.Persona5, UiTheme.ChineseStyle, UiTheme.Windows98, UiTheme.CassetteFuturism,
+                UiTheme.Magritte, UiTheme.Atompunk };
+            var descriptions = new[] { "坐标 · 几何 · 光轨", "留白 · 阅读 · 专注", "街区终端 · 飞行交通", "黄铜仪表 · 蒸汽机械", "梦境桌面 · 复古窗口", "斜向构图 · 红黑印版", "阶梯菜单 · 拼贴纸片", "山水册页 · 朱印题签",
+                "青绿桌面 · 经典窗口", "磁带转轴 · 模拟仪表", "留白画廊 · 反常晴空", "流线火箭 · 轨道星芒" };
             for (int i = 0; i < themes.Length; i++)
             {
                 var choice = Find<RadioButton>("Theme" + themes[i]);
@@ -321,7 +384,7 @@ namespace EnglishTypingPractice
             var layout = Find<Grid>("SnakeLayout");
             var play = Find<Grid>("SnakePlayArea");
             var controls = Find<DockPanel>("SnakeControls");
-            bool left = theme == UiTheme.Persona5 || theme == UiTheme.Constructivist || theme == UiTheme.Cyberpunk;
+            bool left = theme == UiTheme.Persona5 || theme == UiTheme.Constructivist || theme == UiTheme.Cyberpunk || theme == UiTheme.CassetteFuturism;
             layout.ColumnDefinitions.Clear();
             double controlsWidth = spacious ? (theme == UiTheme.Persona5 ? 300 : 312) : 228;
             Columns(layout, left ? controlsWidth : -1, left ? -1 : controlsWidth);
@@ -329,11 +392,13 @@ namespace EnglishTypingPractice
             Grid.SetColumn(controls, left ? 0 : 1);
             controls.Margin = left ? new Thickness(0, 0, 13, 0) : new Thickness(13, 0, 0, 0);
             var command = (FrameworkElement)controls.Children[0];
-            DockPanel.SetDock(command, theme == UiTheme.Steampunk || theme == UiTheme.Cyberpunk ? Dock.Top : Dock.Bottom);
+            DockPanel.SetDock(command, theme == UiTheme.Steampunk || theme == UiTheme.Cyberpunk || theme == UiTheme.CassetteFuturism ? Dock.Top : Dock.Bottom);
             command.Margin = new Thickness(0, 6, 0, 8);
             var page = Find<Grid>("SnakePage");
             page.Margin = spacious ? new Thickness(26, 22, 26, 24) : new Thickness(12);
             var header = Find<DockPanel>("SnakeHeader");
+            if (theme == UiTheme.Windows98)
+                header.Background = Brush("Raised");
             DockPanel.SetDock(Find<Button>("CloseSnake"), left ? Dock.Left : Dock.Right);
             DockPanel.SetDock(Find<Button>("OpenSnakeRules"), left ? Dock.Left : Dock.Right);
             header.LastChildFill = true;
@@ -346,11 +411,13 @@ namespace EnglishTypingPractice
             var rules = Find<Grid>("SnakeRules");
             var header = Find<DockPanel>("RulesHeader");
             var body = Find<Border>("RulesFrame");
+            if (theme == UiTheme.Windows98)
+                header.Background = Brush("Raised");
             rules.MaxWidth = spacious ? 1180 : 850;
             rules.ColumnDefinitions.Clear();
             rules.RowDefinitions.Clear();
-            bool side = spacious && (theme == UiTheme.ChineseStyle || theme == UiTheme.Persona5 || theme == UiTheme.Constructivist);
-            bool right = theme == UiTheme.ChineseStyle;
+            bool side = spacious && (theme == UiTheme.ChineseStyle || theme == UiTheme.Persona5 || theme == UiTheme.Constructivist || theme == UiTheme.Atompunk);
+            bool right = theme == UiTheme.ChineseStyle || theme == UiTheme.Atompunk;
             if (side)
             {
                 Columns(rules, right ? -1 : 232, right ? 232 : -1);
@@ -370,13 +437,13 @@ namespace EnglishTypingPractice
                 DockPanel.SetDock(Find<Button>("CloseSnakeRules"), Dock.Right);
             }
             var form = Find<Border>("StartupForm");
-            form.HorizontalAlignment = spacious && (theme == UiTheme.Cyberpunk || theme == UiTheme.Persona5) ? HorizontalAlignment.Left
+            form.HorizontalAlignment = spacious && (theme == UiTheme.Cyberpunk || theme == UiTheme.Persona5 || theme == UiTheme.CassetteFuturism) ? HorizontalAlignment.Left
                 : spacious && theme == UiTheme.ChineseStyle ? HorizontalAlignment.Right : HorizontalAlignment.Center;
             form.Margin = form.HorizontalAlignment == HorizontalAlignment.Left ? new Thickness(100, 0, 0, 0)
                 : form.HorizontalAlignment == HorizontalAlignment.Right ? new Thickness(0, 0, 100, 0) : new Thickness(0);
             var confirm = Find<Button>("StartupConfirm");
             confirm.HorizontalAlignment = theme == UiTheme.ChineseStyle ? HorizontalAlignment.Right
-                : theme == UiTheme.Minimal || theme == UiTheme.Vaporwave ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+                : theme == UiTheme.Minimal || theme == UiTheme.Vaporwave || theme == UiTheme.Windows98 ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
         }
 
         private void DecorateOtherPages()
@@ -422,6 +489,21 @@ namespace EnglishTypingPractice
                 case UiTheme.Constructivist: border.BorderBrush = Brush("Text"); border.BorderThickness = new Thickness(6, 2, 2, 2); break;
                 case UiTheme.Persona5: border.BorderBrush = Brush("Text"); border.BorderThickness = new Thickness(4, 3, 7, 5); break;
                 case UiTheme.ChineseStyle: border.CornerRadius = new CornerRadius(1); border.BorderThickness = new Thickness(3, 1, 3, 1); break;
+                case UiTheme.Windows98:
+                    border.BorderBrush = new LinearGradientBrush(Colors.White, Color.FromRgb(66, 66, 66), 45);
+                    border.BorderThickness = new Thickness(2);
+                    break;
+                case UiTheme.CassetteFuturism:
+                    border.CornerRadius = new CornerRadius(11, 5, 11, 5);
+                    border.BorderThickness = new Thickness(5, 3, 2, 4);
+                    break;
+                case UiTheme.Magritte:
+                    border.BorderThickness = new Thickness(0, 1, 0, 0);
+                    break;
+                case UiTheme.Atompunk:
+                    border.CornerRadius = new CornerRadius(12, 24, 12, 24);
+                    border.BorderThickness = new Thickness(1, 2, 1, 3);
+                    break;
             }
         }
 
@@ -464,13 +546,46 @@ namespace EnglishTypingPractice
         internal ThemeThumbnail(UiTheme theme) { this.theme = theme; IsHitTestVisible = false; }
         protected override void OnRender(DrawingContext dc)
         {
-            string[] backgrounds = { "#17111F", "#F1F2EF", "#241A14", "#101C24", "#F4C3EB", "#E4CFB3", "#171417", "#E6E1CE" };
-            string[] accents = { "#56F4E5", "#266858", "#F0BF73", "#ECF664", "#61399B", "#A72722", "#DE102B", "#962F25" };
+            string[] backgrounds = { "#17111F", "#F1F2EF", "#241A14", "#101C24", "#F4C3EB", "#E4CFB3", "#171417", "#E6E1CE",
+                "#008080", "#172825", "#F0EEE6", "#F9E8C8" };
+            string[] accents = { "#56F4E5", "#266858", "#F0BF73", "#ECF664", "#61399B", "#A72722", "#DE102B", "#962F25",
+                "#C0C0C0", "#E4B971", "#365B70", "#A13F2F" };
             Brush background = (Brush)new BrushConverter().ConvertFromString(backgrounds[(int)theme]);
             Brush accent = (Brush)new BrushConverter().ConvertFromString(accents[(int)theme]);
             var outline = new Pen(accent, 1);
             double w = Math.Max(1, ActualWidth), h = ActualHeight;
             dc.DrawRectangle(background, outline, new Rect(0, 0, w, h));
+            if (w < 52 || h < 56) return;
+            if (theme == UiTheme.Windows98)
+            {
+                dc.DrawRectangle(accent, null, new Rect(13, 10, w - 25, 42));
+                dc.DrawRectangle(Brushes.Navy, null, new Rect(15, 12, w - 29, 7));
+                dc.DrawRectangle(Brushes.White, null, new Rect(17, 25, w - 33, 20));
+                dc.DrawRectangle(accent, null, new Rect(0, h - 8, w, 8));
+                return;
+            }
+            if (theme == UiTheme.CassetteFuturism)
+            {
+                dc.DrawRoundedRectangle(null, outline, new Rect(9, 9, w - 18, 46), 5, 5);
+                dc.DrawLine(outline, new Point(w * .3, 34), new Point(w * .7, 34));
+                dc.DrawEllipse(background, outline, new Point(w * .28, 33), 10, 10);
+                dc.DrawEllipse(background, outline, new Point(w * .72, 33), 10, 10);
+                return;
+            }
+            if (theme == UiTheme.Magritte)
+            {
+                dc.DrawRectangle(accent, null, new Rect(w * .5 - 17, 8, 34, 44));
+                dc.DrawRectangle(Brushes.SkyBlue, null, new Rect(w * .5 - 15, 10, 30, 40));
+                dc.DrawEllipse(Brushes.White, null, new Point(w * .5 - 5, 25), 8, 3);
+                dc.DrawEllipse(Brushes.White, null, new Point(w * .5 + 6, 23), 7, 4);
+                return;
+            }
+            if (theme == UiTheme.Atompunk)
+            {
+                dc.DrawGeometry(accent, null, ThemePlate.Polygon(9, 40, w - 11, 12, w - 24, 44, w * .44, 42, w * .25, 54));
+                dc.DrawEllipse(Brushes.Teal, null, new Point(w * .33, 24), 9, 9);
+                return;
+            }
             bool left = theme == UiTheme.Persona5 || theme == UiTheme.Cyberpunk || theme == UiTheme.Constructivist;
             bool right = theme == UiTheme.ChineseStyle;
             if (left || right)

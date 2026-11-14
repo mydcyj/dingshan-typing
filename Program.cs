@@ -20,7 +20,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.3.2.0")]
+[assembly: System.Reflection.AssemblyVersion("2.4.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -409,7 +409,11 @@ namespace EnglishTypingPractice
                 { UiTheme.Vaporwave, (RadioButton)window.FindName("ThemeVaporwave") },
                 { UiTheme.Constructivist, (RadioButton)window.FindName("ThemeConstructivist") },
                 { UiTheme.Persona5, (RadioButton)window.FindName("ThemePersona5") },
-                { UiTheme.ChineseStyle, (RadioButton)window.FindName("ThemeChineseStyle") }
+                { UiTheme.ChineseStyle, (RadioButton)window.FindName("ThemeChineseStyle") },
+                { UiTheme.Windows98, (RadioButton)window.FindName("ThemeWindows98") },
+                { UiTheme.CassetteFuturism, (RadioButton)window.FindName("ThemeCassetteFuturism") },
+                { UiTheme.Magritte, (RadioButton)window.FindName("ThemeMagritte") },
+                { UiTheme.Atompunk, (RadioButton)window.FindName("ThemeAtompunk") }
             };
             bool resume = false;
             Func<UiTheme> selected = () => options.First(item => item.Value.IsChecked == true).Key;

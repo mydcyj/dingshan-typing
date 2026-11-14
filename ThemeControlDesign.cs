@@ -325,6 +325,11 @@ namespace EnglishTypingPractice
             var area = new Rect(inset, inset, Math.Max(1, w - inset * 2 - 2), Math.Max(1, h - inset * 2 - 2));
             var outline = new Pen(edge, Theme == UiTheme.Persona5 || Theme == UiTheme.Vaporwave ? 2 : 1);
             dc.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, w, h));
+            if (Theme == UiTheme.Windows98)
+            {
+                DrawClassicPlate(dc, area);
+                return;
+            }
             if (Down) dc.PushTransform(new TranslateTransform(1, 1));
             var shape = Outline(area, Theme, Field);
             if (Theme == UiTheme.Persona5 || Theme == UiTheme.Constructivist || Theme == UiTheme.Vaporwave)
@@ -372,12 +377,41 @@ namespace EnglishTypingPractice
                 dc.DrawLine(new Pen(Brushes.White, 1.5), new Point(left + 5, top + 3), new Point(right - 4, top + 3));
                 dc.DrawLine(new Pen(Brushes.White, 1), new Point(left + 3, top + 5), new Point(left + 3, bottom - 4));
             }
+            else if (Theme == UiTheme.CassetteFuturism && !Field && w > 64 && h > 24)
+            {
+                dc.DrawRectangle(Hot || Down ? Accent : Line, null, new Rect(left + 6, top + 7, 3, 6));
+                dc.DrawLine(new Pen(edge, 1), new Point(left + 8, bottom - 3), new Point(right - 8, bottom - 3));
+            }
+            else if (Theme == UiTheme.Atompunk && !Field && w > 52 && h > 24)
+            {
+                dc.DrawLine(new Pen(Brushes.White, 1), new Point(left + 12, top + 3), new Point(right - 15, top + 3));
+                dc.DrawLine(new Pen(edge, 1), new Point(left + 16, bottom - 3), new Point(right - 17, bottom - 3));
+            }
             else if (Theme == UiTheme.Modern)
                 dc.DrawLine(new Pen(Accent, 1.5), new Point(left + 4, top + 3), new Point(left + Math.Min(17, w * .3), top + 3));
             if (Focused)
                 dc.DrawRectangle(null, new Pen(Accent, 1) { DashStyle = DashStyles.Dot },
                     new Rect(5, 5, Math.Max(1, w - 12), Math.Max(1, h - 12)));
             if (Down) dc.Pop();
+        }
+
+        private void DrawClassicPlate(DrawingContext dc, Rect area)
+        {
+            bool sunk = Field || Down;
+            var top = new Pen(sunk ? Brushes.Gray : Brushes.White, 1);
+            var bottom = new Pen(sunk ? Brushes.White : Brushes.DimGray, 1);
+            dc.DrawRectangle(Fill, new Pen(sunk ? Brushes.DimGray : Brushes.Black, 1), area);
+            Rect rim = area;
+            rim.Inflate(-1, -1);
+            dc.DrawLine(top, rim.BottomLeft, rim.TopLeft);
+            dc.DrawLine(top, rim.TopLeft, rim.TopRight);
+            dc.DrawLine(bottom, rim.TopRight, rim.BottomRight);
+            dc.DrawLine(bottom, rim.BottomLeft, rim.BottomRight);
+            if (Focused && area.Width > 10 && area.Height > 10)
+            {
+                rim.Inflate(-2, -2);
+                dc.DrawRectangle(null, new Pen(Brushes.Black, 1) { DashStyle = DashStyles.Dot }, rim);
+            }
         }
 
         private static Geometry Outline(Rect r, UiTheme theme, bool field)
@@ -400,6 +434,14 @@ namespace EnglishTypingPractice
                     return Polygon(l + 3, t, right - 3, t, right - 3, t + 3, right, t + 3, right, b - 3, right - 3, b - 3, right - 3, b, l + 3, b, l + 3, b - 3, l, b - 3, l, t + 3, l + 3, t + 3);
                 case UiTheme.ChineseStyle:
                     return Polygon(l + 1, t + 1, right - 2, t, right, t + 2, right - 1, b, l, b - 1);
+                case UiTheme.CassetteFuturism:
+                    return Polygon(l + cut, t, right - cut, t, right, t + cut, right, b - cut * .65,
+                        right - cut * .65, b, l, b, l, t + cut);
+                case UiTheme.Magritte:
+                    return new RectangleGeometry(r);
+                case UiTheme.Atompunk:
+                    double radius = Math.Min(field ? 5 : 14, Math.Min(r.Height, r.Width) * .36);
+                    return new RectangleGeometry(r, radius, radius);
                 default:
                     return Polygon(l, t, right - cut, t, right, t + cut, right, b, l, b);
             }
@@ -454,6 +496,10 @@ namespace EnglishTypingPractice
                 case UiTheme.Constructivist: return new FontFamily("Arial Narrow, SimHei, Microsoft YaHei UI");
                 case UiTheme.Persona5: return new FontFamily("Trebuchet MS, Microsoft YaHei UI");
                 case UiTheme.ChineseStyle: return new FontFamily("KaiTi, SimSun, Microsoft YaHei UI");
+                case UiTheme.Windows98: return new FontFamily("Tahoma, SimSun, Microsoft YaHei UI");
+                case UiTheme.CassetteFuturism: return new FontFamily("Bahnschrift SemiCondensed, SimHei, Microsoft YaHei UI");
+                case UiTheme.Magritte: return new FontFamily("Georgia, SimSun, Microsoft YaHei UI");
+                case UiTheme.Atompunk: return new FontFamily("Trebuchet MS, DengXian, Microsoft YaHei UI");
                 default: return new FontFamily("Bahnschrift, Microsoft YaHei UI");
             }
         }
@@ -469,13 +515,18 @@ namespace EnglishTypingPractice
                 case UiTheme.Constructivist: return new FontFamily("Impact, SimHei, Microsoft YaHei UI");
                 case UiTheme.Persona5: return new FontFamily("Arial Black, DengXian, Microsoft YaHei UI");
                 case UiTheme.ChineseStyle: return new FontFamily("KaiTi, SimSun, Microsoft YaHei UI");
+                case UiTheme.Windows98: return new FontFamily("Tahoma, SimSun, Microsoft YaHei UI");
+                case UiTheme.CassetteFuturism: return new FontFamily("Bahnschrift Condensed, SimHei, Microsoft YaHei UI");
+                case UiTheme.Magritte: return new FontFamily("Georgia, SimSun, Microsoft YaHei UI");
+                case UiTheme.Atompunk: return new FontFamily("Trebuchet MS, DengXian, Microsoft YaHei UI");
                 default: return new FontFamily("Bahnschrift, Microsoft YaHei UI");
             }
         }
 
         internal static FontWeight CaptionWeight(UiTheme theme)
         {
-            return theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle ? FontWeights.Normal : FontWeights.Bold;
+            return theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle || theme == UiTheme.Windows98 || theme == UiTheme.Magritte
+                ? FontWeights.Normal : FontWeights.Bold;
         }
 
         internal static FontFamily NumberFamily(UiTheme theme)
@@ -483,6 +534,7 @@ namespace EnglishTypingPractice
             // Scores must fit decimal accuracies and multi-digit times in narrow HUD columns.
             if (theme == UiTheme.Persona5) return new FontFamily("Arial Narrow, Microsoft YaHei UI");
             if (theme == UiTheme.ChineseStyle) return new FontFamily("Times New Roman, KaiTi, SimSun");
+            if (theme == UiTheme.CassetteFuturism) return new FontFamily("Consolas, SimHei, Microsoft YaHei UI");
             return Family(theme);
         }
 
@@ -534,6 +586,8 @@ namespace EnglishTypingPractice
                     double rake = theme == UiTheme.Cyberpunk ? -.12 : -.08;
                     outline.Transform = new MatrixTransform(1, 0, rake, 1, -rake * formatted.Height * .7, 0);
                 }
+                else if (theme == UiTheme.Atompunk)
+                    outline.Transform = new MatrixTransform(1, 0, -.17, 1, formatted.Height * .12, 0);
                 if (theme == UiTheme.Cyberpunk || theme == UiTheme.Vaporwave)
                 {
                     dc.PushOpacity(title ? .65 : .34);
@@ -557,6 +611,15 @@ namespace EnglishTypingPractice
                     dc.DrawGeometry(ink, new Pen(ink, .8), outline);
                     dc.Pop();
                 }
+                else if (theme == UiTheme.Atompunk && title)
+                {
+                    dc.PushOpacity(.38);
+                    dc.PushTransform(new TranslateTransform(2, 2));
+                    dc.DrawGeometry(Brushes.Sienna, null, outline);
+                    dc.Pop(); dc.Pop();
+                }
+                else if (theme == UiTheme.CassetteFuturism && title)
+                    dc.DrawLine(new Pen(ink, .7), new Point(3, formatted.Height - 1), new Point(Math.Min(47, formatted.Width), formatted.Height - 1));
                 dc.DrawGeometry(ink, null, outline);
                 if (theme == UiTheme.Modern && title)
                     dc.DrawLine(new Pen(ink, .7), new Point(2, formatted.Height - 1), new Point(Math.Min(26, formatted.Width), formatted.Height - 1));
