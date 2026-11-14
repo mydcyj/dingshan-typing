@@ -29,6 +29,7 @@ namespace EnglishTypingPractice
         public bool TypingFeedback { get; set; }
         public bool SnakeVoiceEnabled { get; set; }
         public bool SnakeLowEffects { get; set; }
+        public string LocalNickname { get; set; }
         public Dictionary<string, int> SnakeReviewWords { get; set; }
         public bool PlayMusic { get; set; }
         public string Folder { get; set; }
@@ -53,6 +54,7 @@ namespace EnglishTypingPractice
                 settings.RoomEffectsVolume = Math.Max(0, Math.Min(100, settings.RoomEffectsVolume));
                 if (settings.SnakeReviewWords == null)
                     settings.SnakeReviewWords = new Dictionary<string, int>();
+                settings.LocalNickname = NormalizeLocalNickname(settings.LocalNickname);
                 return settings;
             }
             catch (Exception ex)
@@ -62,6 +64,12 @@ namespace EnglishTypingPractice
                     throw;
                 return new PracticeSettings();
             }
+        }
+
+        internal static string NormalizeLocalNickname(string value)
+        {
+            string nickname = value == null ? null : value.Trim();
+            return LanWire.IsName(nickname, 20) ? nickname : null;
         }
 
         internal bool RecordSnakeReview(string input, IEnumerable<string> allowedWords)

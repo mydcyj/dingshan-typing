@@ -37,6 +37,8 @@ namespace EnglishTypingPractice
         private readonly Action exited;
         private readonly Func<SnakeRole> selectedRole;
         private readonly Func<SnakeMode> selectedMode;
+        private readonly PracticeSettings settings;
+        private readonly Action saveSettings;
         private readonly DispatcherTimer timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(45) };
         private LanHost host;
         private LanClient client;
@@ -46,6 +48,7 @@ namespace EnglishTypingPractice
         private bool busy;
         private bool updatingTeams;
         private bool reconnecting;
+        private string displayedNickname;
 
         internal LanLobby(Window window, Action entered, Action<SnakeMatchState, int> update, Action exited,
             Func<SnakeRole> selectedRole, Func<SnakeMode> selectedMode, PracticeSettings settings, Action saveSettings)
@@ -55,8 +58,11 @@ namespace EnglishTypingPractice
             this.exited = exited;
             this.selectedRole = selectedRole;
             this.selectedMode = selectedMode;
+            this.settings = settings;
+            this.saveSettings = saveSettings;
             panel = (FrameworkElement)window.FindName("LanPanel");
             name = (TextBox)window.FindName("LanName");
+            RefreshNickname();
             roomName = (TextBox)window.FindName("LanRoomName");
             address = (TextBox)window.FindName("LanAddress");
             rooms = (ListBox)window.FindName("LanRooms");
@@ -102,7 +108,14 @@ namespace EnglishTypingPractice
             toggle.Click += (sender, e) =>
             {
                 panel.Visibility = panel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
-                name.Focus();
+                if (panel.Visibility == Visibility.Visible)
+                {
+                    RefreshNickname();
+                    if (string.IsNullOrWhiteSpace(name.Text))
+                        name.Focus();
+                    else if (string.IsNullOrWhiteSpace(roomName.Text))
+                        roomName.Focus();
+                }
             };
             create.Click += (sender, e) => CreateRoom();
             scan.Click += async (sender, e) => await Scan();
@@ -219,7 +232,8 @@ namespace EnglishTypingPractice
 
         private async void CreateRoom()
         {
-            string player = name.Text.Trim();
+            RefreshNickname();
+            string player = PracticeSettings.NormalizeLocalNickname(name.Text);
             string room = roomName.Text.Trim();
             if (!CheckName(player))
                 return;
@@ -243,6 +257,7 @@ namespace EnglishTypingPractice
             }
             try { localAddress = LanDiscovery.LocalAddresses().Select(ip => ip.ToString()).FirstOrDefault(); }
             catch (System.Net.NetworkInformation.NetworkInformationException) { }
+            RememberNickname(player);
             OpenRoom();
             await music.Host(host);
         }
@@ -279,7 +294,8 @@ namespace EnglishTypingPractice
 
         private async Task JoinRoom()
         {
-            string player = name.Text.Trim();
+            RefreshNickname();
+            string player = PracticeSettings.NormalizeLocalNickname(name.Text);
             if (!CheckName(player))
                 return;
 
@@ -321,16 +337,34 @@ namespace EnglishTypingPractice
                 SetBusy(false);
                 return;
             }
+            RememberNickname(player);
             OpenRoom();
         }
 
         private bool CheckName(string player)
         {
-            if (LanWire.IsName(player, 20))
+            if (player != null)
                 return true;
-            notice.Text = "请输入昵称。";
+            notice.Text = "请输入 1–20 个字符的昵称。";
             name.Focus();
             return false;
+        }
+
+        private void RefreshNickname()
+        {
+            if (displayedNickname == settings.LocalNickname)
+                return;
+            displayedNickname = settings.LocalNickname;
+            name.Text = displayedNickname ?? "";
+        }
+
+        private void RememberNickname(string nickname)
+        {
+            name.Text = displayedNickname = nickname;
+            if (settings.LocalNickname == nickname)
+                return;
+            settings.LocalNickname = nickname;
+            saveSettings();
         }
 
         private void OpenRoom()

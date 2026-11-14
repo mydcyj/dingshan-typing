@@ -21,7 +21,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.0.1.0")]
 
 namespace EnglishTypingPractice
 {
@@ -37,7 +37,7 @@ namespace EnglishTypingPractice
                 window = (Window)XamlReader.Load(stream);
             using (var stream = typeof(Program).Assembly.GetManifestResourceStream("TypingIcon.ico"))
                 window.Icon = BitmapFrame.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-            new Practice(window);
+            new Practice(window, showStartup: true);
             app.Run(window);
         }
     }
@@ -103,7 +103,11 @@ namespace EnglishTypingPractice
         private string lastRoundResult;
         private string priorRoundResult;
 
-        internal Practice(Window window)
+        internal Practice(Window window) : this(window, false)
+        {
+        }
+
+        internal Practice(Window window, bool showStartup)
         {
             this.window = window;
             using (var reader = new StreamReader(typeof(Practice).Assembly.GetManifestResourceStream("Passages.json")))
@@ -268,7 +272,8 @@ namespace EnglishTypingPractice
             timer.Tick += (sender, e) => RefreshClock();
             window.Loaded += async (sender, e) =>
             {
-                typed.Focus();
+                if (!showStartup)
+                    typed.Focus();
                 musicTimer.Start();
                 if (!string.IsNullOrEmpty(settings.Folder))
                     await LoadMusicFolder();
@@ -285,6 +290,8 @@ namespace EnglishTypingPractice
             };
             ConfigureBackgroundMotion((TranslateTransform)window.FindName("BackgroundDrift"), practicePage);
             ChoosePassage();
+            if (showStartup)
+                new StartupExperience(window, settings, () => typed.Focus());
         }
 
         private static void RevealPage(FrameworkElement page, double offset)

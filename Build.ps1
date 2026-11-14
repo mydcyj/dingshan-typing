@@ -23,6 +23,7 @@ $references = @(
     ("/resource:{0},Cet4-LICENSE.txt" -f (Join-Path $PSScriptRoot 'Cet4-LICENSE.txt')) `
     ("/resource:{0},LICENSE" -f (Join-Path $PSScriptRoot 'LICENSE')) `
     (Join-Path $PSScriptRoot 'Program.cs') (Join-Path $PSScriptRoot 'PracticeSettings.cs') `
+    (Join-Path $PSScriptRoot 'StartupExperience.cs') `
     (Join-Path $PSScriptRoot 'TypingRound.cs') (Join-Path $PSScriptRoot 'SnakeTutorial.cs') `
     (Join-Path $PSScriptRoot 'TypingEffects.cs') (Join-Path $PSScriptRoot 'SnakeModes.cs') `
     (Join-Path $PSScriptRoot 'SnakeWordVoice.cs') `
