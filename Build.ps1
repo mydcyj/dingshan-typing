@@ -30,6 +30,7 @@ try {
         ("/resource:{0},TypingIcon.ico" -f (Join-Path $PSScriptRoot 'TypingIcon.ico')) `
         ("/resource:{0},Window.xaml" -f (Join-Path $PSScriptRoot 'Window.xaml')) `
         ("/resource:{0},Passages.json" -f (Join-Path $PSScriptRoot 'Passages.json')) `
+        ("/resource:{0},SnakeMusic.wav" -f (Join-Path $PSScriptRoot 'SnakeMusic.wav')) `
         ("/resource:{0},Cet4.tsv" -f (Join-Path $PSScriptRoot 'Cet4.tsv')) `
         ("/resource:{0},Cet6.tsv" -f (Join-Path $PSScriptRoot 'Cet6.tsv')) `
         ("/resource:{0},Cet4-LICENSE.txt" -f (Join-Path $PSScriptRoot 'Cet4-LICENSE.txt')) `
@@ -51,6 +52,7 @@ try {
         (Join-Path $PSScriptRoot 'SnakeHotspot.cs') (Join-Path $PSScriptRoot 'SnakeRelay.cs') `
         (Join-Path $PSScriptRoot 'SnakeWordVoice.cs') `
         (Join-Path $PSScriptRoot 'SnakeTeams.cs') (Join-Path $PSScriptRoot 'RoomMusic.cs') `
+        (Join-Path $PSScriptRoot 'SnakeMusicPlayback.cs') `
         (Join-Path $PSScriptRoot 'MusicPlayback.cs') (Join-Path $PSScriptRoot 'SnakeGame.cs') (Join-Path $PSScriptRoot 'SnakeWords.cs') `
         (Join-Path $PSScriptRoot 'SnakePractice.cs') (Join-Path $PSScriptRoot 'SnakeMatch.cs') `
         (Join-Path $PSScriptRoot 'LanRoom.cs') (Join-Path $PSScriptRoot 'LanDiscovery.cs') (Join-Path $PSScriptRoot 'LanLobby.cs')

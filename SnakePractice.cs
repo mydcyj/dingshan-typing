@@ -53,7 +53,7 @@ namespace EnglishTypingPractice
         private readonly TextBlock scoreGuide;
         private readonly TextBlock[] directionWords;
         private readonly SnakeBoard board;
-        private readonly Action<bool> gameRunningChanged;
+        private readonly SnakeMusicPlayback soloMusic = new SnakeMusicPlayback();
         private readonly Action<double, double> shakeWindow;
         private readonly SnakeWordVoice voice;
         private readonly CheckBox voiceEnabled;
@@ -73,10 +73,9 @@ namespace EnglishTypingPractice
         private bool updatingMode;
         private int sprintRound;
 
-        internal SnakePractice(Window window, Action<bool> gameRunningChanged, PracticeSettings settings, Action saveSettings,
+        internal SnakePractice(Window window, PracticeSettings settings, Action saveSettings,
             Action<double, double> shakeWindow)
         {
-            this.gameRunningChanged = gameRunningChanged;
             this.shakeWindow = shakeWindow;
             this.settings = settings;
             this.saveSettings = saveSettings;
@@ -95,6 +94,15 @@ namespace EnglishTypingPractice
             chargeInput = (TextBox)window.FindName("SnakeChargeInput");
             status = (TextBlock)window.FindName("SnakeStatus");
             voiceEnabled = (CheckBox)window.FindName("SnakeVoiceEnabled");
+            var gameMusic = (CheckBox)window.FindName("SnakeMusicEnabled");
+            gameMusic.IsChecked = settings.SnakeMusicEnabled;
+            gameMusic.Click += (sender, e) =>
+            {
+                settings.SnakeMusicEnabled = gameMusic.IsChecked == true;
+                soloMusic.SetPlaying(musicRunning && settings.SnakeMusicEnabled, settings.MusicVolume / 100.0);
+                saveSettings();
+            };
+            window.Closed += (sender, e) => soloMusic.Dispose();
             voiceEnabled.IsChecked = settings.SnakeVoiceEnabled;
             voice = new SnakeWordVoice(() =>
             {
@@ -1158,7 +1166,7 @@ namespace EnglishTypingPractice
             if (musicRunning == running)
                 return;
             musicRunning = running;
-            gameRunningChanged(running);
+            soloMusic.SetPlaying(running && settings.SnakeMusicEnabled, settings.MusicVolume / 100.0);
         }
 
         private void StopSprint()

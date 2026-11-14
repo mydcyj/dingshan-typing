@@ -38,6 +38,8 @@ namespace EnglishTypingPractice
         private readonly SoundPlayer[] effects = new SoundPlayer[3];
         private MusicPlayback hostPlayer;
         private MediaPlayer guestPlayer;
+        private SnakeMusicPlayback builtInPlayer;
+        private bool hostCustomPlaying;
         private CancellationTokenSource pending;
         private string localFile;
         private RoomMusicState music;
@@ -58,11 +60,18 @@ namespace EnglishTypingPractice
             {
                 status.Text = text;
                 if (text.StartsWith("正在读取", StringComparison.Ordinal) || text.StartsWith("音乐无法", StringComparison.Ordinal))
+                {
+                    hostCustomPlaying = false;
                     host.SetMusic(null);
+                }
             }, (tracks, index) => { });
             hostPlayer = player;
             player.TrackPlaying += file =>
             {
+                // A just-opened local track takes priority before the next room snapshot arrives.
+                hostCustomPlaying = true;
+                if (builtInPlayer != null)
+                    builtInPlayer.SetPlaying(false, 0);
                 try
                 {
                     if (file.Length <= LanWire.MusicLimit && file.Length > 0)
@@ -89,12 +98,17 @@ namespace EnglishTypingPractice
                     if (active)
                         hostPlayer.SetPlaying(true);
                     else
+                    {
+                        hostCustomPlaying = false;
                         hostPlayer.StopAndRewind();
+                    }
                 }
+                if (!active)
+                    status.Text = "开局后播放房间音乐";
             }
-            UpdateVolume();
             if (client != null)
                 UpdateGuest(client);
+            UpdateVolume();
             if (previous == null || state.Round != previous.Round)
                 return;
             var own = state.Players.First(player => player.Slot == slot);
@@ -116,6 +130,18 @@ namespace EnglishTypingPractice
                 hostPlayer.SetVolume((int)Math.Round(volume * 100));
             if (guestPlayer != null)
                 guestPlayer.Volume = volume;
+
+            bool useBuiltIn = playing && music.Track == 0 && !hostCustomPlaying;
+            if (useBuiltIn && builtInPlayer == null)
+                builtInPlayer = new SnakeMusicPlayback();
+            if (builtInPlayer != null)
+                builtInPlayer.SetPlaying(useBuiltIn, volume);
+            if (useBuiltIn)
+            {
+                string label = volume > 0 ? "正在播放内置贪吃蛇配乐" : "内置贪吃蛇配乐 · 静音";
+                if (status.Text != label)
+                    status.Text = label;
+            }
         }
 
         internal void ResetEffects()
@@ -144,7 +170,8 @@ namespace EnglishTypingPractice
             {
                 if (track != 0)
                     StopGuest();
-                status.Text = playing ? "等待房主音乐…" : "开局后播放房主音乐";
+                if (!playing)
+                    status.Text = "开局后播放房间音乐";
                 return;
             }
             if (track != music.Track && failedTrack != music.Track)
@@ -238,6 +265,10 @@ namespace EnglishTypingPractice
             if (hostPlayer != null)
                 hostPlayer.Dispose();
             hostPlayer = null;
+            hostCustomPlaying = false;
+            if (builtInPlayer != null)
+                builtInPlayer.Dispose();
+            builtInPlayer = null;
             StopGuest();
             ResetEffects();
             music = null;

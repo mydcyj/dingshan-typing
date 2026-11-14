@@ -17,6 +17,7 @@ namespace EnglishTypingPractice
             MatchCase = true;
             IncludePunctuation = true;
             PlayMusic = true;
+            SnakeMusicEnabled = true;
             MusicVolume = 35;
             RoomMasterVolume = 65;
             RoomMusicVolume = 65;
@@ -39,6 +40,7 @@ namespace EnglishTypingPractice
         public Dictionary<string, int> SnakeRaceBest { get; set; }
         public PracticeLeaderboard PracticeRecords { get; set; }
         public bool PlayMusic { get; set; }
+        public bool SnakeMusicEnabled { get; set; }
         public string Folder { get; set; }
         public PlaybackMode MusicMode { get; set; }
         public int MusicVolume { get; set; }

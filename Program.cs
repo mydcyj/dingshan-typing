@@ -20,7 +20,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("2.3.1.0")]
+[assembly: System.Reflection.AssemblyVersion("2.3.2.0")]
 
 namespace EnglishTypingPractice
 {
@@ -184,8 +184,7 @@ namespace EnglishTypingPractice
             };
 
             music = new MusicPlayback(text => musicStatus.Text = text, UpdatePlaylist);
-            snake = new SnakePractice(window, running => music.SetPlaying(settings.PlayMusic && running), settings,
-                SaveSettings, effects.ShakeWindow);
+            snake = new SnakePractice(window, settings, SaveSettings, effects.ShakeWindow);
             var practicePage = (FrameworkElement)window.FindName("PracticePage");
             ConfigureSettingsPage(practicePage);
             Action closeRecord = () =>
