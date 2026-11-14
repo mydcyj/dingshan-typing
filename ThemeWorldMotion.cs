@@ -37,7 +37,8 @@ namespace EnglishTypingPractice
             this.lowEffects = lowEffects;
             startup = (FrameworkElement)window.FindName("StartupOverlay");
             background = new WorldScene(theme, false) { Name = "ThemeWorldBackground", Opacity = .74 };
-            header = new WorldScene(theme, true) { Name = "ThemeWorldHeader", HorizontalAlignment = HorizontalAlignment.Right };
+            header = new WorldScene(theme, true) { Name = "ThemeWorldHeader",
+                HorizontalAlignment = theme == UiTheme.ArtDeco ? HorizontalAlignment.Stretch : HorizontalAlignment.Right };
             ((Grid)window.FindName("BackgroundLayers")).Children.Add(background);
             var hero = (Grid)window.FindName("PracticeHero");
             Grid.SetColumnSpan(header, Math.Max(1, hero.ColumnDefinitions.Count));
@@ -58,11 +59,8 @@ namespace EnglishTypingPractice
 
         private void ResizeHeader(object sender, SizeChangedEventArgs e)
         {
-            if (theme == UiTheme.Magritte)
-            {
-                header.Width = Math.Min(640, e.NewSize.Width * .57);
+            if (theme == UiTheme.ArtDeco)
                 return;
-            }
             header.Width = Math.Min(440, e.NewSize.Width);
             header.Opacity = e.NewSize.Width < 500 ? .23 : .92;
         }
@@ -141,6 +139,7 @@ namespace EnglishTypingPractice
             private readonly bool hero;
             private readonly Dictionary<string, DrawingImage> art = new Dictionary<string, DrawingImage>();
             private readonly DrawingGroup scenery = new DrawingGroup();
+            private readonly DrawingGroup decoCrest = new DrawingGroup();
             private readonly Action<double> moveVignette;
             private readonly DrawingGroup[] traffic;
             private readonly TranslateTransform carrier = new TranslateTransform(), rescue = new TranslateTransform();
@@ -182,15 +181,15 @@ namespace EnglishTypingPractice
                     moveVignette = BuildDesktop();
                 else if (theme == UiTheme.CassetteFuturism)
                     moveVignette = BuildCassette();
-                else if (theme == UiTheme.Magritte)
-                    moveVignette = hero ? BuildDaylightDoor() : BuildMagritteRoom();
+                else if (theme == UiTheme.ArtDeco)
+                    moveVignette = hero ? BuildDecoHeader() : BuildDecoBackground();
                 else if (theme == UiTheme.Atompunk)
                     moveVignette = BuildAtomicStation();
                 Advance(0);
             }
 
-            private double SceneWidth { get { return hero ? 440 : 1100; } }
-            private double SceneHeight { get { return hero ? (theme == UiTheme.Magritte ? 190 : 150) : 700; } }
+            private double SceneWidth { get { return hero && theme != UiTheme.ArtDeco ? 440 : 1100; } }
+            private double SceneHeight { get { return hero ? (theme == UiTheme.ArtDeco ? 200 : 150) : 700; } }
             private double CarrierWidth { get { return hero ? 168 : 240; } }
             private double RescueWidth { get { return hero ? 138 : 180; } }
 
@@ -229,6 +228,13 @@ namespace EnglishTypingPractice
                 dc.PushTransform(new ScaleTransform(ActualWidth / SceneWidth, ActualHeight / SceneHeight));
                 dc.DrawDrawing(scenery);
                 dc.Pop();
+                if (hero && theme == UiTheme.ArtDeco)
+                {
+                    double scale = Math.Min(ActualWidth / 800, ActualHeight / SceneHeight);
+                    dc.PushTransform(new MatrixTransform(scale, 0, 0, scale, ActualWidth / 2, ActualHeight * .329));
+                    dc.DrawDrawing(decoCrest);
+                    dc.Pop();
+                }
             }
 
             private Action<double> BuildDesktop()
@@ -381,104 +387,82 @@ namespace EnglishTypingPractice
                 };
             }
 
-            private Action<double> BuildMagritteRoom()
+            private Action<double> BuildDecoHeader()
             {
-                var wall = Paint("EFE9DC");
-                var floor = Paint("D2C7B4");
+                var fineGold = Stroke(Paint("A78349"), 1);
+                var brightGold = Stroke(Paint("D4AF63"), 1.2);
+                var bronze = Stroke(Paint("5C482D"), 1);
                 AddSceneDrawing(scenery, null, dc =>
                 {
-                    dc.DrawRectangle(wall, null, new Rect(0, 0, SceneWidth, SceneHeight));
-                    dc.DrawGeometry(floor, null, Shape("M0,562 H1100 V700 H0 Z"));
-                    dc.DrawGeometry(Paint("E6DDD0"), null, Shape("M0,0 H165 V562 H0 Z"));
-                    dc.DrawGeometry(null, Stroke(Paint("B3A99B"), 1), Shape("M0,563 H1100 M165,0 V563 L118,700 M672,563 L855,700"));
+                    dc.DrawRectangle(Tone("201915", "100E0D", 90), null, new Rect(0, 0, 1100, 200));
+                    dc.DrawGeometry(Paint("181310"), fineGold, Shape(
+                        "M10,54 H24 V31 H49 V12 H475 L488,22 H612 L625,12 H1051 V31 H1076 V54 H1090 V146 H1076 V169 H1051 V188 H625 L612,178 H488 L475,188 H49 V169 H24 V146 H10 Z"));
+                    dc.DrawGeometry(null, bronze, Shape(
+                        "M17,59 H31 V37 H56 V19 H472 L486,29 H614 L628,19 H1044 V37 H1069 V59 H1083 V141 H1069 V163 H1044 V181 H628 L614,171 H486 L472,181 H56 V163 H31 V141 H17 Z"));
+
+                    // One half of the inlay is reflected on the central axis.
+                    for (int side = 0; side < 2; side++)
+                    {
+                        if (side == 1) dc.PushTransform(new ScaleTransform(-1, 1, 550, 0));
+                        dc.DrawGeometry(Tone("38291B", "14100F", 0), null, Shape(
+                            "M31,40 H82 V56 H120 V71 H159 V86 H205 V101 H250 V117 H205 V132 H159 V147 H120 V162 H82 V178 H61 V160 H34 V140 H20 V61 H31 Z"));
+                        dc.DrawGeometry(null, fineGold, Shape(
+                            "M58,28 H89 V50 H128 V66 H168 V81 H211 V96 H259 M58,172 H89 V150 H128 V134 H168 V119 H211 V104 H259"));
+                        dc.DrawGeometry(null, bronze, Shape(
+                            "M42,48 H77 V63 H111 V77 H151 V91 H195 M42,152 H77 V137 H111 V123 H151 V109 H195"));
+                        dc.DrawGeometry(null, bronze, Shape(
+                            "M42,71 L195,100 42,129 M49,59 L183,100 49,141 M76,62 L170,100 76,138 M37,100 H232"));
+                        dc.DrawGeometry(Paint("D4AF63"), null, Shape("M256,100 L263,96 270,100 263,104 Z"));
+                        dc.DrawGeometry(Paint("916A39"), null, Shape("M278,100 L282,97 286,100 282,103 Z"));
+                        if (side == 1) dc.Pop();
+                    }
+
+                    dc.DrawGeometry(null, fineGold, Shape("M430,160 H493 L505,166 H595 L607,160 H670"));
+                    dc.DrawGeometry(null, bronze, Shape("M466,166 H489 L502,173 H598 L611,166 H634"));
+                    dc.DrawGeometry(Paint("D4AF63"), null, Shape("M542,165 L550,161 558,165 550,169 Z"));
                 });
-                var light = new TranslateTransform();
-                AddSceneDrawing(scenery, light, dc =>
+                var sun = AddSceneDrawing(decoCrest, new TranslateTransform(), dc =>
                 {
-                    dc.DrawGeometry(Paint("F5EFE2"), null, Shape("M494,0 H560 L928,562 H773 Z"));
-                    dc.DrawGeometry(Paint("E4D8C3"), null, Shape("M773,562 H928 L1043,700 H851 Z"));
-                }).Opacity = .58;
-                return t => light.X = 16 * Math.Sin(t * .16);
+                    // All rails point to the same origin so the fan stays legible at narrow widths.
+                    for (int ray = -7; ray <= 7; ray++)
+                    {
+                        double angle = ray * Math.PI / 17;
+                        double outer = 44 - Math.Abs(ray) * .7;
+                        var start = new Point(Math.Sin(angle) * 12, -Math.Cos(angle) * 12);
+                        var end = new Point(Math.Sin(angle) * outer, -Math.Cos(angle) * outer);
+                        dc.DrawLine(ray % 2 == 0 ? brightGold : fineGold, start, end);
+                    }
+                    dc.DrawGeometry(Paint("D4AF63"), null, Shape("M-10,-1 A10,10 0 0 1 10,-1 Z"));
+                    dc.DrawGeometry(null, bronze, Shape("M-46,1 H46 M-39,5 H39 M-27,9 H27"));
+                    dc.DrawGeometry(Paint("D4AF63"), null, Shape("M-54,1 L-50,-2 -46,1 -50,4 Z M46,1 L50,-2 54,1 50,4 Z"));
+                });
+                return t => sun.Opacity = .87 + .13 * Math.Cos(t * .62);
             }
 
-            private Action<double> BuildDaylightDoor()
+            private Action<double> BuildDecoBackground()
             {
-                // Freeze the terrace and door independently from the two clipped cloud layers.
-                AddSceneDrawing(scenery, null, DrawNightTerrace);
-                var aperture = new DrawingGroup { ClipGeometry = Shape("M228,29 H308 V147 H228 Z") };
-                scenery.Children.Add(aperture);
-                AddSceneDrawing(aperture, null, dc =>
+                var border = Stroke(Paint("726045"), 1);
+                var filigree = Stroke(Paint("3B2D20"), 1);
+                AddSceneDrawing(scenery, null, dc =>
                 {
-                    dc.DrawRectangle(Tone("397BB8", "E2ECD9", 90), null, new Rect(228, 29, 80, 118));
-                    dc.DrawGeometry(Tone("CFDDD2", "7CA2A8", 90), null, Shape("M222,121 Q245,118 268,119 Q293,116 316,119 V147 H222 Z"));
-                    dc.DrawGeometry(Tone("A3C5BF", "557F83", 90), null, Shape("M224,132 Q242,132 255,129 Q276,129 292,126 Q308,128 317,127 V148 H224 Z"));
-                    dc.DrawGeometry(null, Stroke(Paint("85D8DED0"), .6), Shape("M230,122 H253 M271,121 H290 M256,125 H271 M284,129 H305 M242,136 H269 M232,142 H248 M273,141 H300"));
+                    dc.DrawRectangle(Tone("1C1714", "100E0D", 90), null, new Rect(0, 0, SceneWidth, SceneHeight));
+                    for (int side = 0; side < 2; side++)
+                    {
+                        if (side == 1) dc.PushTransform(new ScaleTransform(-1, 1, 550, 0));
+                        dc.DrawGeometry(Tone("493724", "181410", 0), null, Shape(
+                            "M0,0 H136 V44 H108 V92 H83 V137 H61 V563 H83 V608 H108 V656 H136 V700 H0 Z"));
+                        dc.DrawGeometry(null, border, Shape("M125,16 V34 H98 V83 H72 V130 H49 V570 H72 V617 H98 V666 H125 V684"));
+                        dc.DrawGeometry(null, filigree, Shape("M94,16 V26 H84 V74 H60 V123 H36 V577 H60 V626 H84 V674 H94 V684"));
+                        dc.DrawGeometry(null, filigree, Shape("M22,121 V578 M12,136 V563 M112,19 H478 M112,681 H478"));
+                        if (side == 1) dc.Pop();
+                    }
                 });
-                var distantDrift = new TranslateTransform();
-                AddSceneDrawing(aperture, distantDrift, dc =>
+                var glints = AddSceneDrawing(scenery, new TranslateTransform(), dc =>
                 {
-                    dc.DrawGeometry(Tone("E8EAD9", "169CB7B4", 90), null, Shape("M217,109 Q225,106 234,107 Q243,101 254,106 Q268,104 279,108 Q292,108 301,111 Q270,115 235,114 L217,113 Z"));
-                    dc.DrawGeometry(Tone("F1EDDA", "659CB7B8", 90), null, Shape("M272,91 Q280,87 289,88 Q294,83 304,83 Q315,82 324,89 Q332,89 337,93 Q316,96 298,95 Q285,96 272,91 Z"));
+                    dc.DrawGeometry(Paint("9D7B45"), null, Shape("M22,331 L28,350 22,369 16,350 Z M1078,331 L1084,350 1078,369 1072,350 Z"));
+                    dc.DrawGeometry(Paint("ECCF89"), null, Shape("M22,341 L25,350 22,359 19,350 Z M1078,341 L1081,350 1078,359 1075,350 Z"));
                 });
-                var nearDrift = new TranslateTransform();
-                AddSceneDrawing(aperture, nearDrift, dc =>
-                {
-                    dc.DrawGeometry(Tone("F7F3DC", "B0C4C7", 90), null, Shape("M209,73 C213,67 220,65 226,66 C227,60 232,56 239,57 C242,48 250,43 258,45 C265,45 271,49 273,55 C280,53 287,57 289,63 C298,63 306,66 309,71 C315,72 317,74 316,77 C303,83 286,82 274,80 C257,85 238,81 230,79 C220,80 213,78 209,73 Z"));
-                    dc.DrawGeometry(Tone("FFF9E3", "0AF8EDCE", 90), null, Shape("M221,69 Q232,67 237,63 Q241,58 244,59 Q243,52 253,48 Q265,44 271,55 Q266,55 264,60 Q275,56 283,62 Q288,66 294,68 Q283,74 268,71 Q252,77 239,72 Q232,73 221,69 Z"));
-                    dc.DrawGeometry(Tone("ABAFC0", "05BDCFCE", 90), null, Shape("M221,75 Q232,73 242,75 Q250,79 261,76 Q274,73 283,76 Q296,76 309,73 Q307,81 293,81 Q280,80 271,80 Q252,84 238,80 Q223,82 221,75 Z"));
-                });
-
-                AddSceneDrawing(scenery, null, DrawDaylightDoorFrame);
-                return t =>
-                {
-                    nearDrift.X = 9 * Math.Sin(t * .19);
-                    distantDrift.X = 6 * Math.Sin(t * .12 + 1);
-                };
-            }
-
-            private void DrawNightTerrace(DrawingContext dc)
-            {
-                dc.DrawRectangle(Tone("101B28", "405361", 90), null, new Rect(0, 0, SceneWidth, 114));
-                dc.DrawGeometry(Tone("003F5A63", "29647274", 90), null, Shape("M112,36 C145,36 175,19 219,24 C253,30 284,16 322,23 C370,30 412,20 440,25 V42 C411,34 371,44 331,39 C282,34 253,48 211,37 C174,31 144,45 112,41 Z"));
-                dc.DrawGeometry(Tone("B4C3BA9B", "3C97A3A1", 90), null, Shape("M397,40 C386,39 383,27 393,22 C388,30 390,36 397,40 Z"));
-                dc.DrawGeometry(Tone("005A717B", "4B697B7E", 90), null, Shape("M131,82 C180,80 196,73 247,78 C288,85 339,73 372,77 C397,80 426,74 440,72 V85 C429,84 414,84 389,87 C323,85 297,96 243,88 C201,82 163,89 131,86 Z"));
-                dc.DrawGeometry(Tone("193040", "283C47", 90), null, Shape("M0,96 Q54,94 91,95 C143,94 178,101 232,96 C289,94 355,98 440,94 V141 H0 Z"));
-                dc.DrawGeometry(Tone("242C38", "14232D", 90), null, Shape("M0,95 Q42,89 76,91 Q106,84 124,85 Q147,87 159,91 Q185,91 216,99 L233,102 Q184,102 143,99 Q55,104 0,102 Z"));
-                dc.DrawGeometry(Tone("293847", "1A2630", 90), null, Shape("M316,98 Q346,96 367,91 L380,90 388,83 399,83 401,78 H405 V83 L417,84 421,91 440,94 V109 Q363,108 316,103 Z"));
-                dc.DrawGeometry(Paint("23303D"), null, Shape("M370,97 V91 L374,88 378,91 V97 Z M389,94 V86 L394,82 399,87 V94 Z M403,95 V89 L407,85 412,87 V96 Z M416,97 V95 L420,92 424,95 V98 Z"));
-                dc.DrawGeometry(Paint("B49B67"), null, Shape("M373,92 H374 V93 H373 Z M393,88 H394 V89 H393 Z M406,90 H407 V91 H406 Z"));
-                dc.DrawGeometry(null, Stroke(Paint("57717E78"), .45), Shape("M358,101 H377 M386,100 H406 M385,103 H401 M400,105 H418 M413,99 H429"));
-                dc.DrawGeometry(null, Stroke(Paint("706D8388"), .55), Shape("M69,106 H101 M142,109 H176 M182,105 H206 M116,116 H136 M319,111 H341 M363,107 H388 M344,117 H392"));
-
-                dc.DrawGeometry(Tone("343F45", "151D22", 90), null, Shape("M0,124 L440,121 V190 H0 Z"));
-                dc.DrawGeometry(Tone("576160", "313F43", 90), null, Shape("M0,119 L440,116 V122 L0,125 Z"));
-                dc.DrawGeometry(Tone("283137", "11191F", 90), null, Shape("M0,137 L440,134 V190 H0 Z"));
-                dc.DrawGeometry(null, Stroke(Paint("404B5352"), .55), Shape("M28,171 L43,170 M120,156 L141,155 M153,170 L168,169 M356,162 L363,161 M377,153 L397,152 M390,185 L420,183 M417,141 L428,140"));
-                dc.DrawGeometry(null, Stroke(Paint("67475151"), .6), Shape("M0,149 L440,146 M0,161 L440,157 M0,182 L440,174 M155,137 L92,190 M213,136 L185,190 M277,136 L293,190 M325,135 L378,190 M374,134 L440,180"));
-                dc.DrawGeometry(Tone("B8D8C7A1", "117C9798", 90), null, Shape("M227,146 H307 L351,190 H116 Z"));
-                dc.DrawGeometry(Tone("99E9D5A5", "00A6AD95", 90), null, Shape("M231,147 H305 L337,187 147,189 Z"));
-                dc.DrawGeometry(null, Stroke(Paint("497C8071"), .55), Shape("M212,152 L315,151 M186,163 L324,161 M153,176 L339,172 M213,147 L185,184 M279,148 L292,183"));
-                dc.DrawGeometry(Tone("151F29", "00151F29", 0), null, Shape("M0,0 H167 V190 H0 Z"));
-            }
-
-            private static void DrawDaylightDoorFrame(DrawingContext dc)
-            {
-                dc.DrawGeometry(Tone("100F11", "0F171D", 0), null, Shape("M216,20 H320 L322,150 310,155 220,153 215,147 Z M228,29 H308 V147 H228 Z"));
-                dc.DrawGeometry(Tone("141719", "0014191D", 0), null, Shape("M319,146 L358,151 384,159 358,164 306,155 Z"));
-                dc.DrawGeometry(Tone("332D27", "806B58", 0), null, Shape("M218,20 H318 V151 H306 V31 H229 V151 H218 Z"));
-                dc.DrawGeometry(Tone("5C4E42", "AE9470", 0), null, Shape("M220,23 H315 V29 H226 V149 H221 Z M310,28 H314 V150 H307 V32 Z"));
-                dc.DrawGeometry(null, Stroke(Paint("C4AB80"), .65), Shape("M225,147 V27 H310 M228,31 H303 M227,147 L306,146"));
-                dc.DrawGeometry(null, Stroke(Paint("4B3D31"), 1.1), Shape("M218,20 H318 M221,146 V25 H312 M314,25 V149"));
-
-                var leaf = Shape("M315,26 L353,42 V156 L315,148 Z");
-                dc.DrawGeometry(Tone("69523E", "292724", 0), Stroke(Paint("231F1C"), 1.1), leaf);
-                dc.DrawGeometry(Tone("6B5544", "3C3127", 0), Stroke(Paint("8E7456"), .65), Shape("M320,38 L346,49 V88 L320,83 Z M320,92 L346,97 V147 L320,141 Z"));
-                dc.DrawGeometry(Tone("3D3128", "584638", 0), Stroke(Paint("3B3027"), .6), Shape("M323,44 L343,52 V83 L323,79 Z M323,97 L343,101 V142 L323,137 Z"));
-                dc.DrawGeometry(null, Stroke(Paint("5B4738"), .5), Shape("M328,47 L327,59 328,77 M337,50 V79 M326,100 L327,113 326,136 M336,103 L335,120 336,138"));
-                dc.DrawGeometry(Tone("241D18", "5D4632", 0), null, Shape("M353,42 L356,44 V156 L353,157 Z"));
-                dc.DrawGeometry(Paint("A48753"), null, Shape("M345,91 L350,92 V97 L345,96 Z"));
-                dc.DrawEllipse(Paint("D5BB7D"), Stroke(Paint("6B5239"), .55), new Point(347.5, 93.2), 1.3, 1);
-                dc.DrawGeometry(null, Stroke(Paint("EDE0B7"), .65), Shape("M230,147 H306"));
+                return t => glints.Opacity = .44 + .18 * Math.Cos(t * .47);
             }
 
             private static LinearGradientBrush Tone(string start, string end, double angle)

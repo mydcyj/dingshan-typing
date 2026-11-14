@@ -9,6 +9,9 @@ namespace EnglishTypingPractice
         private static readonly Brush Steam = MakeSteamBrush();
         private static readonly Geometry DesktopCursor = MakeGeometry("M0,0 L0,18 5,13 8,21 11,20 8,12 15,12 Z");
         private static readonly Geometry Spark = MakeGeometry("M0,-13 Q1,-2 14,0 Q1,2 0,13 Q-1,2 -14,0 Q-1,-2 0,-13 Z");
+        private static readonly Geometry DecoSteps = MakeGeometry("M7,46 H22 V42 H33 V38 H43 M57,38 H67 V42 H78 V46 H93 " +
+            "M16,51 H25 V47 H36 V43 H42 M58,43 H64 V47 H75 V51 H84");
+        private static readonly Geometry DecoDiamond = MakeGeometry("M50,38 L55,45 50,52 45,45 Z");
 
         internal static readonly DependencyProperty ProgressProperty = DependencyProperty.Register(
             "Progress", typeof(double), typeof(TypingEffectVisuals),
@@ -47,7 +50,7 @@ namespace EnglishTypingPractice
                 case UiTheme.ChineseStyle: DrawInk(drawing, time); break;
                 case UiTheme.Windows98: DrawDesktop(drawing, time); break;
                 case UiTheme.CassetteFuturism: DrawDeck(drawing, time); break;
-                case UiTheme.Magritte: DrawDaylight(drawing, time); break;
+                case UiTheme.ArtDeco: DrawDeco(drawing, time); break;
                 case UiTheme.Atompunk: DrawOrbit(drawing, time); break;
                 default: DrawBrackets(drawing, time); break;
             }
@@ -198,15 +201,27 @@ namespace EnglishTypingPractice
                     null, new Rect(66, 47 - 7 * i, 18, 3));
         }
 
-        private void DrawDaylight(DrawingContext drawing, double time)
+        private void DrawDeco(DrawingContext drawing, double time)
         {
-            double opening = Math.Sin(Math.PI * time);
-            double scale = level == 0 ? .31 : .44;
-            drawing.PushTransform(new TranslateTransform(60, level == 0 ? 17 : 7));
-            drawing.PushTransform(new ScaleTransform(scale, scale));
-            StartupThemeEffects.DrawDaylightDoor(drawing, .24 + opening * (level == 0 ? .30 : .75));
-            drawing.Pop();
-            drawing.Pop();
+            double reach = 1 - Math.Pow(1 - Math.Min(1, time * 2.8 + .25), 2);
+            int outer = 2 + 2 * level;
+            var pivot = new Point(50, 41);
+            for (int ray = -outer; ray <= outer; ray++)
+            {
+                double angle = ray * Math.PI / (outer * 2.8);
+                double radius = ((ray % 2 == 0 ? 29 : 23) + level * 3) * reach;
+                drawing.DrawLine(ray == 0 ? bold : thin, pivot,
+                    new Point(pivot.X + Math.Sin(angle) * radius, pivot.Y - Math.Cos(angle) * radius));
+            }
+            drawing.DrawGeometry(secondary, thin, DecoDiamond);
+            if (level > 0)
+                drawing.DrawGeometry(null, thin, DecoSteps);
+            if (level == 2)
+            {
+                double span = 39 * reach;
+                drawing.DrawLine(thin, new Point(50 - span, 57), new Point(44, 57));
+                drawing.DrawLine(thin, new Point(56, 57), new Point(50 + span, 57));
+            }
         }
 
         private void DrawOrbit(DrawingContext drawing, double time)

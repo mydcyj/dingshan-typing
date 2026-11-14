@@ -382,6 +382,17 @@ namespace EnglishTypingPractice
                 dc.DrawRectangle(Hot || Down ? Accent : Line, null, new Rect(left + 6, top + 7, 3, 6));
                 dc.DrawLine(new Pen(edge, 1), new Point(left + 8, bottom - 3), new Point(right - 8, bottom - 3));
             }
+            else if (Theme == UiTheme.ArtDeco && !Field && w > 58 && h > 26)
+            {
+                var detail = new Pen(Fill == Accent ? Line : edge, .8);
+                double cy = (top + bottom) / 2;
+                foreach (double x in new[] { left + 5, right - 5 })
+                {
+                    dc.DrawLine(detail, new Point(x, cy - 6), new Point(x, cy - 3));
+                    dc.DrawGeometry(null, detail, Polygon(x, cy - 2, x + 2, cy, x, cy + 2, x - 2, cy));
+                    dc.DrawLine(detail, new Point(x, cy + 3), new Point(x, cy + 6));
+                }
+            }
             else if (Theme == UiTheme.Atompunk && !Field && w > 52 && h > 24)
             {
                 dc.DrawLine(new Pen(Brushes.White, 1), new Point(left + 12, top + 3), new Point(right - 15, top + 3));
@@ -437,8 +448,14 @@ namespace EnglishTypingPractice
                 case UiTheme.CassetteFuturism:
                     return Polygon(l + cut, t, right - cut, t, right, t + cut, right, b - cut * .65,
                         right - cut * .65, b, l, b, l, t + cut);
-                case UiTheme.Magritte:
-                    return new RectangleGeometry(r);
+                case UiTheme.ArtDeco:
+                    double step = Math.Min(cut / 2, Math.Min(r.Width, r.Height) / 8);
+                    return Polygon(l + 2 * step, t, right - 2 * step, t,
+                        right - 2 * step, t + step, right - step, t + step, right - step, t + 2 * step,
+                        right, t + 2 * step, right, b - 2 * step, right - step, b - 2 * step,
+                        right - step, b - step, right - 2 * step, b - step, right - 2 * step, b,
+                        l + 2 * step, b, l + 2 * step, b - step, l + step, b - step, l + step, b - 2 * step,
+                        l, b - 2 * step, l, t + 2 * step, l + step, t + 2 * step, l + step, t + step, l + 2 * step, t + step);
                 case UiTheme.Atompunk:
                     double radius = Math.Min(field ? 5 : 14, Math.Min(r.Height, r.Width) * .36);
                     return new RectangleGeometry(r, radius, radius);
@@ -498,7 +515,7 @@ namespace EnglishTypingPractice
                 case UiTheme.ChineseStyle: return new FontFamily("KaiTi, SimSun, Microsoft YaHei UI");
                 case UiTheme.Windows98: return new FontFamily("Tahoma, SimSun, Microsoft YaHei UI");
                 case UiTheme.CassetteFuturism: return new FontFamily("Bahnschrift SemiCondensed, SimHei, Microsoft YaHei UI");
-                case UiTheme.Magritte: return new FontFamily("Georgia, SimSun, Microsoft YaHei UI");
+                case UiTheme.ArtDeco: return new FontFamily("Segoe UI, Microsoft YaHei UI");
                 case UiTheme.Atompunk: return new FontFamily("Trebuchet MS, DengXian, Microsoft YaHei UI");
                 default: return new FontFamily("Bahnschrift, Microsoft YaHei UI");
             }
@@ -517,7 +534,7 @@ namespace EnglishTypingPractice
                 case UiTheme.ChineseStyle: return new FontFamily("KaiTi, SimSun, Microsoft YaHei UI");
                 case UiTheme.Windows98: return new FontFamily("Tahoma, SimSun, Microsoft YaHei UI");
                 case UiTheme.CassetteFuturism: return new FontFamily("Bahnschrift Condensed, SimHei, Microsoft YaHei UI");
-                case UiTheme.Magritte: return new FontFamily("Georgia, SimSun, Microsoft YaHei UI");
+                case UiTheme.ArtDeco: return new FontFamily("Bahnschrift Light, DengXian, Microsoft YaHei UI");
                 case UiTheme.Atompunk: return new FontFamily("Trebuchet MS, DengXian, Microsoft YaHei UI");
                 default: return new FontFamily("Bahnschrift, Microsoft YaHei UI");
             }
@@ -525,7 +542,7 @@ namespace EnglishTypingPractice
 
         internal static FontWeight CaptionWeight(UiTheme theme)
         {
-            return theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle || theme == UiTheme.Windows98 || theme == UiTheme.Magritte
+            return theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle || theme == UiTheme.Windows98 || theme == UiTheme.ArtDeco
                 ? FontWeights.Normal : FontWeights.Bold;
         }
 
@@ -550,9 +567,10 @@ namespace EnglishTypingPractice
             if (string.IsNullOrEmpty(value) || area.Width < 1 || area.Height < 1) return;
             var formatted = Format(value, size, theme, ink);
             double extra = theme == UiTheme.Persona5 ? 1.08 : 1;
-            double naturalWidth = formatted.WidthIncludingTrailingWhitespace * extra + 4;
+            double tracking = theme == UiTheme.ArtDeco && title && value == "鼎山打字通" ? size * .12 : 0;
+            double naturalWidth = formatted.WidthIncludingTrailingWhitespace * extra + (value.Length - 1) * tracking + 4;
             double scale = Math.Min(1, Math.Min(area.Width / naturalWidth, area.Height / (formatted.Height + 3)));
-            double x = title ? 0 : Math.Max(0, (area.Width - naturalWidth * scale) / 2);
+            double x = title && tracking == 0 ? 0 : Math.Max(0, (area.Width - naturalWidth * scale) / 2);
             double y = Math.Max(0, (area.Height - formatted.Height * scale) / 2);
             dc.PushClip(new RectangleGeometry(area));
             dc.PushTransform(new TranslateTransform(area.X + x, area.Y + y));
@@ -575,6 +593,16 @@ namespace EnglishTypingPractice
                     dc.DrawGeometry(pigment, null, glyph.BuildGeometry(new Point(0, 0)));
                     dc.Pop(); dc.Pop();
                     advance += width * 1.08;
+                }
+            }
+            else if (tracking > 0)
+            {
+                double advance = 2;
+                foreach (char character in value)
+                {
+                    var glyph = Format(character.ToString(), size, theme, ink);
+                    dc.DrawText(glyph, new Point(advance, 0));
+                    advance += glyph.WidthIncludingTrailingWhitespace + tracking;
                 }
             }
             else

@@ -133,13 +133,13 @@ namespace EnglishTypingPractice
                         sample += TapeRelay(t - .126, noise) * .63 + Sweep(t - .151, 310, -631, .086) * .30 +
                             noise * Envelope(t - .155, .101) * .095 + TapeRelay(t - .311, -noise) * .42;
                     return sample;
-                case UiTheme.Magritte:
-                    sample = FeltKey(t, 349.2) * .29;
+                case UiTheme.ArtDeco:
+                    sample = Tone(t, 283, .008) * .18 + Tone(t, 1517, .003) * .14 + noise * Envelope(t, .005) * .10;
                     if (word)
-                        sample += FeltKey(t - .052, 523.25) * .23 + FeltKey(t - .096, 466.16) * .16;
+                        sample += DecoBar(t - .023, 659.25) * .23 + DecoBar(t - .070, 880) * .17;
                     if (complete)
-                        sample += FeltKey(t - .137, 293.66) * .20 + FeltKey(t - .195, 440) * .18 +
-                            FeltKey(t - .206, 587.33) * .15;
+                        sample += DecoBar(t - .114, 440) * .25 + DecoBar(t - .174, 554.37) * .20 +
+                            DecoBar(t - .230, 739.99) * .17 + DecoBar(t - .282, 987.77) * .16;
                     return sample;
                 case UiTheme.Atompunk:
                     sample = OrbitTone(t, 440, 2400, .024) * .31;
@@ -209,10 +209,11 @@ namespace EnglishTypingPractice
             return Tone(t, 176, .009) * .33 + Tone(t, 836, .004) * .25 + noise * Envelope(t, .009) * .48;
         }
 
-        private static double FeltKey(double t, double frequency)
+        internal static double DecoBar(double t, double frequency)
         {
-            return Tone(t, frequency, .105) + .21 * Tone(t, frequency * 2.003, .039) +
-                .08 * Tone(t, frequency * 3.014, .018);
+            double tremolo = .88 + .12 * Math.Cos(2 * Math.PI * t * 6);
+            return Tone(t, frequency, .12) * tremolo + .21 * Tone(t, frequency * 4.01, .027) +
+                .07 * Tone(t, frequency * 9.15, .010);
         }
 
         private static double OrbitTone(double t, double frequency, double glide, double decay)

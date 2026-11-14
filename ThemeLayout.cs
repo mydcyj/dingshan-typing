@@ -84,8 +84,8 @@ namespace EnglishTypingPractice
             foreach (FrameworkElement element in new[] { hero, options, actions, sheet, statistics, ranking, music, notice })
                 desk.Children.Add(element);
             stack.Margin = new Thickness(24, 20, 24, 28);
-            stack.MaxWidth = theme == UiTheme.Minimal ? 960 : theme == UiTheme.Magritte ? 1110 : 1390;
-            if (theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle || theme == UiTheme.Magritte || theme == UiTheme.Windows98)
+            stack.MaxWidth = theme == UiTheme.Minimal ? 960 : theme == UiTheme.ArtDeco ? 1110 : 1390;
+            if (theme == UiTheme.Minimal || theme == UiTheme.ChineseStyle || theme == UiTheme.Windows98)
                 Find<FrameworkElement>("BackgroundGrid").Visibility = Visibility.Collapsed;
             foreach (Border panel in new[] { sheet, statistics, ranking, music }.Cast<Border>())
                 Frame(panel);
@@ -98,18 +98,19 @@ namespace EnglishTypingPractice
                 actions.Background = Brush("Raised");
                 options.Background = Brush("Raised");
             }
-            else if (theme == UiTheme.Magritte)
+            else if (theme == UiTheme.ArtDeco)
             {
-                hero.Background = new SolidColorBrush(Color.FromRgb(21, 31, 41));
+                hero.Background = window.Background;
                 foreach (Border layer in hero.Children.OfType<Border>())
                     layer.Visibility = Visibility.Collapsed;
-
                 var lettering = brand.Children.OfType<TextBlock>().ToArray();
-                lettering[0].Foreground = new SolidColorBrush(Color.FromRgb(192, 211, 207));
-                lettering[1].Foreground = new SolidColorBrush(Color.FromRgb(247, 239, 221));
-                lettering[1].Margin = new Thickness(0, 6, 0, 10);
-                lettering[2].Foreground = new SolidColorBrush(Color.FromRgb(212, 222, 219));
-                hero.SizeChanged += (sender, e) => ArrangeMagritteHero(e.NewSize.Width);
+                lettering[0].Visibility = Visibility.Collapsed;
+                lettering[1].Foreground = Brush("Accent");
+                lettering[1].Margin = new Thickness(0, 0, 0, 5);
+                lettering[1].TextAlignment = TextAlignment.Center;
+                lettering[2].TextAlignment = TextAlignment.Center;
+                foreach (TextBlock line in lettering)
+                    line.HorizontalAlignment = HorizontalAlignment.Center;
             }
 
             // Settings is a gallery of miniature compositions, not a list of color swatches.
@@ -191,7 +192,6 @@ namespace EnglishTypingPractice
                     : theme == UiTheme.Vaporwave ? new FrameworkElement[] { hero, options, sheet, statistics, actions, music, ranking, notice }
                     : theme == UiTheme.Windows98 ? new FrameworkElement[] { hero, actions, options, sheet, statistics, music, ranking, notice }
                     : theme == UiTheme.CassetteFuturism ? new FrameworkElement[] { hero, actions, options, statistics, sheet, music, ranking, notice }
-                    : theme == UiTheme.Magritte ? new FrameworkElement[] { hero, actions, options, sheet, statistics, ranking, music, notice }
                     : new FrameworkElement[] { hero, actions, options, sheet, statistics, ranking, music, notice };
                 for (int i = 0; i < sequence.Length; i++) Place(sequence[i], i, 0);
                 brand.Margin = new Thickness(16, 12, 12, 12);
@@ -278,7 +278,7 @@ namespace EnglishTypingPractice
                         Place(options, 2, 1); Place(music, 3, 0); Place(sheet, 3, 1);
                         Place(ranking, 4, 0);
                         break;
-                    case UiTheme.Magritte:
+                    case UiTheme.ArtDeco:
                         Columns(desk, -1, -1);
                         Place(hero, 0, 0, 2); Place(actions, 1, 0, 2);
                         Place(options, 2, 0, 2); Place(sheet, 3, 0, 2);
@@ -301,21 +301,27 @@ namespace EnglishTypingPractice
                 }
                 Place(notice, 7, 0, desk.ColumnDefinitions.Count);
             }
-            if (theme == UiTheme.Magritte)
-                ArrangeMagritteHero(hero.ActualWidth > 0 ? hero.ActualWidth : window.Width - 60);
+            if (theme == UiTheme.ArtDeco)
+            {
+                hero.MinHeight = spacious ? 218 : 150;
+                brand.Width = spacious ? 405 : 350;
+                brand.Margin = new Thickness(0, spacious ? 87 : 49, 0, 0);
+                brand.HorizontalAlignment = HorizontalAlignment.Center;
+                brand.VerticalAlignment = VerticalAlignment.Top;
+                display.FontSize = spacious ? 46 : 30;
+                display.Width = spacious ? 330 : 230;
+                hint.FontSize = spacious ? 13 : 12;
+                hint.MaxWidth = spacious ? 385 : 345;
+                actions.HorizontalAlignment = HorizontalAlignment.Center;
+                // Keep the first checklist item aligned with the inset on a wrapping options row.
+                options.HorizontalAlignment = spacious ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+                foreach (Button button in actions.Children)
+                    button.MinWidth = spacious ? 102 : 82;
+            }
             // All navigation and live input remain horizontal and scrollable on small screens.
             ReflowSettings(spacious);
             ReflowSnake(spacious);
             ReflowSecondaryPages(spacious);
-        }
-
-        private void ArrangeMagritteHero(double width)
-        {
-            double inset = width < 650 ? 18 : 35;
-            brand.Margin = new Thickness(inset, 12, 0, 12);
-            brand.Width = Math.Max(0, width * .43 - inset);
-            ((TextBlock)brand.Children[1]).FontSize = Math.Min(49, Math.Max(28, width / 20));
-            hero.MinHeight = Math.Max(146, Math.Min(640, width * .57) * 190 / 440);
         }
 
         private void Rail(double width, bool stagger)
@@ -338,7 +344,7 @@ namespace EnglishTypingPractice
             settingsLayout.ColumnDefinitions.Clear();
             settingsLayout.RowDefinitions.Clear();
             for (int i = 0; i < 3; i++) settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            themeChoices.Columns = spacious ? (theme == UiTheme.Persona5 || theme == UiTheme.Constructivist ? 2 : 4) : 2;
+            themeChoices.Columns = spacious ? (theme == UiTheme.Persona5 || theme == UiTheme.Constructivist ? 2 : theme == UiTheme.ArtDeco ? 3 : 4) : 2;
             foreach (FrameworkElement child in settingsLayout.Children)
             {
                 Grid.SetRowSpan(child, 1);
@@ -370,19 +376,19 @@ namespace EnglishTypingPractice
                 option.MinHeight = spacious ? 146 : 85;
                 var panel = option.Content as StackPanel;
                 if (panel != null && panel.Children.Count > 0)
-                    panel.Children[0].Visibility = spacious ? Visibility.Visible : Visibility.Collapsed;
+                    panel.Children[0].Visibility = spacious || option.Name == "ThemeArtDeco" ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 
         private void BuildThemeGallery()
         {
             var names = new[] { "现代", "极简", "赛博朋克", "蒸汽朋克", "蒸汽波", "构成主义", "P5 风格", "国风",
-                "Windows 98", "磁带未来主义", "马格利特式", "原子朋克" };
+                "Windows 98", "磁带未来主义", "装饰艺术 Art Deco", "原子朋克" };
             var themes = new[] { UiTheme.Modern, UiTheme.Minimal, UiTheme.Cyberpunk, UiTheme.Steampunk, UiTheme.Vaporwave,
                 UiTheme.Constructivist, UiTheme.Persona5, UiTheme.ChineseStyle, UiTheme.Windows98, UiTheme.CassetteFuturism,
-                UiTheme.Magritte, UiTheme.Atompunk };
+                UiTheme.ArtDeco, UiTheme.Atompunk };
             var descriptions = new[] { "坐标 · 几何 · 光轨", "留白 · 阅读 · 专注", "街区终端 · 飞行交通", "黄铜仪表 · 蒸汽机械", "梦境桌面 · 复古窗口", "斜向构图 · 红黑印版", "阶梯菜单 · 拼贴纸片", "山水册页 · 朱印题签",
-                "青绿桌面 · 经典窗口", "磁带转轴 · 模拟仪表", "午夜海边 · 门内白昼", "流线火箭 · 轨道星芒" };
+                "青绿桌面 · 经典窗口", "磁带转轴 · 模拟仪表", "黑金剧院 · 对称放射", "流线火箭 · 轨道星芒" };
             for (int i = 0; i < themes.Length; i++)
             {
                 var choice = Find<RadioButton>("Theme" + themes[i]);
@@ -462,7 +468,8 @@ namespace EnglishTypingPractice
                 : form.HorizontalAlignment == HorizontalAlignment.Right ? new Thickness(0, 0, 100, 0) : new Thickness(0);
             var confirm = Find<Button>("StartupConfirm");
             confirm.HorizontalAlignment = theme == UiTheme.ChineseStyle ? HorizontalAlignment.Right
-                : theme == UiTheme.Minimal || theme == UiTheme.Vaporwave || theme == UiTheme.Windows98 ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+                : theme == UiTheme.Minimal || theme == UiTheme.Vaporwave || theme == UiTheme.Windows98 || theme == UiTheme.ArtDeco
+                    ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
         }
 
         private void DecorateOtherPages()
@@ -516,8 +523,8 @@ namespace EnglishTypingPractice
                     border.CornerRadius = new CornerRadius(11, 5, 11, 5);
                     border.BorderThickness = new Thickness(5, 3, 2, 4);
                     break;
-                case UiTheme.Magritte:
-                    border.BorderThickness = new Thickness(0, 1, 0, 0);
+                case UiTheme.ArtDeco:
+                    border.BorderThickness = new Thickness(1, 2, 1, 1);
                     break;
                 case UiTheme.Atompunk:
                     border.CornerRadius = new CornerRadius(12, 24, 12, 24);
@@ -566,9 +573,9 @@ namespace EnglishTypingPractice
         protected override void OnRender(DrawingContext dc)
         {
             string[] backgrounds = { "#17111F", "#F1F2EF", "#241A14", "#101C24", "#F4C3EB", "#E4CFB3", "#171417", "#E6E1CE",
-                "#008080", "#172825", "#F0EEE6", "#F9E8C8" };
+                "#008080", "#172825", "#12100F", "#F9E8C8" };
             string[] accents = { "#56F4E5", "#266858", "#F0BF73", "#ECF664", "#61399B", "#A72722", "#DE102B", "#962F25",
-                "#C0C0C0", "#E4B971", "#365B70", "#A13F2F" };
+                "#C0C0C0", "#E4B971", "#D4AF63", "#A13F2F" };
             Brush background = (Brush)new BrushConverter().ConvertFromString(backgrounds[(int)theme]);
             Brush accent = (Brush)new BrushConverter().ConvertFromString(accents[(int)theme]);
             var outline = new Pen(accent, 1);
@@ -591,19 +598,20 @@ namespace EnglishTypingPractice
                 dc.DrawEllipse(background, outline, new Point(w * .72, 33), 10, 10);
                 return;
             }
-            if (theme == UiTheme.Magritte)
+            if (theme == UiTheme.ArtDeco)
             {
-                var night = new SolidColorBrush(Color.FromRgb(21, 31, 41));
-                var light = new SolidColorBrush(Color.FromRgb(241, 226, 192));
-                double center = w * .53;
-                dc.DrawRectangle(night, null, new Rect(5, 5, w - 10, h - 10));
-                dc.DrawEllipse(light, null, new Point(w * .24, 19), 3, 3);
-                dc.DrawLine(outline, new Point(8, 42), new Point(w - 8, 42));
-                dc.DrawGeometry(light, null, ThemePlate.Polygon(center - 10, 46, center + 15, 46, center + 21, 55, center - 25, 55));
-                dc.DrawRectangle(light, null, new Rect(center - 13, 11, 31, 36));
-                dc.DrawRectangle(Brushes.SkyBlue, null, new Rect(center - 10, 14, 25, 31));
-                dc.DrawEllipse(Brushes.White, null, new Point(center + 6, 25), 7, 3);
-                dc.DrawGeometry(accent, null, ThemePlate.Polygon(center - 10, 14, center - 22, 17, center - 22, 49, center - 10, 45));
+                double mid = w / 2;
+                double side = Math.Min(53, mid - 5);
+                dc.DrawGeometry(null, outline, ThemePlate.Polygon(mid - side, 56, mid - side, 40, mid - side + 7, 40,
+                    mid - side + 7, 32, mid - side + 14, 32, mid - side + 14, 24, mid + side - 14, 24,
+                    mid + side - 14, 32, mid + side - 7, 32, mid + side - 7, 40, mid + side, 40, mid + side, 56));
+                for (int ray = -5; ray <= 5; ray++)
+                {
+                    double angle = ray * Math.PI / 15;
+                    dc.DrawLine(outline, new Point(mid + Math.Sin(angle) * 6, 46 - Math.Cos(angle) * 6),
+                        new Point(mid + Math.Sin(angle) * 37, 46 - Math.Cos(angle) * 37));
+                }
+                dc.DrawGeometry(accent, null, ThemePlate.Polygon(mid, 41, mid + 5, 47, mid, 53, mid - 5, 47));
                 return;
             }
             if (theme == UiTheme.Atompunk)

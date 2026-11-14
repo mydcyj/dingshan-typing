@@ -1425,7 +1425,7 @@
           </RadioButton>
           <RadioButton x:Name="ThemeWindows98" GroupName="Theme" Content="Windows 98" />
           <RadioButton x:Name="ThemeCassetteFuturism" GroupName="Theme" Content="磁带未来主义" />
-          <RadioButton x:Name="ThemeMagritte" GroupName="Theme" Content="马格利特式" />
+          <RadioButton x:Name="ThemeArtDeco" GroupName="Theme" Content="装饰艺术" />
           <RadioButton x:Name="ThemeAtompunk" GroupName="Theme" Content="原子朋克" />
           </UniformGrid>
         </StackPanel>

@@ -53,8 +53,13 @@ namespace EnglishTypingPractice
         {
             try
             {
-                var settings = new JavaScriptSerializer().Deserialize<PracticeSettings>(File.ReadAllText(SettingsPath))
-                    ?? new PracticeSettings();
+                var serializer = new JavaScriptSerializer();
+                var values = serializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(SettingsPath));
+                object previousTheme;
+                if (values != null && values.TryGetValue("Theme", out previousTheme) &&
+                    string.Equals(previousTheme as string, "Magritte", StringComparison.OrdinalIgnoreCase))
+                    values["Theme"] = (int)UiTheme.ArtDeco;
+                var settings = values == null ? new PracticeSettings() : serializer.ConvertToType<PracticeSettings>(values);
                 if (!Enum.IsDefined(typeof(PlaybackMode), settings.MusicMode))
                     settings.MusicMode = PlaybackMode.Sequential;
                 if (!Enum.IsDefined(typeof(UiTheme), settings.Theme))

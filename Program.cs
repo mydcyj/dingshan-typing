@@ -412,7 +412,7 @@ namespace EnglishTypingPractice
                 { UiTheme.ChineseStyle, (RadioButton)window.FindName("ThemeChineseStyle") },
                 { UiTheme.Windows98, (RadioButton)window.FindName("ThemeWindows98") },
                 { UiTheme.CassetteFuturism, (RadioButton)window.FindName("ThemeCassetteFuturism") },
-                { UiTheme.Magritte, (RadioButton)window.FindName("ThemeMagritte") },
+                { UiTheme.ArtDeco, (RadioButton)window.FindName("ThemeArtDeco") },
                 { UiTheme.Atompunk, (RadioButton)window.FindName("ThemeAtompunk") }
             };
             bool resume = false;

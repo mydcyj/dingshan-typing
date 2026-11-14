@@ -32,28 +32,21 @@ namespace EnglishTypingPractice
         private static readonly Brush DeckCase = FrozenBrush(38, 52, 49);
         private static readonly Brush DeckGlass = FrozenBrush(23, 32, 29);
         private static readonly Brush DeckAmber = FrozenBrush(231, 180, 100);
-        private static readonly Brush NightWall = FrozenGradient(Color.FromRgb(35, 50, 59), Color.FromRgb(24, 33, 40));
-        private static readonly Brush NightFloor = FrozenGradient(Color.FromRgb(47, 47, 41), Color.FromRgb(25, 30, 33));
-        private static readonly Brush NightWindow = FrozenBrush(15, 25, 39);
-        private static readonly Brush NightSea = FrozenBrush(32, 52, 65);
-        private static readonly Brush NightTrim = FrozenBrush(47, 61, 65);
-        private static readonly Brush Moon = FrozenBrush(220, 225, 210);
-        private static readonly Brush DoorFrame = FrozenBrush(122, 111, 88);
-        private static readonly Brush DoorInterior = FrozenBrush(75, 118, 142);
-        private static readonly Brush DoorSea = FrozenBrush(111, 156, 167);
-        private static readonly Brush DoorSand = FrozenBrush(222, 198, 149);
-        private static readonly Brush DoorLeaf = FrozenBrush(50, 64, 61);
-        private static readonly Brush DoorPanel = FrozenBrush(42, 55, 54);
-        private static readonly Brush DoorLight = FrozenBrush(238, 214, 164);
-        private static readonly Brush DoorSky = FrozenGradient(Color.FromRgb(109, 169, 208), Color.FromRgb(236, 223, 191));
-        private static readonly Brush DoorLightSpill = FrozenGradient(Color.FromArgb(133, 238, 214, 164), Color.FromArgb(22, 238, 214, 164));
-        private static readonly Geometry NightCliff = Geometry.Parse(
-            "M-272,13 V-10 L-261,-12 -253,-16 -248,-12 -236,-13 -222,-5 -218,2 -206,3 -199,7 -189,13 Z");
-        private static readonly Geometry DoorCloud = Geometry.Parse(
-            "M3,35 C5,31 9,30 13,30 C14,26 18,23 23,24 C26,19 34,20 38,24 " +
-            "C44,23 49,27 51,30 C56,30 59,32 61,36 C52,39 39,39 30,38 C24,40 11,39 3,35 Z");
-        private static readonly Geometry DoorDune = Geometry.Parse(
-            "M0,86 C15,88 23,87 33,85 C44,83 54,82 60,83 V100 H0 Z");
+        internal static readonly Brush DecoLacquer = FrozenBrush(18, 16, 15);
+        internal static readonly Brush DecoIvory = FrozenBrush(246, 232, 205);
+        private static readonly Brush DecoGold = FrozenBrush(212, 175, 99);
+        private static readonly Brush DecoShadow = FrozenBrush(113, 83, 48);
+        private static readonly Brush DecoRay = FrozenBrush(90, 64, 34);
+        private static readonly Pen DecoInlay = new Pen(DecoGold, 1.15);
+        private static readonly Pen DecoEtch = new Pen(DecoShadow, .75);
+        internal static readonly Brush DecoFrame = CreateDecoFrame();
+        private static readonly Geometry DecoMarquee = Geometry.Parse(
+            "M-219,33 H-179 V20 H-152 V7 H-121 M121,7 H152 V20 H179 V33 H219 " +
+            "M-219,48 H-179 V61 H-152 V74 H-121 M121,74 H152 V61 H179 V48 H219 " +
+            "M-121,74 H-60 L-50,84 H50 L60,74 H121 M-121,7 H-108 M108,7 H121");
+        private static readonly Geometry DecoBase = Geometry.Parse(
+            "M-125,62 H-52 L-43,70 H43 L52,62 H125 M-15,92 L0,87 15,92 0,97 Z " +
+            "M-8,-52 L0,-67 8,-52 0,-43 Z");
         private static readonly Brush AtomicCoral = FrozenBrush(220, 86, 58);
         private static readonly Brush AtomicTeal = FrozenBrush(50, 135, 128);
         private static readonly Geometry AtomicSpark = Geometry.Parse("M0,-27 Q3,-5 27,0 Q3,5 0,27 Q-3,5 -27,0 Q-3,-5 0,-27 Z");
@@ -149,8 +142,8 @@ namespace EnglishTypingPractice
                 DrawDesktop(drawing, t);
             else if (theme == UiTheme.CassetteFuturism)
                 DrawDeck(drawing, t);
-            else if (theme == UiTheme.Magritte)
-                DrawNightRoom(drawing, t, ActualWidth / scale, ActualHeight / scale);
+            else if (theme == UiTheme.ArtDeco)
+                DrawDeco(drawing, t, ActualWidth / scale, ActualHeight / scale);
             else if (theme == UiTheme.Atompunk)
                 DrawAtomic(drawing, t);
             else
@@ -408,83 +401,42 @@ namespace EnglishTypingPractice
             }
         }
 
-        private static void DrawNightRoom(DrawingContext drawing, double t, double width, double height)
+        private static Brush CreateDecoFrame()
         {
-            const double floor = 110;
-            drawing.DrawRectangle(NightWall, null, new Rect(-width / 2, -height / 2, width, height));
-            drawing.DrawRectangle(NightTrim, null, new Rect(-width / 2, floor - 6, width, 6));
-            drawing.DrawRectangle(NightFloor, null, new Rect(-width / 2, floor, width, height / 2 - floor));
-
-            double spread = Math.Min(1, Math.Max(0, (width - 440) / 290));
-            drawing.PushTransform(new TranslateTransform(70 * (1 - spread), 0));
-            drawing.DrawRectangle(NightTrim, null, new Rect(-276, -93, 128, 128));
-            drawing.DrawRectangle(NightWindow, null, new Rect(-272, -89, 120, 120));
-            drawing.DrawEllipse(Moon, null, new Point(-188, -61), 11, 11);
-            drawing.DrawRectangle(NightSea, null, new Rect(-272, -3, 120, 34));
-            drawing.DrawGeometry(NightWindow, null, NightCliff);
-            drawing.DrawRectangle(NightTrim, null, new Rect(-213, -89, 3, 120));
-            drawing.DrawRectangle(NightTrim, null, new Rect(-281, 31, 138, 5));
-            drawing.Pop();
-
-            double progress = Math.Min(1, t / .36);
-            double swing = progress * progress * (3 - 2 * progress);
-            double doorScale = 1.3 + .8 * spread;
-            drawing.PushTransform(new TranslateTransform(100 + 37 * spread, floor - 100 * doorScale));
-            drawing.PushTransform(new ScaleTransform(doorScale, doorScale));
-            DrawDaylightDoor(drawing, .20 + .74 * swing);
-            drawing.Pop();
-            drawing.Pop();
-        }
-
-        internal static void DrawDaylightDoor(DrawingContext drawing, double opening)
-        {
-            double edge = 60 - opening * 88;
-            double depth = 5 * Math.Sin(opening * 2.3);
-            drawing.DrawGeometry(DoorLightSpill, null, DoorPolygon(new Point(Math.Max(0, edge), 100),
-                new Point(60, 100), new Point(74, 125), new Point(-28 + Math.Max(0, edge), 125)));
-
-            drawing.DrawRectangle(DoorFrame, null, new Rect(-4, -4, 68, 104));
-            var doorway = new Rect(0, 0, 60, 100);
-            drawing.PushClip(new RectangleGeometry(doorway));
-            drawing.DrawRectangle(DoorSky, null, doorway);
-            drawing.DrawGeometry(Brushes.FloralWhite, null, DoorCloud);
-            drawing.DrawRectangle(DoorInterior, null, new Rect(0, 68, 60, 32));
-            drawing.DrawRectangle(DoorSea, null, new Rect(0, 79, 60, 21));
-            drawing.DrawGeometry(DoorSand, null, DoorDune);
-            drawing.Pop();
-
-            var topHinge = new Point(0, 0);
-            var bottomHinge = new Point(0, 100);
-            var topEdge = new Point(edge, -depth);
-            var bottomEdge = new Point(edge, 100 + depth);
-            drawing.DrawGeometry(DoorLeaf, null, DoorPolygon(topHinge, topEdge, bottomEdge, bottomHinge));
-            double inset = edge * .14;
-            double outer = edge * .86;
-            drawing.DrawGeometry(DoorPanel, null, DoorPolygon(new Point(inset, 10),
-                new Point(outer, 8 - depth), new Point(outer, 65), new Point(inset, 64)));
-            drawing.DrawGeometry(DoorPanel, null, DoorPolygon(new Point(inset, 72),
-                new Point(outer, 73), new Point(outer, 93 + depth), new Point(inset, 92)));
-            drawing.DrawEllipse(DoorLight, null, new Point(outer, 67), Math.Max(.3, Math.Abs(edge) * .028), 1.6);
-        }
-
-        private static Geometry DoorPolygon(Point a, Point b, Point c, Point d)
-        {
-            var shape = new StreamGeometry();
-            using (var path = shape.Open())
+            var frame = new DrawingGroup();
+            using (DrawingContext drawing = frame.Open())
             {
-                path.BeginFigure(a, true, true);
-                path.LineTo(b, true, false);
-                path.LineTo(c, true, false);
-                path.LineTo(d, true, false);
+                drawing.DrawRectangle(DecoLacquer, null, new Rect(0, 0, 1000, 600));
+                drawing.DrawGeometry(null, DecoEtch, Geometry.Parse(
+                    "M4,47 H22 V24 H48 V4 H952 V24 H978 V47 H996 V553 H978 V576 H952 V596 H48 V576 H22 V553 H4 Z " +
+                    "M17,58 H36 V35 H60 V16 H940 V35 H964 V58 H983 V542 H964 V565 H940 V584 H60 V565 H36 V542 H17 Z"));
+                drawing.DrawGeometry(DecoShadow, null, Geometry.Parse(
+                    "M488,16 L500,5 512,16 500,27 Z M488,584 L500,573 512,584 500,595 Z"));
             }
-            return shape;
-        }
-
-        private static Brush FrozenGradient(Color start, Color end)
-        {
-            var brush = new LinearGradientBrush(start, end, 90);
+            var brush = new DrawingBrush(frame);
             brush.Freeze();
             return brush;
+        }
+
+        private static void DrawDeco(DrawingContext drawing, double time, double width, double height)
+        {
+            var backdrop = new Rect(-width * .5 + 15, -height * .5 + 15, width - 30, height - 30);
+            drawing.DrawRectangle(DecoFrame, null, backdrop);
+
+            double progress = Math.Min(1, time / .34);
+            double reach = 1 - Math.Pow(1 - progress, 3);
+            var pivot = new Point(0, -42);
+            for (int line = -8; line <= 8; line++)
+            {
+                double angle = line * Math.PI / 21;
+                double radius = (line % 2 == 0 ? 117 : 105) * reach;
+                var rayEnd = new Point(Math.Sin(angle) * radius, pivot.Y - Math.Cos(angle) * radius);
+                drawing.DrawLine(line % 2 == 0 ? DecoInlay : DecoEtch, pivot, rayEnd);
+            }
+            drawing.DrawGeometry(DecoRay, DecoInlay, DecoBase);
+            drawing.DrawGeometry(null, DecoEtch, DecoMarquee);
+            drawing.DrawLine(DecoInlay, new Point(-69 * reach, -38), new Point(69 * reach, -38));
+            drawing.DrawLine(DecoEtch, new Point(-91, -34), new Point(91, -34));
         }
 
         private void DrawAtomic(DrawingContext drawing, double t)
@@ -591,9 +543,11 @@ namespace EnglishTypingPractice
                             PrintStamp(t - .358, 119 * root) * .18;
                         previousNoise = white;
                     }
-                    else if (theme == UiTheme.Magritte)
-                        sample = FeltChime(t, 349.2 * root) * .22 + FeltChime(t - .108, 523.25 * root) * .14 +
-                            FeltChime(t - .270, 466.16 * root) * .15;
+                    else if (theme == UiTheme.ArtDeco)
+                        sample = ThemedTypingAudio.DecoBar(t, 261.63 * root) * .24 +
+                            ThemedTypingAudio.DecoBar(t - .081, 329.63 * root) * .18 +
+                            ThemedTypingAudio.DecoBar(t - .158, 392 * root) * .17 +
+                            ThemedTypingAudio.DecoBar(t - .239, 587.33 * root) * .16;
                     else if (theme == UiTheme.Atompunk)
                         sample = Glide(t, 235 * root, 1050, .155) * .26 + Glide(t - .142, 740 * root, -370, .080) * .19 +
                             Tone(t - .255, 1120 * root, .085) * .16 + Tone(t - .299, 1480 * root, .079) * .12;
@@ -644,11 +598,6 @@ namespace EnglishTypingPractice
         private static double DesktopChime(double t, double frequency)
         {
             return Tone(t, frequency, .065) + .18 * Tone(t, frequency * 3, .022);
-        }
-
-        private static double FeltChime(double t, double frequency)
-        {
-            return Tone(t, frequency, .14) + .18 * Tone(t, frequency * 2.003, .056);
         }
 
         private static double Glide(double t, double frequency, double glide, double decay)
