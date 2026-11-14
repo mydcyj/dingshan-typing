@@ -1,6 +1,6 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="鼎山打字通" Width="1160" Height="815" MinWidth="565" MinHeight="420"
+        Title="鼎山打字通 v2.0" Width="1160" Height="815" MinWidth="565" MinHeight="420"
         WindowStartupLocation="CenterScreen" Background="#101C24"
         Foreground="#EDF4F2" FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="14"
         UseLayoutRounding="True">
@@ -384,6 +384,20 @@
           <ComboBoxItem Content="C 语言" />
           <ComboBoxItem Content="C++" />
           <ComboBoxItem Content="Python" />
+          <ComboBoxItem Content="贪吃蛇词汇复习" />
+        </ComboBox>
+        <ComboBox x:Name="CodeExerciseKind" SelectedIndex="0" Visibility="Collapsed" MinWidth="104"
+                  MinHeight="28" Margin="0,0,12,4" AutomationProperties.Name="代码练习题型">
+          <ComboBoxItem Content="完整示例" />
+          <ComboBoxItem Content="括号" />
+          <ComboBoxItem Content="引号" />
+          <ComboBoxItem Content="缩进" />
+        </ComboBox>
+        <ComboBox x:Name="ReviewLevel" SelectedIndex="0" Visibility="Collapsed" MinWidth="83"
+                  MinHeight="28" Margin="0,0,12,4" AutomationProperties.Name="复习词库">
+          <ComboBoxItem Content="全部词库" />
+          <ComboBoxItem Content="四级" />
+          <ComboBoxItem Content="六级" />
         </ComboBox>
         <CheckBox x:Name="MatchCase" Content="区分大小写" Margin="0,0,19,0"
                   ToolTip="取消勾选后，字母大小写均可。更改后重练本篇。" />
@@ -446,6 +460,10 @@
                      InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
                      AutomationProperties.Name="在这里输入" Language="en-US">
             </TextBox>
+            <TextBlock x:Name="ReviewMeaning" Margin="0,8,0,0" Visibility="Collapsed"
+                       TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
+            <TextBlock x:Name="PracticeResult" Margin="0,10,0,0" Visibility="Collapsed"
+                       TextWrapping="Wrap" Foreground="{StaticResource Accent}" />
           </StackPanel>
         </StackPanel>
       </Border>
@@ -552,6 +570,15 @@
         <TextBlock Text="贪吃蛇" Style="{StaticResource DisplayTitle}" />
         <TextBlock x:Name="SnakeCameraMode" Text="自由视角 · Alt 切换" Margin="0,3,0,0"
                    Foreground="{StaticResource Muted}" />
+        <Border x:Name="SnakeTutorialBanner" Visibility="Collapsed" Margin="0,6,0,0" Padding="7,4"
+                Background="{StaticResource Field}" BorderBrush="{StaticResource Accent}" BorderThickness="1">
+          <DockPanel>
+            <Button x:Name="ExitSnakeTutorial" DockPanel.Dock="Right" Content="退出引导" Margin="8,0,0,0"
+                    VerticalAlignment="Center" />
+            <TextBlock x:Name="SnakeTutorialInstruction" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Foreground="{StaticResource Accent}" AutomationProperties.LiveSetting="Polite" />
+          </DockPanel>
+        </Border>
       </StackPanel>
     </DockPanel>
 
@@ -792,7 +819,12 @@
               <Button x:Name="LanToggle" Content="局域网联机" />
               <CheckBox x:Name="SnakeVoiceEnabled" Content="英文女声" Margin="8,0,0,0" VerticalAlignment="Center"
                         ToolTip="念出你完成的有效方向词和技能词。" />
+              <CheckBox x:Name="SnakeLowEffects" Content="低特效" Margin="8,0,0,0" VerticalAlignment="Center"
+                        ToolTip="减弱震动和动画，保留子弹与技能范围提示。" />
             </WrapPanel>
+            <Expander x:Name="SnakeRecap" Header="本局复盘" Visibility="Collapsed" Margin="0,5,0,0">
+              <TextBlock x:Name="SnakeRecapText" TextWrapping="Wrap" Margin="0,4,0,4" />
+            </Expander>
             <TextBlock x:Name="LanRoster" Margin="0,6,0,6" TextWrapping="Wrap" LineHeight="22"
                        Foreground="{StaticResource Muted}" Visibility="Collapsed" />
             <Expander x:Name="LanAudioControls" Header="房间音量" Visibility="Collapsed" Margin="0,3,0,8">
@@ -819,6 +851,9 @@
               </StackPanel>
             </Expander>
             <Button x:Name="LanLeave" Content="离开房间" HorizontalAlignment="Left" Visibility="Collapsed" />
+            <Button x:Name="LanReady" Content="准备" HorizontalAlignment="Left" Visibility="Collapsed" Margin="0,6,0,0" />
+            <TextBlock x:Name="LanRules" Foreground="{StaticResource Muted}" TextWrapping="Wrap"
+                       FontSize="12" Visibility="Collapsed" Margin="0,5,0,0" />
           </StackPanel>
         </ScrollViewer>
         </DockPanel>
@@ -854,6 +889,15 @@
     <Border Grid.Row="1" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1">
       <ScrollViewer x:Name="SnakeRulesScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="20,5,20,16">
+          <TextBlock Text="跟着棋盘练一遍" Style="{StaticResource RuleHeading}" />
+          <TextBlock Text="练习打词转向、切换视角和清空输入，再体验所选职业。引导会在每步操作之间暂停。"
+                     Style="{StaticResource RuleText}" />
+          <WrapPanel Margin="0,0,0,4">
+            <ComboBox x:Name="SnakeTutorialRole" MinWidth="130" Margin="0,0,8,4"
+                      AutomationProperties.Name="引导练习职业" />
+            <Button x:Name="StartSnakeTutorial" Content="开始引导" Style="{StaticResource PrimaryButton}" Margin="0,0,0,4" />
+          </WrapPanel>
+          <TextBlock x:Name="SnakeTutorialNotice" TextWrapping="Wrap" Foreground="{StaticResource Coral}" />
           <TextBlock Text="快速开局" Style="{StaticResource RuleHeading}" />
           <TextBlock Style="{StaticResource RuleText}">
             <Run Text="1. 先选模式和职业。单人直接输入 " /><Run Text="start" FontFamily="Consolas" FontWeight="Bold" /><Run Text="。联机时，房主建房，同一网络的朋友扫描加入，再由房主开局。" />

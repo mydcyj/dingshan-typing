@@ -22,6 +22,8 @@ namespace EnglishTypingPractice
         private readonly Button scan;
         private readonly Button join;
         private readonly Button leave;
+        private readonly Button ready;
+        private readonly TextBlock rules;
         private readonly TextBlock roster;
         private readonly TextBox command;
         private readonly TextBlock snakeStatus;
@@ -43,6 +45,7 @@ namespace EnglishTypingPractice
         private int action;
         private bool busy;
         private bool updatingTeams;
+        private bool reconnecting;
 
         internal LanLobby(Window window, Action entered, Action<SnakeMatchState, int> update, Action exited,
             Func<SnakeRole> selectedRole, Func<SnakeMode> selectedMode, PracticeSettings settings, Action saveSettings)
@@ -63,6 +66,8 @@ namespace EnglishTypingPractice
             scan = (Button)window.FindName("LanScan");
             join = (Button)window.FindName("LanJoin");
             leave = (Button)window.FindName("LanLeave");
+            ready = (Button)window.FindName("LanReady");
+            rules = (TextBlock)window.FindName("LanRules");
             roster = (TextBlock)window.FindName("LanRoster");
             command = (TextBox)window.FindName("SnakeCommand");
             snakeStatus = (TextBlock)window.FindName("SnakeStatus");
@@ -104,9 +109,21 @@ namespace EnglishTypingPractice
             join.Click += async (sender, e) => await JoinRoom();
             leave.Click += (sender, e) =>
             {
-                Close();
+                Close(true);
                 panel.Visibility = Visibility.Visible;
                 notice.Text = "已离开房间。";
+            };
+            ready.Click += (sender, e) =>
+            {
+                if (latest == null)
+                    return;
+                if (host != null && latest.Phase == MatchPhase.Finished)
+                {
+                    host.ReturnToLobby();
+                    RefreshRoom();
+                }
+                else if (client != null && latest.Phase == MatchPhase.Lobby && !client.Reconnecting)
+                    client.SetReady(!latest.ReadySlots.Contains(client.Slot));
             };
             rooms.SelectionChanged += (sender, e) => address.Clear();
             timer.Tick += (sender, e) => RefreshRoom();
@@ -117,9 +134,11 @@ namespace EnglishTypingPractice
         {
             if (host == null)
                 return;
-            if (!host.Start())
-                snakeStatus.Text = "团战人数至少要达到队伍数。";
+            string failure;
+            host.Start(out failure);
             RefreshRoom();
+            if (failure != null)
+                snakeStatus.Text = failure;
         }
 
         private static void BindVolume(Window window, string name, int initial, Action<int> change, Action save)
@@ -268,6 +287,11 @@ namespace EnglishTypingPractice
             var selected = rooms.SelectedItem as DiscoveredRoom;
             if (string.IsNullOrWhiteSpace(address.Text) && selected != null)
             {
+                if (selected.Info.Version != LanWire.Version || selected.Info.AppVersion != LanWire.AppVersion)
+                {
+                    notice.Text = LanWire.VersionMismatch(LanWire.DisplayVersion(selected.Info.AppVersion, selected.Info.Version), LanWire.AppVersion);
+                    return;
+                }
                 if (!selected.Info.Joinable)
                 {
                     notice.Text = "房间已满或本局正在进行。请稍后重新扫描。";
@@ -331,6 +355,14 @@ namespace EnglishTypingPractice
                 notice.Text = "与房主的连接已断开。";
                 return;
             }
+            bool lost = client != null && client.Reconnecting;
+            if (lost != reconnecting)
+            {
+                reconnecting = lost;
+                command.IsEnabled = !lost;
+                ready.IsEnabled = !lost;
+                snakeStatus.Text = lost ? "连接中断，正在尝试重连…" : "已重新连接房间。";
+            }
             var state = host != null ? host.Snapshot() : client.State;
             if (ReferenceEquals(state, latest))
                 return;
@@ -343,8 +375,15 @@ namespace EnglishTypingPractice
             updatingTeams = true;
             teamPicker.SelectedIndex = state.NextTeamCount - 2;
             updatingTeams = false;
+            ready.Visibility = (host != null && state.Phase == MatchPhase.Finished ||
+                client != null && state.Phase == MatchPhase.Lobby) ? Visibility.Visible : Visibility.Collapsed;
+            ready.Content = host != null ? "返回准备" : state.ReadySlots.Contains(slot) ? "取消准备" : "准备";
+            rules.Visibility = Visibility.Visible;
+            rules.Text = "房主设置 · " + LanDiscovery.ModeName(state.NextMode) +
+                (teamMode ? " · " + state.NextTeamCount + " 队 · 每局随机分队" : "") + " · " + LanWire.AppVersion;
             if (latest == null || latest.Phase != state.Phase || latest.Round != state.Round || latest.Mode != state.Mode ||
                 !latest.Players.Select(PlayerLine).SequenceEqual(state.Players.Select(PlayerLine)) ||
+                !latest.ReadySlots.SequenceEqual(state.ReadySlots) || !latest.ReconnectingSlots.SequenceEqual(state.ReconnectingSlots) ||
                 !latest.TeamScores.SequenceEqual(state.TeamScores))
                 RenderRoster(state, slot);
             music.Refresh(state, latest, client, slot);
@@ -383,7 +422,10 @@ namespace EnglishTypingPractice
                 roster.Inlines.Add(new System.Windows.Documents.Run(PlayerLabel(player, slot) +
                     " · " + SnakeWords.RoleName(player.Role) +
                     (state.Phase == MatchPhase.Playing ? "  " + player.Score + unit : "") +
-                    (player.Result == SnakeResult.Left ? " · 已离开" :
+                    (state.ReconnectingSlots.Contains(player.Slot) ? " · 重连中" :
+                        state.Phase == MatchPhase.Lobby && player.Slot != 0 ?
+                            (state.ReadySlots.Contains(player.Slot) ? " · 已准备" : " · 等待准备") :
+                        player.Result == SnakeResult.Left ? " · 已离开" :
                         state.Phase == MatchPhase.Playing && player.Result != SnakeResult.Running ? " · 出局" : "")));
             }
         }
@@ -403,7 +445,8 @@ namespace EnglishTypingPractice
                 roster.Inlines.Add(" " + state.TeamScores[team] + " 球");
                 foreach (var player in state.Players.Where(player => player.Team == team))
                     roster.Inlines.Add(" · " + PlayerLabel(player, slot) +
-                        (player.Result == SnakeResult.Left ? "（离开）" : player.Carrying > 0 ? " ＋" + player.Carrying : ""));
+                        (state.ReconnectingSlots.Contains(player.Slot) ? "（重连中）" :
+                            player.Result == SnakeResult.Left ? "（离开）" : player.Carrying > 0 ? " ＋" + player.Carrying : ""));
             }
         }
 
@@ -418,7 +461,7 @@ namespace EnglishTypingPractice
             return player.Name + (player.Slot == slot ? "（你）" : player.Slot == 0 ? "（房主）" : "");
         }
 
-        internal void Close()
+        internal void Close(bool intentional = true)
         {
             action++;
             timer.Stop();
@@ -426,12 +469,18 @@ namespace EnglishTypingPractice
             if (host != null)
                 host.Dispose();
             if (client != null)
-                client.Dispose();
+            {
+                if (intentional && !busy && !client.Reconnecting && !client.Disconnected)
+                    client.Leave();
+                else
+                    client.Dispose();
+            }
             host = null;
             client = null;
             latest = null;
             localAddress = null;
             busy = false;
+            reconnecting = false;
             panel.Visibility = Visibility.Collapsed;
             UpdateControls();
             exited();
@@ -455,7 +504,10 @@ namespace EnglishTypingPractice
             audioControls.Visibility = roster.Visibility;
             masterControl.Visibility = host == null ? Visibility.Collapsed : Visibility.Visible;
             if (!connected)
+            {
                 teamLabel.Visibility = teamPicker.Visibility = Visibility.Collapsed;
+                ready.Visibility = rules.Visibility = Visibility.Collapsed;
+            }
         }
     }
 }

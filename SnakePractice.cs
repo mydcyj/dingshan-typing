@@ -53,6 +53,12 @@ namespace EnglishTypingPractice
         private readonly Action<double, double> shakeWindow;
         private readonly SnakeWordVoice voice;
         private readonly CheckBox voiceEnabled;
+        private readonly Expander recap;
+        private readonly TextBlock recapText;
+        private readonly Action saveSettings;
+        private readonly SnakeTutorial tutorial;
+        private bool reviewedDirectionAttempt;
+        private bool reviewedSkillAttempt;
         private readonly PracticeSettings settings;
         private readonly LanLobby lobby;
         private SnakeMatchState online;
@@ -69,6 +75,7 @@ namespace EnglishTypingPractice
             this.gameRunningChanged = gameRunningChanged;
             this.shakeWindow = shakeWindow;
             this.settings = settings;
+            this.saveSettings = saveSettings;
             command = (TextBox)window.FindName("SnakeCommand");
             rolePicker = (ComboBox)window.FindName("SnakeRole");
             modePicker = (ComboBox)window.FindName("SnakeMode");
@@ -111,6 +118,15 @@ namespace EnglishTypingPractice
             directionWords = new[] { "SnakeNorth", "SnakeEast", "SnakeSouth", "SnakeWest" }
                 .Select(name => (TextBlock)window.FindName(name)).ToArray();
             board = new SnakeBoard();
+            var lowEffects = (CheckBox)window.FindName("SnakeLowEffects");
+            lowEffects.IsChecked = board.LowEffects = settings.SnakeLowEffects;
+            lowEffects.Click += (sender, e) =>
+            {
+                board.LowEffects = settings.SnakeLowEffects = lowEffects.IsChecked == true;
+                saveSettings();
+            };
+            recap = (Expander)window.FindName("SnakeRecap");
+            recapText = (TextBlock)window.FindName("SnakeRecapText");
             ((Border)window.FindName("SnakeBoardHost")).Child = board;
             overview = (FrameworkElement)window.FindName("SnakeOverview");
             overviewSize = (TextBlock)window.FindName("SnakeOverviewSize");
@@ -141,6 +157,11 @@ namespace EnglishTypingPractice
             scoreGuide = (TextBlock)window.FindName("SnakeScoreGuide");
             lobby = new LanLobby(window, EnterRoom, ApplyRoomState, LeaveRoom, () => SelectedRole, () => SelectedMode,
                 settings, saveSettings);
+            tutorial = new SnakeTutorial(window, StartTutorial, StopTutorial, () =>
+            {
+                game.PlaceTutorialFruit();
+                Render();
+            }, moving => { if (moving) clock.Start(); else clock.Stop(); });
             rolePicker.SelectionChanged += (sender, e) =>
             {
                 if (updatingRole)
@@ -199,6 +220,7 @@ namespace EnglishTypingPractice
                         ClearLook();
                         board.ToggleCamera();
                         UpdateOverview(board.MapSize);
+                        tutorial.CameraChanged(board.CameraLocked);
                     }
                     e.Handled = true;
                     return;
@@ -208,7 +230,10 @@ namespace EnglishTypingPractice
                     (key == Key.Left || key == Key.Right || key == Key.Up || key == Key.Down))
                 {
                     if (!e.IsRepeat && lookKeys.Add(key))
+                    {
                         UpdateLook();
+                        tutorial.LookChanged(true);
+                    }
                     e.Handled = true;
                     return;
                 }
@@ -222,7 +247,12 @@ namespace EnglishTypingPractice
                 }
                 else if (e.Key == Key.Space && (command.IsKeyboardFocusWithin || chargeInput.IsKeyboardFocusWithin))
                 {
-                    (chargeInput.IsKeyboardFocusWithin ? chargeInput : command).Clear();
+                    bool skill = chargeInput.IsKeyboardFocusWithin;
+                    var input = skill ? chargeInput : command;
+                    if (!(skill ? reviewedSkillAttempt : reviewedDirectionAttempt))
+                        RecordReview(input.Text, ReviewWords(skill));
+                    tutorial.InputCleared(input.Text.Length > 0);
+                    input.Clear();
                     e.Handled = true;
                 }
                 else if (e.Key == Key.Tab && chargePanel.Visibility == Visibility.Visible &&
@@ -241,6 +271,7 @@ namespace EnglishTypingPractice
                 if (lookKeys.Remove(key))
                 {
                     UpdateLook();
+                    tutorial.LookChanged(lookKeys.Count > 0);
                     e.Handled = true;
                 }
                 if ((e.Key == Key.LeftShift || e.Key == Key.RightShift) &&
@@ -308,6 +339,7 @@ namespace EnglishTypingPractice
 
         internal void Leave()
         {
+            tutorial.Cancel();
             StopSprint();
             wordFlash.BeginAnimation(UIElement.OpacityProperty, null);
             soloMatch = null;
@@ -328,7 +360,10 @@ namespace EnglishTypingPractice
         private void OnCommandChanged(object sender, TextChangedEventArgs e)
         {
             if (command.Text.Length == 0)
+            {
+                reviewedDirectionAttempt = false;
                 return;
+            }
 
             if (online != null)
             {
@@ -357,6 +392,7 @@ namespace EnglishTypingPractice
                 var before = game.Direction;
                 if (game.TryWord(word, game.WordGroup, clock.ElapsedMilliseconds))
                 {
+                    tutorial.TurnAccepted(before != game.Direction, game.ExtraMoves, word.Length);
                     FlashWord(game.LastWord);
                     PulseDirection(game.Direction);
                     if (before != game.Direction)
@@ -382,12 +418,16 @@ namespace EnglishTypingPractice
                 soloMatch.SetMode(SelectedMode);
                 soloMatch.Start();
                 clock.Restart();
+                if (tutorial.Active && !tutorial.CanMove)
+                    clock.Stop();
                 RefreshSoloMatch();
                 timer.Start();
                 return;
             }
             game.Start(SelectedRole, SelectedMode, SelectedMode == SnakeMode.Classic ? SelectedMapSize : SnakeGame.BaseSize);
             clock.Restart();
+            if (tutorial.Active && !tutorial.CanMove)
+                clock.Stop();
             status.Text = "";
             Render();
             timer.Start();
@@ -396,11 +436,15 @@ namespace EnglishTypingPractice
 
         private void Tick(object sender, EventArgs e)
         {
+            if (tutorial.Active && !tutorial.CanMove)
+                return;
             long now = clock.ElapsedMilliseconds;
             if (soloMatch != null)
             {
+                int head = online.Players[0].Body.FirstOrDefault();
                 soloMatch.Step(now);
                 RefreshSoloMatch();
+                tutorial.AfterTick(now, head != online.Players[0].Body.FirstOrDefault());
                 if (soloMatch.Phase == MatchPhase.Finished && !soloMatch.HasBurst)
                 {
                     timer.Stop();
@@ -409,17 +453,26 @@ namespace EnglishTypingPractice
                 return;
             }
             bool changed = game.UpdateSoloClock(now);
-            if (!changed && !game.MoveDue(now))
-                return;
-
-            if (game.MoveDue(now))
+            bool moveDue = game.MoveDue(now);
+            bool moved = false;
+            if (moveDue)
             {
+                int head = game.Body.First.Value;
+                int bodyLength = game.Body.Count;
+                game.RecordActiveTime(now);
                 game.Step(now);
                 if (game.MoveDue(now))
                     game.ScheduleNext(now);
+                if (game.Body.Count > bodyLength)
+                    tutorial.FruitCollected();
+                moved = head != game.Body.First.Value;
             }
+            tutorial.AfterTick(now, moved);
+            if (!changed && !moveDue)
+                return;
             if (!game.IsRunning)
             {
+                tutorial.Cancel();
                 timer.Stop();
                 clock.Stop();
                 command.Clear();
@@ -464,6 +517,14 @@ namespace EnglishTypingPractice
             UpdateOverview(size);
             PublishTyping(false);
             score.Text = (territory ? 0 : game.Score).ToString(CultureInfo.CurrentCulture);
+            recap.Visibility = game.Result == SnakeResult.Wall || game.Result == SnakeResult.Body ||
+                game.Result == SnakeResult.Obstacle || game.Result == SnakeResult.Won ? Visibility.Visible : Visibility.Collapsed;
+            if (recap.Visibility == Visibility.Visible)
+                recapText.Text = FormatRecap(SelectedMode, new SnakePlayerState
+                {
+                    SurvivalMs = game.SurvivalMs, Turns = game.Turns, SkillHits = game.SkillHits,
+                    SkillUses = game.SkillUses, Result = game.Result, Score = game.Score
+                });
         }
 
         private void ShowWords(bool running, SnakeDirection movement, string[] words, SnakeRole role)
@@ -480,10 +541,13 @@ namespace EnglishTypingPractice
                         if (current && variant != 2)
                             return variant == 0 ? "—" : null;
                         string word = words[(int)direction * variants + variant];
-                        return word + " " + SnakeWords.Meaning(word) + (opposite ? " ×" : "");
+                        string effect = role != SnakeRole.Timewalker || variant == 0 ? "" :
+                            " +" + variant * (SnakeGame.UsesTimewalkerBalance(online == null ? SelectedMode : online.Mode) ? 1 : 2) + "格";
+                        return word + effect + " " + SnakeWords.Meaning(word) + (opposite ? " ×" : "");
                     }).Where(line => line != null));
                 label.Foreground = opposite || !running ? SnakeBoard.Quiet : SnakeBoard.Label;
-                label.ToolTip = current ? "当前方向" : opposite ? "禁止掉头" : null;
+                label.ToolTip = !running ? null : opposite ? "禁止掉头" :
+                    current ? (role == SnakeRole.Timewalker ? "最长词可沿当前方向额外前进" : "当前方向") : label.Text;
                 var card = (Border)((StackPanel)label.Parent).Parent;
                 if (current)
                     card.Background = SnakeBoard.Current;
@@ -560,8 +624,14 @@ namespace EnglishTypingPractice
         private void OnChargeChanged(object sender, TextChangedEventArgs e)
         {
             if (chargeInput.Text.Length == 0)
+            {
+                reviewedSkillAttempt = false;
                 return;
+            }
             string word = chargeInput.Text;
+            if (tutorial.Active && !tutorial.AcceptsSkill)
+                return;
+            RecordMistype(word, ReviewWords(true), ref reviewedSkillAttempt);
             if (online != null)
             {
                 var own = online.Players.First(player => player.Slot == ownSlot);
@@ -573,10 +643,14 @@ namespace EnglishTypingPractice
                 if (soloMatch == null)
                     lobby.Turn(word, online.ChargeGroup, online.Round, charge: true);
                 else if (soloMatch.TryCharge(0, word, online.ChargeGroup, online.Round, clock.ElapsedMilliseconds))
+                {
+                    tutorial.SkillAccepted(clock.ElapsedMilliseconds);
                     RefreshSoloMatch();
+                }
             }
             else if (game.TryCharge(word, game.ChargeGroup, clock.ElapsedMilliseconds))
             {
+                tutorial.SkillAccepted(clock.ElapsedMilliseconds);
                 chargeInput.Clear();
                 FlashWord(game.LastWord);
                 Render();
@@ -586,9 +660,15 @@ namespace EnglishTypingPractice
         private void SubmitWord(string[] words, SnakeRole role, SnakeDirection direction, bool stunned, Action<string> submit)
         {
             string word = command.Text;
+            if (tutorial.Active && !tutorial.AcceptsDirection)
+                return;
             int index = Array.FindIndex(words, candidate => word.Equals(candidate, StringComparison.OrdinalIgnoreCase));
             if (index < 0)
+            {
+                if (!stunned)
+                    RecordMistype(word, ReviewWords(false), ref reviewedDirectionAttempt);
                 return;
+            }
             command.Clear();
             int variants = SnakeWords.Variants(role);
             int target = index / variants;
@@ -602,6 +682,7 @@ namespace EnglishTypingPractice
 
         private void EnterRoom()
         {
+            tutorial.Cancel();
             soloMatch = null;
             online = null;
             timer.Stop();
@@ -650,13 +731,77 @@ namespace EnglishTypingPractice
                 if (soloMatch == null)
                     lobby.Turn(word, online.WordGroup, online.Round);
                 else if (soloMatch.TryWord(0, word, online.WordGroup, online.Round, clock.ElapsedMilliseconds))
+                {
+                    int index = Array.IndexOf(online.Words, online.Words.First(item => item.Equals(word, StringComparison.OrdinalIgnoreCase)));
+                    int variants = SnakeWords.Variants(own.Role);
+                    tutorial.TurnAccepted(index / variants != (int)own.Direction,
+                        index % variants * (SnakeGame.UsesTimewalkerBalance(online.Mode) ? 1 : 2), word.Length);
                     RefreshSoloMatch();
+                }
             });
         }
 
         private void RefreshSoloMatch()
         {
             ApplyRoomState(soloMatch.Snapshot("单人游戏", 0), 0);
+        }
+
+        private bool StartTutorial(SnakeRole role)
+        {
+            if (online != null && soloMatch == null)
+                return false;
+            timer.Stop();
+            clock.Stop();
+            soloMatch = null;
+            online = null;
+            game = new SnakeGame();
+            rolePicker.SelectedIndex = (int)role;
+            modePicker.SelectedIndex = (int)SnakeMode.Classic;
+            if (board.CameraLocked)
+                board.ToggleCamera();
+            tutorial.CameraChanged(board.CameraLocked);
+            lobby.HidePanel();
+            command.IsReadOnly = false;
+            Start();
+            command.Focus();
+            return true;
+        }
+
+        private void StopTutorial()
+        {
+            Leave();
+            command.Focus();
+        }
+
+        private string[] ReviewWords(bool skill)
+        {
+            var player = online == null ? null : online.Players.FirstOrDefault(item => item.Slot == ownSlot);
+            if (player == null ? !game.IsRunning : online.Phase != MatchPhase.Playing || player.Result != SnakeResult.Running || player.StunRemaining > 0)
+                return new string[0];
+            if (skill)
+            {
+                var word = player == null ? game.ChargeWord : online.ChargeWord;
+                return string.IsNullOrEmpty(word) ? new string[0] : new[] { word };
+            }
+            var direction = player == null ? game.Direction : player.Direction;
+            int variants = SnakeWords.Variants(player == null ? game.Role : player.Role);
+            return (player == null ? game.Words : online.Words).Where((word, i) =>
+                i / variants != ((int)direction + 2) % 4 && (i / variants != (int)direction || i % variants == 2)).ToArray();
+        }
+
+        private void RecordMistype(string input, string[] words, ref bool reviewed)
+        {
+            if (!reviewed && words.Length > 0 && input.Length >= words.Min(word => word.Length) &&
+                !words.Any(word => word.StartsWith(input, StringComparison.OrdinalIgnoreCase)))
+                reviewed = RecordReview(input, words);
+        }
+
+        private bool RecordReview(string input, string[] words)
+        {
+            if (tutorial.Active || !settings.RecordSnakeReview(input, words))
+                return false;
+            saveSettings();
+            return true;
         }
 
         private static string ShrinkGuide(int side, int next)
@@ -715,12 +860,13 @@ namespace EnglishTypingPractice
                 command.Clear();
                 chargeInput.Clear();
                 status.Text = state.Phase == MatchPhase.Lobby
-                    ? (slot == 0 ? "等待同学加入，输入 start 开局。" : "等待房主输入 start。")
+                    ? (slot == 0 ? "成员准备后输入 start 开局。" : "点击「准备」，等待房主开局。")
                     : state.Phase == MatchPhase.Finished
                         ? ((own.Result == SnakeResult.Survived ? "你是最后存活的玩家。" : "本局结束。") +
                             (soloMatch != null ? (state.Mode == SnakeMode.Territory
                                 ? "共占领 " + own.Score + " 格。" : "得分 " + own.Score + "。") : "") +
-                            (slot == 0 ? "输入 start 再开一局。" : "等待房主开局。"))
+                            (soloMatch != null ? "输入 start 再开一局。" : slot == 0 ?
+                                "点击「返回准备」或输入 start。" : "等待房主返回准备。"))
                         : running ? "" : "你已出局，可以继续观战。";
             }
             else if (previous.WordGroup != state.WordGroup)
@@ -781,6 +927,35 @@ namespace EnglishTypingPractice
             UpdateOverview(size);
             PublishTyping(false);
             UpdateMusic(running && soloMatch != null);
+            if (state.Phase == MatchPhase.Finished && (previous == null || previous.Phase != MatchPhase.Finished))
+            {
+                tutorial.Cancel();
+                recapText.Text = FormatRecap(state.Mode, own);
+            }
+            recap.Visibility = state.Phase == MatchPhase.Finished ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private static string FormatRecap(SnakeMode mode, SnakePlayerState player)
+        {
+            string actions = "转向 " + player.Turns + " 次 · 技能命中 " + player.SkillHits + " 次（施放 " + player.SkillUses + " 次）";
+            if (mode == SnakeMode.Territory)
+                return "最终占地 " + player.Score + " 格 · 累计获得 " + player.LandGained +
+                    " 格 · 被夺走 " + player.LandLost + " 格\n复活 " + player.Respawns + " 次 · " + actions;
+            if (mode == SnakeMode.Teams)
+                return "成功交付 " + player.Deliveries + " 球 · 复活 " + player.Respawns + " 次\n" + actions;
+            string result;
+            switch (player.Result)
+            {
+                case SnakeResult.Wall: result = "撞墙或出圈"; break;
+                case SnakeResult.Body: result = "撞到自身"; break;
+                case SnakeResult.Obstacle: result = "撞到障碍"; break;
+                case SnakeResult.Rival: result = "与其他玩家碰撞"; break;
+                case SnakeResult.Skill: result = "被对手技能命中"; break;
+                case SnakeResult.Survived: result = "最后存活"; break;
+                case SnakeResult.Won: result = "通关"; break;
+                default: result = "本局结束"; break;
+            }
+            return "存活 " + (player.SurvivalMs / 1000.0).ToString("0.0") + " 秒 · " + result + "\n" + actions;
         }
 
         private void UpdateOverview(int size)
@@ -844,7 +1019,8 @@ namespace EnglishTypingPractice
             fade.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(620))));
             fade.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1040))));
             wordFlash.BeginAnimation(UIElement.OpacityProperty, fade);
-            for (int i = 0; i < 2; i++)
+            flashBlue.Visibility = flashRose.Visibility = board.LowEffects ? Visibility.Hidden : Visibility.Visible;
+            for (int i = 0; i < (board.LowEffects ? 0 : 2); i++)
             {
                 var transform = (TranslateTransform)(i == 0 ? flashBlue : flashRose).RenderTransform;
                 transform.BeginAnimation(TranslateTransform.XProperty,
@@ -855,13 +1031,13 @@ namespace EnglishTypingPractice
         private void TurnFeedback(SnakeDirection previousDirection)
         {
             board.ShowTurnEffect(previousDirection);
-            if (board.IsVisible && SystemParameters.ClientAreaAnimation)
+            if (!board.LowEffects && board.IsVisible && SystemParameters.ClientAreaAnimation)
                 shakeWindow(2.5, 140);
         }
 
         private void PulseDirection(SnakeDirection direction)
         {
-            if (!SystemParameters.ClientAreaAnimation)
+            if (board.LowEffects || !SystemParameters.ClientAreaAnimation)
                 return;
             var card = (Border)((StackPanel)directionWords[(int)direction].Parent).Parent;
             var current = (SolidColorBrush)card.FindResource("Line");
@@ -997,6 +1173,24 @@ namespace EnglishTypingPractice
         private bool cameraLocked;
         private Point cameraHead = new Point(16.5, 16.5);
         private Vector lookOffset;
+        private bool lowEffects;
+        internal bool LowEffects
+        {
+            get { return lowEffects; }
+            set
+            {
+                if (lowEffects == value)
+                    return;
+                lowEffects = value;
+                if (value)
+                {
+                    turnFlashes.Clear();
+                    muzzleFlashes.Clear();
+                    BeginAnimation(CameraOffsetProperty, null);
+                }
+                InvalidateVisual();
+            }
+        }
 
         internal SnakeBoard()
         {
@@ -1064,6 +1258,8 @@ namespace EnglishTypingPractice
 
         private void AddTurnEffect(int head, SnakeDirection previousDirection, double now)
         {
+            if (LowEffects)
+                return;
             turnFlashes.Add(new Flash
             {
                 Origin = CellCenter(head),
@@ -1098,7 +1294,7 @@ namespace EnglishTypingPractice
                         continue;
                     if (player.Slot != ownSlot && player.Body.Length > 0 && player.Direction != prior.Direction)
                         AddTurnEffect(prior.Body[0], prior.Direction, now);
-                    if (player.Role == SnakeRole.Hunter && player.SkillUses > prior.SkillUses)
+                    if (!LowEffects && player.Role == SnakeRole.Hunter && player.SkillUses > prior.SkillUses)
                         muzzleFlashes.Add(new Flash
                         {
                             Origin = CellCenter(player.Body.Length == 0 ? prior.Body[0] : player.Body[0]),
@@ -1168,7 +1364,7 @@ namespace EnglishTypingPractice
             viewport.X = (int)next.X;
             viewport.Y = (int)next.Y;
             SetValue(CameraOffsetProperty, next);
-            if (!reset && current != next && IsVisible && SystemParameters.ClientAreaAnimation)
+            if (!reset && !LowEffects && current != next && IsVisible && SystemParameters.ClientAreaAnimation)
             {
                 BeginAnimation(CameraOffsetProperty, new PointAnimation(current, next, TimeSpan.FromMilliseconds(190))
                 {
@@ -1197,7 +1393,7 @@ namespace EnglishTypingPractice
             drawing.PushClip(new RectangleGeometry(area));
             if (cameraLocked)
                 drawing.DrawRectangle(OutsideMap, null, area);
-            DrawTerrain(drawing, world, cell, visible, true);
+            DrawTerrain(drawing, world, cell, visible, !LowEffects);
             var gridArea = Rect.Intersect(area, world);
             for (int x = visible.X + 1; x < visible.X + visible.Width; x++)
             {
@@ -1460,17 +1656,19 @@ namespace EnglishTypingPractice
                 Point center = ToScreen(ShotPosition(shot, now), area, cell);
                 if (shot.Direction.LengthSquared > 0)
                 {
-                    Point tail = center - shot.Direction * (cell * 1.75);
+                    Point tail = center - shot.Direction * (cell * (LowEffects ? .8 : 1.75));
                     drawing.DrawLine(ShotTrail, tail, center);
-                    for (int i = 1; i <= 3; i++)
+                    for (int i = 1; !LowEffects && i <= 3; i++)
                     {
                         Point spark = center - shot.Direction * (cell * (.38 + i * .36));
                         double radius = cell * (.22 - .035 * i);
                         drawing.DrawEllipse(ShotGlow, null, spark, radius, radius);
                     }
                 }
-                drawing.DrawEllipse(ShotGlow, null, center, cell * .54, cell * .54);
-                drawing.DrawEllipse(ShotCore, null, center, cell * .20, cell * .20);
+                if (!LowEffects)
+                    drawing.DrawEllipse(ShotGlow, null, center, cell * .54, cell * .54);
+                double coreRadius = cell * (LowEffects ? .30 : .20);
+                drawing.DrawEllipse(ShotCore, null, center, coreRadius, coreRadius);
             }
             foreach (var flash in muzzleFlashes)
             {
@@ -1496,11 +1694,14 @@ namespace EnglishTypingPractice
                 burst.Intersect(new Rect(0, 0, size, size));
                 var pulseArea = new Rect(ToScreen(burst.TopLeft, area, cell), ToScreen(burst.BottomRight, area, cell));
                 Point center = ToScreen(flash.Origin, area, cell);
-                drawing.PushOpacity(1 - progress);
+                drawing.PushOpacity(LowEffects ? .8 : 1 - progress);
                 drawing.DrawRectangle(BurstFill, BurstOutline, pulseArea);
-                double radius = cell * (.25 + progress * 2.25);
-                drawing.DrawEllipse(null, BurstOutline, center, radius, radius);
-                drawing.DrawEllipse(ShotCore, null, center, cell * .18, cell * .18);
+                if (!LowEffects)
+                {
+                    double radius = cell * (.25 + progress * 2.25);
+                    drawing.DrawEllipse(null, BurstOutline, center, radius, radius);
+                    drawing.DrawEllipse(ShotCore, null, center, cell * .18, cell * .18);
+                }
                 drawing.Pop();
             }
         }
@@ -1513,49 +1714,34 @@ namespace EnglishTypingPractice
             if (own == null)
                 return;
             Point head = ToScreen(CellCenter(own.Body[0]), world, cell);
-            if (!viewportArea.Contains(head))
-                return;
             Point fruit = ToScreen(CellCenter(largeFruit) + new Vector(.5, .5), world, cell);
-            var direction = fruit - head;
+            var visibleFruit = new Rect(fruit.X - cell, fruit.Y - cell, 2 * cell, 2 * cell);
+            if (viewportArea.IntersectsWith(visibleFruit))
+                return;
+            var direction = fruit - new Point(viewportArea.X + viewportArea.Width / 2, viewportArea.Y + viewportArea.Height / 2);
             if (direction.LengthSquared == 0)
                 return;
-            direction.Normalize();
-            var normal = new Vector(-direction.Y, direction.X);
             double length = Math.Max(3.5, Math.Min(9, cell * .48));
             var bounds = viewportArea;
-            bounds.Inflate(-length, -length);
-            if (bounds.IsEmpty)
+            if (bounds.Width <= 3 * length || bounds.Height <= 3 * length)
                 return;
-
-            var anchor = head + direction * (cell * 1.35 + length);
-            double separation = cell * 1.1 + length;
-            var nearFruit = new Rect(fruit.X - cell, fruit.Y - cell, 2 * cell, 2 * cell);
-            nearFruit.Inflate(length * .5, length * .5);
-            foreach (var candidate in new[]
+            bounds.Inflate(-1.5 * length, -1.5 * length);
+            Point center = new Point(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2);
+            var candidate = center + direction * Math.Min(bounds.Width / (2 * Math.Abs(direction.X)),
+                bounds.Height / (2 * Math.Abs(direction.Y)));
+            if (fruit != head)
+                direction = fruit - head;
+            direction.Normalize();
+            var normal = new Vector(-direction.Y, direction.X);
+            var arrow = new StreamGeometry();
+            using (var shape = arrow.Open())
             {
-                anchor, head + normal * separation, head - normal * separation,
-                head - direction * separation, head + (normal - direction) * separation,
-                head - (normal + direction) * separation
-            })
-            {
-                if (!bounds.Contains(candidate) || nearFruit.Contains(candidate) || own.Body.Any(position =>
-                {
-                    Rect body = CellBounds(position, world, cell);
-                    body.Inflate(length * .70, length * .70);
-                    return body.Contains(candidate);
-                }))
-                    continue;
-                var arrow = new StreamGeometry();
-                using (var shape = arrow.Open())
-                {
-                    shape.BeginFigure(candidate + direction * length, true, true);
-                    shape.LineTo(candidate - direction * length * .75 + normal * length * .70, true, false);
-                    shape.LineTo(candidate - direction * length * .33, true, false);
-                    shape.LineTo(candidate - direction * length * .75 - normal * length * .70, true, false);
-                }
-                drawing.DrawGeometry(LargeFruit, FruitArrowOutline, arrow);
-                return;
+                shape.BeginFigure(candidate + direction * length, true, true);
+                shape.LineTo(candidate - direction * length * .75 + normal * length * .70, true, false);
+                shape.LineTo(candidate - direction * length * .33, true, false);
+                shape.LineTo(candidate - direction * length * .75 - normal * length * .70, true, false);
             }
+            drawing.DrawGeometry(LargeFruit, FruitArrowOutline, arrow);
         }
 
         private static Point ToScreen(Point point, Rect world, double cell)
@@ -1627,13 +1813,16 @@ namespace EnglishTypingPractice
         {
             var placed = new System.Collections.Generic.List<Rect>();
             double textWidth = Math.Max(1, Math.Min(190, area.Width - 14));
-            foreach (var player in players)
+            var ownPlayer = players.FirstOrDefault(player => player.Slot == ownSlot && player.Body.Length > 0);
+            foreach (var player in players.OrderBy(player => player.Slot != ownSlot))
             {
                 if (player.Body.Length == 0)
                     continue;
                 bool own = player.Slot == ownSlot;
                 string name = showNames ? player.Name : null;
                 string input = own ? localTyping : player.Result == SnakeResult.Running ? player.Typing ?? "" : null;
+                if (!own && ownPlayer != null && Distance(player.Body[0], ownPlayer.Body[0]) > 12)
+                    input = null;
                 bool skill = own ? localTypingSkill : player.TypingSkill;
                 if (string.IsNullOrEmpty(name) && input == null)
                     continue;
@@ -1676,6 +1865,11 @@ namespace EnglishTypingPractice
                 if (typing != null)
                     drawing.DrawText(typing, new Point(bubble.X + 6, bubble.Y + labelHeight + 3));
             }
+        }
+
+        private int Distance(int first, int second)
+        {
+            return Math.Abs(first % size - second % size) + Math.Abs(first / size - second / size);
         }
 
         private FormattedText BubbleText(string text, string font, Brush brush, double width)

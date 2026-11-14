@@ -12,9 +12,12 @@ namespace EnglishTypingPractice
     internal sealed class LanRoomInfo
     {
         public string Version { get; set; }
+        public string AppVersion { get; set; }
         public string Name { get; set; }
         public int Players { get; set; }
         public bool Joinable { get; set; }
+        public SnakeMode Mode { get; set; }
+        public MatchPhase Phase { get; set; }
     }
 
     internal sealed class DiscoveredRoom
@@ -24,18 +27,47 @@ namespace EnglishTypingPractice
 
         public override string ToString()
         {
-            return Info.Name + "   " + Info.Players + "/4   " + Endpoint.Address +
-                (Info.Joinable ? "" : Info.Players == 4 ? "   已满" : "   对局中");
+            string status = Info.Phase == MatchPhase.Playing ? "对局中" : Info.Players == 4 ? "已满" :
+                Info.Phase == MatchPhase.Finished ? "已结算" : "等待开局";
+            return Info.Name + " · " + (Info.Version == LanWire.Version ? LanDiscovery.ModeName(Info.Mode) + " · " : "") +
+                Info.Players + "/4 · " + LanWire.DisplayVersion(Info.AppVersion, Info.Version) + " · " + status;
         }
     }
 
     internal static class LanDiscovery
     {
         private static readonly byte[] Probe = Encoding.ASCII.GetBytes(LanWire.Version + " find");
+        private static readonly byte[][] Probes = { Probe, Encoding.ASCII.GetBytes(LanWire.PreviousVersion + " find"),
+            Encoding.ASCII.GetBytes("TypingSnake/8 find") };
 
         internal static bool IsProbe(byte[] data)
         {
             return data.Length == Probe.Length && data.SequenceEqual(Probe);
+        }
+
+        internal static string ModeName(SnakeMode mode)
+        {
+            switch (mode)
+            {
+                case SnakeMode.Obstacles: return "障碍赛";
+                case SnakeMode.Territory: return "圈地战";
+                case SnakeMode.Teams: return "团战";
+                default: return "经典";
+            }
+        }
+
+        internal static string FindOlderVersion(IPEndPoint endpoint)
+        {
+            try
+            {
+                return Scan(endpoint.Port, new[] { endpoint.Address }).Where(room => room.Info.Version != LanWire.Version)
+                    .Select(room => LanWire.DisplayVersion(room.Info.AppVersion, room.Info.Version)).FirstOrDefault();
+            }
+            catch (Exception error)
+            {
+                if (!LanWire.IsConnectionError(error) && !(error is NetworkInformationException)) throw;
+                return null;
+            }
         }
 
         internal static DiscoveredRoom[] Scan(int port = LanWire.Port, IPAddress[] destinations = null)
@@ -51,8 +83,10 @@ namespace EnglishTypingPractice
                 {
                     foreach (var address in addresses)
                     {
-                        try { client.Send(Probe, Probe.Length, new IPEndPoint(address, port)); }
-                        catch (SocketException) { }
+                        var endpoint = new IPEndPoint(address, port);
+                        foreach (var probe in Probes)
+                            try { client.Send(probe, probe.Length, endpoint); }
+                            catch (SocketException) { }
                     }
 
                     long next = watch.ElapsedMilliseconds + 450;
@@ -68,9 +102,13 @@ namespace EnglishTypingPractice
                             if (data.Length > 1024 || sender.Port != port)
                                 continue;
                             var info = LanWire.Decode<LanRoomInfo>(data);
-                            if (info != null && info.Version == LanWire.Version && LanWire.IsName(info.Name, 24) &&
-                                info.Players >= 1 && info.Players <= 4)
+                            if (info != null && LanWire.IsName(info.Name, 24) && info.Players >= 1 && info.Players <= 4 &&
+                                (info.Version == LanWire.Version && Enum.IsDefined(typeof(SnakeMode), info.Mode) &&
+                                    Enum.IsDefined(typeof(MatchPhase), info.Phase) ||
+                                    info.Version == LanWire.PreviousVersion || info.Version == "TypingSnake/8"))
                             {
+                                if (info.Version != LanWire.Version && !info.Joinable && info.Players < 4)
+                                    info.Phase = MatchPhase.Playing;
                                 results[sender] = new DiscoveredRoom { Info = info, Endpoint = sender };
                             }
                         }

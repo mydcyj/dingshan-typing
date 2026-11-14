@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -21,6 +22,9 @@ namespace EnglishTypingPractice
         public SnakeTypingPreview Preview { get; set; }
         public int SprintRound { get; set; }
         public bool SprintHeld { get; set; }
+        public bool Ready { get; set; }
+        public string Session { get; set; }
+        public string AppVersion { get; set; }
     }
 
     internal sealed class LanReply
@@ -34,10 +38,32 @@ namespace EnglishTypingPractice
     internal static class LanWire
     {
         internal const int Port = 48631;
-        internal const string Version = "TypingSnake/9";
+        internal const string Version = "TypingSnake/10";
+        internal const string PreviousVersion = "TypingSnake/9";
+        internal const int ReconnectMilliseconds = 20000;
         internal const int StateLimit = 65536;
         internal const int MusicLimit = 64 * 1024 * 1024;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
+        internal static readonly string AppVersion = "v" + typeof(LanWire).Assembly.GetName().Version.ToString(
+            typeof(LanWire).Assembly.GetName().Version.Build == 0 ? 2 : 3);
+
+        internal static string VersionMismatch(string hostVersion, string guestVersion)
+        {
+            return "版本不一致：房主 " + hostVersion + "，你 " + guestVersion + "。请使用相同版本。";
+        }
+
+        internal static string DisplayVersion(string appVersion, string protocol)
+        {
+            System.Version parsed;
+            if (appVersion != null && appVersion.Length <= 18 && appVersion.StartsWith("v", StringComparison.Ordinal) &&
+                System.Version.TryParse(appVersion.Substring(1), out parsed))
+                return appVersion;
+            if (protocol == PreviousVersion)
+                return "v1.16.2";
+            if (protocol == "TypingSnake/8")
+                return "v1.16.0–v1.16.1";
+            return "未知版本";
+        }
 
         internal static byte[] Encode<T>(T value)
         {
@@ -100,6 +126,14 @@ namespace EnglishTypingPractice
 
     internal sealed class LanHost : IDisposable
     {
+        private sealed class Seat
+        {
+            internal string Key;
+            internal TcpClient Connection;
+            internal long ReconnectUntil;
+            internal bool Ready;
+        }
+
         private readonly object sync = new object();
         private readonly HashSet<TcpClient> clients = new HashSet<TcpClient>();
         private readonly SnakeMatch match;
@@ -108,8 +142,9 @@ namespace EnglishTypingPractice
         private readonly UdpClient discovery;
         private readonly Timer timer;
         private readonly Stopwatch clock = new Stopwatch();
+        private readonly Stopwatch roomClock = Stopwatch.StartNew();
         private readonly Stopwatch musicClock = new Stopwatch();
-        private readonly HashSet<string> musicKeys = new HashSet<string>();
+        private readonly Seat[] seats = new Seat[4];
         private FileInfo musicFile;
         private int musicTrack;
         private long musicLength;
@@ -133,7 +168,7 @@ namespace EnglishTypingPractice
                 listener.Stop();
                 throw;
             }
-            timer = new Timer(Step, null, Timeout.Infinite, Timeout.Infinite);
+            timer = new Timer(Step, null, 1000, 1000);
             Task.Run((Action)AcceptClients);
             Task.Run((Action)ReplyToScans);
         }
@@ -149,6 +184,8 @@ namespace EnglishTypingPractice
         private SnakeMatchState Snapshot(int slot)
         {
             var state = match.Snapshot(room, slot);
+            state.ReadySlots = new[] { 0 }.Concat(Enumerable.Range(1, 3).Where(i => seats[i] != null && seats[i].Ready)).ToArray();
+            state.ReconnectingSlots = Enumerable.Range(1, 3).Where(i => seats[i] != null && seats[i].Connection == null).ToArray();
             state.Music = new RoomMusicState { Volume = musicVolume };
             if (musicFile != null && state.Phase == MatchPhase.Playing)
             {
@@ -180,14 +217,55 @@ namespace EnglishTypingPractice
 
         internal bool Start()
         {
+            string failure;
+            return Start(out failure);
+        }
+
+        internal bool Start(out string failure)
+        {
             lock (sync)
             {
-                if (closed || !match.Start())
+                failure = null;
+                if (closed || match.Phase == MatchPhase.Playing)
                     return false;
+                ExpireSeats();
+                if (match.Phase == MatchPhase.Finished)
+                {
+                    ReturnToLobbyLocked();
+                    return false;
+                }
+                if (seats.Any(seat => seat != null && (seat.Connection == null || !seat.Ready)))
+                {
+                    failure = "请等成员准备好再开局。";
+                    return false;
+                }
+                if (!match.Start())
+                {
+                    failure = "团战人数至少要达到队伍数。";
+                    return false;
+                }
                 clock.Restart();
                 timer.Change(0, 15);
                 return true;
             }
+        }
+
+        internal void ReturnToLobby()
+        {
+            lock (sync)
+                if (!closed)
+                    ReturnToLobbyLocked();
+        }
+
+        private void ReturnToLobbyLocked()
+        {
+            if (!match.ResetLobby())
+                return;
+            clock.Reset();
+            foreach (var seat in seats)
+                if (seat != null)
+                    seat.Ready = false;
+            timer.Change(1000, 1000);
         }
 
         internal void Turn(string word, int group, int round, bool charge = false)
@@ -221,15 +299,28 @@ namespace EnglishTypingPractice
         internal void SetMode(SnakeMode mode)
         {
             lock (sync)
-                if (!closed)
+                if (!closed && match.Phase != MatchPhase.Playing && match.NextMode != mode)
+                {
                     match.SetMode(mode);
+                    ClearReadiness();
+                }
         }
 
         internal void SetTeamCount(int count)
         {
             lock (sync)
-                if (!closed)
+                if (!closed && match.Phase != MatchPhase.Playing && match.NextTeamCount != count)
+                {
                     match.SetTeamCount(count);
+                    ClearReadiness();
+                }
+        }
+
+        private void ClearReadiness()
+        {
+            foreach (var seat in seats)
+                if (seat != null)
+                    seat.Ready = false;
         }
 
         internal void DropBall(int round)
@@ -245,10 +336,28 @@ namespace EnglishTypingPractice
             {
                 if (closed)
                     return;
+                ExpireSeats();
                 match.Step(clock.ElapsedMilliseconds);
                 if (match.Phase != MatchPhase.Playing && !match.HasBurst)
-                    timer.Change(Timeout.Infinite, Timeout.Infinite);
+                    timer.Change(1000, 1000);
             }
+        }
+
+        private void ExpireSeats()
+        {
+            long now = roomClock.ElapsedMilliseconds;
+            for (int slot = 1; slot < seats.Length; slot++)
+                if (seats[slot] != null && seats[slot].Connection == null && seats[slot].ReconnectUntil <= now)
+                    RemoveSeat(slot);
+        }
+
+        private void RemoveSeat(int slot)
+        {
+            var seat = seats[slot];
+            seats[slot] = null;
+            match.RemovePlayer(slot);
+            if (seat.Connection != null)
+                seat.Connection.Close();
         }
 
         private void AcceptClients()
@@ -279,7 +388,6 @@ namespace EnglishTypingPractice
         private void ServeClient(TcpClient client)
         {
             int slot = -1;
-            string musicKey = null;
             try
             {
                 client.NoDelay = true;
@@ -291,8 +399,16 @@ namespace EnglishTypingPractice
                     SendMusic(stream, hello);
                     return;
                 }
-                if (hello == null || hello.Kind != LanWire.Version || !LanWire.IsName(hello.Text, 20) ||
-                    !Enum.IsDefined(typeof(SnakeRole), hello.Role))
+                if (hello == null)
+                    return;
+                if (hello.Kind != LanWire.Version || hello.AppVersion != LanWire.AppVersion)
+                {
+                    if (hello.Kind != null && hello.Kind.StartsWith("TypingSnake/", StringComparison.Ordinal))
+                        LanWire.Write(stream, new LanReply { Error = LanWire.VersionMismatch(LanWire.AppVersion,
+                            LanWire.DisplayVersion(hello.AppVersion, hello.Kind)) });
+                    return;
+                }
+                if (!LanWire.IsName(hello.Text, 20) || !Enum.IsDefined(typeof(SnakeRole), hello.Role))
                     return;
 
                 LanReply reply;
@@ -300,14 +416,33 @@ namespace EnglishTypingPractice
                 {
                     if (closed)
                         return;
-                    slot = match.AddPlayer(hello.Text, hello.Role);
-                    reply = slot < 0 ? new LanReply { Error = "房间已满或本局正在进行。" } : Reply(slot);
-                    if (slot >= 0)
+                    ExpireSeats();
+                    string failure;
+                    if (hello.Session == null)
                     {
-                        musicKey = Guid.NewGuid().ToString("N");
-                        musicKeys.Add(musicKey);
-                        reply.MusicKey = musicKey;
+                        slot = match.AddPlayer(hello.Text, hello.Role);
+                        if (slot >= 0)
+                            seats[slot] = new Seat { Key = Guid.NewGuid().ToString("N"), Connection = client };
+                        failure = "房间已满或本局正在进行。";
                     }
+                    else
+                    {
+                        slot = Array.FindIndex(seats, seat => seat != null && seat.Key == hello.Session);
+                        if (slot > 0)
+                        {
+                            var seat = seats[slot];
+                            var old = seat.Connection;
+                            seat.Connection = client;
+                            seat.ReconnectUntil = 0;
+                            match.ClearTransientInput(slot, clock.ElapsedMilliseconds);
+                            if (old != null)
+                                old.Close();
+                        }
+                        failure = "重连席位已过期，或房主已重新开房。";
+                    }
+                    reply = slot < 0 ? new LanReply { Error = failure } : Reply(slot);
+                    if (slot >= 0)
+                        reply.MusicKey = seats[slot].Key;
                 }
                 LanWire.Write(stream, reply);
                 if (slot < 0)
@@ -317,12 +452,18 @@ namespace EnglishTypingPractice
                 {
                     var request = LanWire.Read<LanRequest>(stream, 512);
                     if (request == null || (request.Kind != "poll" && request.Kind != "turn" &&
-                        request.Kind != "charge" && request.Kind != "role" && request.Kind != "drop"))
+                        request.Kind != "charge" && request.Kind != "role" && request.Kind != "drop" &&
+                        request.Kind != "ready" && request.Kind != "leave"))
                         return;
                     lock (sync)
                     {
-                        if (closed)
+                        if (closed || seats[slot] == null || seats[slot].Connection != client)
                             return;
+                        if (request.Kind == "leave")
+                        {
+                            RemoveSeat(slot);
+                            return;
+                        }
                         ApplyInput(slot, request);
                         reply = Reply(slot);
                     }
@@ -337,10 +478,14 @@ namespace EnglishTypingPractice
             {
                 lock (sync)
                 {
-                    if (slot >= 0)
+                    if (!closed && slot >= 0 && seats[slot] != null && seats[slot].Connection == client)
                     {
-                        match.RemovePlayer(slot);
-                        musicKeys.Remove(musicKey);
+                        var seat = seats[slot];
+                        seat.Connection = null;
+                        seat.ReconnectUntil = roomClock.ElapsedMilliseconds + LanWire.ReconnectMilliseconds;
+                        if (match.Phase != MatchPhase.Playing)
+                            seat.Ready = false;
+                        match.ClearTransientInput(slot, clock.ElapsedMilliseconds);
                     }
                     clients.Remove(client);
                 }
@@ -350,12 +495,18 @@ namespace EnglishTypingPractice
 
         private void ApplyInput(int slot, LanRequest request)
         {
+            if (request.Kind == "ready" && slot != 0 && match.Phase == MatchPhase.Lobby && request.Round == match.Round)
+                seats[slot].Ready = request.Ready;
             if (request.Preview != null)
                 match.SetPreview(slot, request.Preview, clock.ElapsedMilliseconds);
             if (request.SprintRound != 0)
                 match.SetSprint(slot, request.SprintRound, request.SprintHeld, clock.ElapsedMilliseconds);
             if (request.Kind == "role" && Enum.IsDefined(typeof(SnakeRole), request.Role))
+            {
                 match.SetRole(slot, request.Role);
+                if (slot != 0 && match.Phase != MatchPhase.Playing)
+                    seats[slot].Ready = false;
+            }
             if (request.Kind == "drop")
                 match.DropBall(slot, request.Round, clock.ElapsedMilliseconds);
             if (request.Text == null || request.Text.Length > 20)
@@ -377,7 +528,7 @@ namespace EnglishTypingPractice
             long length;
             lock (sync)
             {
-                if (closed || !musicKeys.Contains(request.Text) || request.Group != musicTrack ||
+                if (closed || !seats.Any(seat => seat != null && seat.Connection != null && seat.Key == request.Text) || request.Group != musicTrack ||
                     match.Phase != MatchPhase.Playing || musicFile == null)
                     return;
                 file = musicFile;
@@ -408,7 +559,8 @@ namespace EnglishTypingPractice
                             return;
                         info = new LanRoomInfo
                         {
-                            Version = LanWire.Version, Name = room, Players = match.Count, Joinable = match.CanJoin
+                            Version = LanWire.Version, AppVersion = LanWire.AppVersion, Name = room,
+                            Players = match.Count, Joinable = match.CanJoin, Mode = match.NextMode, Phase = match.Phase
                         };
                     }
                     data = LanWire.Encode(info);
@@ -440,62 +592,100 @@ namespace EnglishTypingPractice
 
     internal sealed class LanClient : IDisposable
     {
-        private readonly TcpClient client = new TcpClient(AddressFamily.InterNetwork) { NoDelay = true };
+        private readonly object connectionLock = new object();
+        private TcpClient client;
         private volatile SnakeMatchState state;
         private volatile bool closed;
+        private volatile bool reconnecting;
+        private volatile bool leaving;
         private LanRequest turn;
         private LanRequest drop;
         private SnakeTypingPreview preview;
         private LanRequest sprint;
+        private LanRequest readiness;
         private IPEndPoint endpoint;
         private string musicKey;
+        private string playerName;
+        private SnakeRole initialRole;
 
         internal int Slot { get; private set; }
         internal SnakeMatchState State { get { return state; } }
         internal bool Disconnected { get { return closed; } }
+        internal bool Reconnecting { get { return reconnecting; } }
 
         internal async Task<string> Join(IPAddress address, string name, int port = LanWire.Port, SnakeRole role = SnakeRole.Standard)
         {
+            endpoint = new IPEndPoint(address, port);
+            playerName = name;
+            initialRole = role;
+            bool cancelled;
             try
             {
-                var connect = client.ConnectAsync(address, port);
-                if (await Task.WhenAny(connect, Task.Delay(3000)).ConfigureAwait(false) != connect)
+                var stream = await Connect().ConfigureAwait(false);
+                var reply = await Task.Run(() => Hello(stream, null)).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(reply.Error))
                 {
                     Dispose();
-                    return "连接超时，请确认同学仍在房间里。";
+                    return reply.Error;
                 }
-                await connect.ConfigureAwait(false);
-                endpoint = new IPEndPoint(address, port);
-                return await Task.Run(() => JoinRoom(name, role)).ConfigureAwait(false);
+                Slot = reply.Slot;
+                musicKey = reply.MusicKey;
+                state = reply.State;
+                BeginPolling(stream);
+                return null;
             }
             catch (Exception error)
             {
                 if (!LanWire.IsConnectionError(error)) throw;
+                cancelled = closed;
                 Dispose();
-                return "无法连接房间，请确认在同一局域网。";
             }
+            if (!cancelled)
+            {
+                var old = await Task.Run(() => LanDiscovery.FindOlderVersion(endpoint)).ConfigureAwait(false);
+                if (old != null)
+                    return LanWire.VersionMismatch(old, LanWire.AppVersion);
+            }
+            return "无法连接房间，请确认在同一局域网。";
         }
 
-        private string JoinRoom(string name, SnakeRole role)
+        private void BeginPolling(NetworkStream stream)
         {
-            var stream = client.GetStream();
-            stream.ReadTimeout = stream.WriteTimeout = 5000;
-            LanWire.Write(stream, new LanRequest { Kind = LanWire.Version, Text = name, Role = role });
+            Task.Run(() => Poll(stream));
+        }
+
+        private async Task<NetworkStream> Connect()
+        {
+            TcpClient socket;
+            lock (connectionLock)
+            {
+                if (closed || leaving)
+                    throw new IOException("Connection closed.");
+                if (client != null)
+                    client.Close();
+                socket = client = new TcpClient(AddressFamily.InterNetwork) { NoDelay = true };
+            }
+            var connect = socket.ConnectAsync(endpoint.Address, endpoint.Port);
+            if (await Task.WhenAny(connect, Task.Delay(2000)).ConfigureAwait(false) != connect)
+                throw new IOException("Connection timed out.");
+            await connect.ConfigureAwait(false);
+            var stream = socket.GetStream();
+            stream.ReadTimeout = stream.WriteTimeout = 2500;
+            return stream;
+        }
+
+        private LanReply Hello(NetworkStream stream, string session)
+        {
+            LanWire.Write(stream, new LanRequest { Kind = LanWire.Version, Text = playerName, Role = initialRole,
+                Session = session, AppVersion = LanWire.AppVersion });
             var reply = LanWire.Read<LanReply>(stream, LanWire.StateLimit);
             if (reply != null && !string.IsNullOrEmpty(reply.Error))
-            {
-                Dispose();
-                return reply.Error;
-            }
+                return reply;
             Guid key;
             if (reply == null || reply.Slot < 1 || reply.Slot > 3 || !ValidState(reply.State, reply.Slot) ||
                 !Guid.TryParseExact(reply.MusicKey, "N", out key))
                 throw new InvalidDataException("Invalid LAN room reply.");
-            musicKey = reply.MusicKey;
-            Slot = reply.Slot;
-            state = reply.State;
-            Task.Run(() => Poll(stream));
-            return null;
+            return reply;
         }
 
         internal void Turn(string word, int group, int round, bool charge = false)
@@ -521,6 +711,17 @@ namespace EnglishTypingPractice
         internal void DropBall(int round)
         {
             Interlocked.Exchange(ref drop, new LanRequest { Kind = "drop", Round = round });
+        }
+
+        internal void SetReady(bool ready)
+        {
+            if (state != null)
+                Interlocked.Exchange(ref readiness, new LanRequest { Kind = "ready", Ready = ready, Round = state.Round });
+        }
+
+        internal void Leave()
+        {
+            leaving = true;
         }
 
         internal async Task DownloadMusic(RoomMusicState music, string path, CancellationToken cancellation)
@@ -558,37 +759,79 @@ namespace EnglishTypingPractice
             }
         }
 
-        private void Poll(NetworkStream stream)
+        private async Task Poll(NetworkStream stream)
         {
             try
             {
                 while (!closed)
                 {
-                    var request = Interlocked.Exchange(ref turn, null) ?? Interlocked.Exchange(ref drop, null) ??
-                        new LanRequest { Kind = "poll" };
-                    request.Preview = Interlocked.Exchange(ref preview, null);
-                    var speed = Interlocked.Exchange(ref sprint, null);
-                    if (speed != null)
+                    try
                     {
-                        request.SprintRound = speed.SprintRound;
-                        request.SprintHeld = speed.SprintHeld;
+                        if (leaving)
+                        {
+                            LanWire.Write(stream, new LanRequest { Kind = "leave" });
+                            break;
+                        }
+                        var request = Interlocked.Exchange(ref turn, null) ?? Interlocked.Exchange(ref drop, null) ??
+                            Interlocked.Exchange(ref readiness, null) ?? new LanRequest { Kind = "poll" };
+                        request.Preview = Interlocked.Exchange(ref preview, null);
+                        var speed = Interlocked.Exchange(ref sprint, null);
+                        if (speed != null)
+                        {
+                            request.SprintRound = speed.SprintRound;
+                            request.SprintHeld = speed.SprintHeld;
+                        }
+                        LanWire.Write(stream, request);
+                        var reply = LanWire.Read<LanReply>(stream, LanWire.StateLimit);
+                        if (reply == null || reply.Slot != Slot || !ValidState(reply.State, Slot))
+                            break;
+                        state = reply.State;
+                        await Task.Delay(75).ConfigureAwait(false);
+                        continue;
                     }
-                    LanWire.Write(stream, request);
-                    var reply = LanWire.Read<LanReply>(stream, LanWire.StateLimit);
-                    if (reply == null || !ValidState(reply.State, Slot))
+                    catch (Exception error)
+                    {
+                        if (!LanWire.IsConnectionError(error)) throw;
+                    }
+                    stream = await Reconnect().ConfigureAwait(false);
+                    if (stream == null)
                         break;
-                    state = reply.State;
-                    Thread.Sleep(75);
                 }
-            }
-            catch (Exception error)
-            {
-                if (!LanWire.IsConnectionError(error)) throw;
             }
             finally
             {
                 Dispose();
             }
+        }
+
+        private async Task<NetworkStream> Reconnect()
+        {
+            reconnecting = true;
+            var deadline = Stopwatch.StartNew();
+            while (!closed && !leaving && deadline.ElapsedMilliseconds < LanWire.ReconnectMilliseconds)
+            {
+                try
+                {
+                    var stream = await Connect().ConfigureAwait(false);
+                    var reply = Hello(stream, musicKey);
+                    if (!string.IsNullOrEmpty(reply.Error) || reply.Slot != Slot || reply.MusicKey != musicKey)
+                        break;
+                    Interlocked.Exchange(ref turn, null);
+                    Interlocked.Exchange(ref drop, null);
+                    Interlocked.Exchange(ref readiness, null);
+                    Interlocked.Exchange(ref preview, null);
+                    Interlocked.Exchange(ref sprint, null);
+                    state = reply.State;
+                    reconnecting = false;
+                    return stream;
+                }
+                catch (Exception error)
+                {
+                    if (!LanWire.IsConnectionError(error)) throw;
+                }
+                await Task.Delay(400).ConfigureAwait(false);
+            }
+            return null;
         }
 
         private static bool ValidState(SnakeMatchState state, int slot)
@@ -599,6 +842,8 @@ namespace EnglishTypingPractice
                 !Enum.IsDefined(typeof(SnakeMode), state.Mode) || !Enum.IsDefined(typeof(SnakeMode), state.NextMode) ||
                 state.Players == null || state.Players.Length == 0 || state.Players.Length > 4 ||
                 state.Rankings == null || state.Rankings.Length > 4 ||
+                state.ReadySlots == null || state.ReadySlots.Length > 4 ||
+                state.ReconnectingSlots == null || state.ReconnectingSlots.Length > 3 ||
                 state.Music == null || !state.Music.IsValid ||
                 state.Words == null || (state.Words.Length != 0 && state.Words.Length != 4 && state.Words.Length != 12))
                 return false;
@@ -677,6 +922,9 @@ namespace EnglishTypingPractice
                 if (player.WordCount < 0 || (player.WordCount == 0 ? player.LastWord != null :
                     !SnakeWords.Contains(player.LastWord) && !SnakeWords.IsSkillWord(player.LastWord, SnakeRole.Hunter)))
                     return false;
+                if (player.Turns < 0 || player.Turns > player.WordCount || player.SkillHits < 0 ||
+                    player.Deliveries < 0 || player.LandGained < 0 || player.LandLost < 0 || player.SurvivalMs < 0)
+                    return false;
                 foreach (int cell in player.Body)
                     if (cell < 0 || cell >= cells)
                         return false;
@@ -688,13 +936,20 @@ namespace EnglishTypingPractice
                         state.ChargeWord != null))
                     return false;
             }
-            return slots.Contains(slot);
+            return slots.Contains(slot) && state.ReadySlots.Distinct().Count() == state.ReadySlots.Length &&
+                state.ReconnectingSlots.Distinct().Count() == state.ReconnectingSlots.Length &&
+                state.ReadySlots.Contains(0) && state.ReadySlots.All(slots.Contains) &&
+                state.ReconnectingSlots.All(item => item != 0 && slots.Contains(item));
         }
 
         public void Dispose()
         {
-            closed = true;
-            client.Close();
+            lock (connectionLock)
+            {
+                closed = true;
+                if (client != null)
+                    client.Close();
+            }
         }
     }
 }

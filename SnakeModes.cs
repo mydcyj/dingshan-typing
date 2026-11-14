@@ -85,6 +85,8 @@ namespace EnglishTypingPractice
         private readonly int[] land;
         private readonly int[] trails;
         private readonly int[] scores = new int[4];
+        private readonly int[] gained = new int[4];
+        private readonly int[] lost = new int[4];
         private readonly List<int>[] paths = { new List<int>(), new List<int>(), new List<int>(), new List<int>() };
         private int[] landSnapshot;
         private int[] trailSnapshot;
@@ -99,6 +101,8 @@ namespace EnglishTypingPractice
         internal int[] Land { get { return landSnapshot ?? (landSnapshot = (int[])land.Clone()); } }
         internal int[] Trails { get { return trailSnapshot ?? (trailSnapshot = (int[])trails.Clone()); } }
         internal int Score(int slot) { return scores[slot]; }
+        internal int Gained(int slot) { return gained[slot]; }
+        internal int Lost(int slot) { return lost[slot]; }
 
         internal void ClearTrail(int slot)
         {
@@ -168,9 +172,13 @@ namespace EnglishTypingPractice
             if (previous == slot + 1)
                 return;
             if (previous != 0)
+            {
                 scores[previous - 1]--;
+                lost[previous - 1]++;
+            }
             land[cell] = slot + 1;
             scores[slot]++;
+            gained[slot]++;
         }
 
         private static void Enqueue(int cell, bool[] visited, Queue<int> outside)

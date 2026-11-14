@@ -55,6 +55,10 @@ namespace EnglishTypingPractice
         internal int SkillUses { get; private set; }
         internal string LastWord { get; private set; }
         internal int WordCount { get; private set; }
+        internal int Turns { get; private set; }
+        internal int SkillHits { get; set; }
+        internal int Deliveries { get; set; }
+        internal long SurvivalMs { get; private set; }
         internal int Respawns { get; private set; }
         internal int ExtraMoves { get; private set; }
         internal string ChargeWord { get; private set; }
@@ -105,6 +109,8 @@ namespace EnglishTypingPractice
             SkillUses = 0;
             LastWord = null;
             WordCount = 0;
+            Turns = SkillHits = Deliveries = 0;
+            SurvivalMs = 0;
             spawnX = x;
             spawnY = y;
             spawnDirection = direction;
@@ -155,6 +161,8 @@ namespace EnglishTypingPractice
                 Score += words[index].Length;
             LastWord = words[index];
             WordCount++;
+            if (direction != Direction)
+                Turns++;
             Direction = direction;
             ExtraMoves = variant * (balancedTimewalker ? 1 : 2);
             DrawWords();
@@ -199,6 +207,11 @@ namespace EnglishTypingPractice
         }
 
         internal bool IsCharging(long now) { return IsRunning && chargeUntil > now; }
+        internal void RecordActiveTime(long now)
+        {
+            if (IsRunning)
+                SurvivalMs = now;
+        }
         internal bool IsStabilizing(long now) { return IsRunning && stabilizationUntil > now; }
         internal int StabilizerCooldownRemaining(long now) { return IsRunning ? (int)Math.Max(0, stabilizeReadyAt - now) : 0; }
         internal bool IsStunned(long now) { return IsRunning && stunUntil > now; }
@@ -448,6 +461,13 @@ namespace EnglishTypingPractice
             Fruit = FindFruit(Size, blocked, random, bounds: Bounds);
             if (Fruit < 0)
                 Result = SnakeResult.Won;
+        }
+
+        internal void PlaceTutorialFruit()
+        {
+            int next = NextCell();
+            if (Bounds.Contains(next, Size) && !occupied.Contains(next))
+                Fruit = next;
         }
 
         internal static int FindFruit(int size, HashSet<int> occupied, Random random, bool large = false,

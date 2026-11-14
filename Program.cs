@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -20,7 +21,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("1.16.2.0")]
+[assembly: System.Reflection.AssemblyVersion("2.0.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -80,6 +81,13 @@ namespace EnglishTypingPractice
         private readonly Button nextTrack;
         private readonly TextBlock settingsNotice;
         private readonly ComboBox practiceKind;
+        private readonly ComboBox codeExerciseKind;
+        private readonly ComboBox reviewLevel;
+        private readonly Button newPassage;
+        private readonly Button retry;
+        private readonly TextBlock reviewMeaning;
+        private readonly TextBlock practiceResult;
+        private readonly HashSet<string>[] reviewBanks = new HashSet<string>[2];
 
         private int lastTopic = -1;
         private string original = "";
@@ -88,6 +96,12 @@ namespace EnglishTypingPractice
         private int correctCount;
         private bool resetting;
         private bool updatingPlaylist;
+        private bool composingChinese;
+        private int roundGeneration;
+        private string committedChinese = "";
+        private TypingRound round;
+        private string lastRoundResult;
+        private string priorRoundResult;
 
         internal Practice(Window window)
         {
@@ -96,6 +110,12 @@ namespace EnglishTypingPractice
                 passages = new JavaScriptSerializer().Deserialize<string[][]>(reader.ReadToEnd());
 
             practiceKind = (ComboBox)window.FindName("PracticeKind");
+            codeExerciseKind = (ComboBox)window.FindName("CodeExerciseKind");
+            reviewLevel = (ComboBox)window.FindName("ReviewLevel");
+            newPassage = (Button)window.FindName("NewPassage");
+            retry = (Button)window.FindName("Retry");
+            reviewMeaning = (TextBlock)window.FindName("ReviewMeaning");
+            practiceResult = (TextBlock)window.FindName("PracticeResult");
             var workbench = (Grid)window.FindName("PracticeWorkbench");
             var sidebar = (FrameworkElement)window.FindName("PracticeSidebar");
             var sidebarColumn = (ColumnDefinition)window.FindName("PracticeSidebarColumn");
@@ -185,6 +205,8 @@ namespace EnglishTypingPractice
                     clock.Start();
                     timer.Start();
                 }
+                else if (IsReview && original.Length == 0)
+                    ChoosePassage();
                 UpdatePracticeMusic();
                 typed.Focus();
             };
@@ -203,22 +225,27 @@ namespace EnglishTypingPractice
                 SaveSettings();
                 UpdatePracticeMusic();
             };
-            ((Button)window.FindName("NewPassage")).Click += (sender, e) =>
+            newPassage.Click += (sender, e) =>
             {
                 ChoosePassage();
                 typed.Focus();
             };
-            ((Button)window.FindName("Retry")).Click += (sender, e) =>
+            retry.Click += (sender, e) =>
             {
+                if (lastRoundResult != null)
+                    priorRoundResult = lastRoundResult;
                 ResetRound();
                 typed.Focus();
             };
-            practiceKind.SelectionChanged += (sender, e) =>
+            SelectionChangedEventHandler changeExercise = (sender, e) =>
             {
                 lastTopic = -1;
                 ChoosePassage();
                 typed.Focus();
             };
+            practiceKind.SelectionChanged += changeExercise;
+            codeExerciseKind.SelectionChanged += changeExercise;
+            reviewLevel.SelectionChanged += changeExercise;
             typed.PreviewKeyDown += (sender, e) =>
             {
                 if (IsCode && !typed.IsReadOnly && e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.None)
@@ -234,6 +261,9 @@ namespace EnglishTypingPractice
             };
             ((Button)window.FindName("ChooseFolder")).Click += ChooseMusicFolder;
             typed.TextChanged += OnTextChanged;
+            TextCompositionManager.AddPreviewTextInputStartHandler(typed, OnCompositionStart);
+            TextCompositionManager.AddPreviewTextInputUpdateHandler(typed, OnCompositionStart);
+            TextCompositionManager.AddPreviewTextInputHandler(typed, OnCompositionCommit);
             DataObject.AddPastingHandler(typed, (sender, e) => e.CancelCommand());
             timer.Tick += (sender, e) => RefreshClock();
             window.Loaded += async (sender, e) =>
@@ -253,7 +283,7 @@ namespace EnglishTypingPractice
                 music.Dispose();
                 effects.Dispose();
             };
-            ConfigureBackgroundMotion((TranslateTransform)window.FindName("BackgroundDrift"));
+            ConfigureBackgroundMotion((TranslateTransform)window.FindName("BackgroundDrift"), practicePage);
             ChoosePassage();
         }
 
@@ -272,12 +302,12 @@ namespace EnglishTypingPractice
                 new DoubleAnimation(.86, 1, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
         }
 
-        private void ConfigureBackgroundMotion(TranslateTransform drift)
+        private void ConfigureBackgroundMotion(TranslateTransform drift, FrameworkElement practicePage)
         {
             ClockGroup motion = null;
             Action update = () =>
             {
-                if (!SystemParameters.ClientAreaAnimation)
+                if (!SystemParameters.ClientAreaAnimation || (!practicePage.IsVisible && settings.SnakeLowEffects))
                 {
                     drift.ApplyAnimationClock(TranslateTransform.XProperty, null);
                     drift.ApplyAnimationClock(TranslateTransform.YProperty, null);
@@ -309,6 +339,9 @@ namespace EnglishTypingPractice
             };
             SystemParameters.StaticPropertyChanged += changed;
             window.StateChanged += (sender, e) => update();
+            practicePage.IsVisibleChanged += (sender, e) => update();
+            var lowEffects = (CheckBox)window.FindName("SnakeLowEffects");
+            lowEffects.Click += (sender, e) => update();
             window.Loaded += (sender, e) => update();
             window.Closed += (sender, e) =>
             {
@@ -320,7 +353,32 @@ namespace EnglishTypingPractice
 
         private void ChoosePassage()
         {
-            var choices = passages[practiceKind.SelectedIndex];
+            priorRoundResult = null;
+            string[] choices;
+            if (IsReview)
+            {
+                int level = reviewLevel.SelectedIndex;
+                var bank = level > 0 ? ReviewBank(level - 1) : null;
+                choices = settings.SnakeReviewWords.Where(item => item.Value > 0 && SnakeWords.Contains(item.Key) &&
+                        (bank == null || bank.Contains(item.Key)))
+                    .OrderByDescending(item => item.Value).ThenBy(item => item.Key).Take(50).Select(item => item.Key).ToArray();
+            }
+            else
+            {
+                choices = passages[practiceKind.SelectedIndex];
+                if (IsCode)
+                    choices = TypingRound.CodeExercises(choices, codeExerciseKind.SelectedIndex);
+            }
+            if (choices.Length == 0)
+            {
+                original = "";
+                lastTopic = -1;
+                ResetRound();
+                roundStatus.Text = IsReview ? "这个词库暂无待复习词" : "这个题型暂无练习";
+                return;
+            }
+            if (choices.Length == 1 || lastTopic >= choices.Length)
+                lastTopic = -1;
             int index = random.Next(lastTopic < 0 ? choices.Length : choices.Length - 1);
             if (lastTopic >= 0 && index >= lastTopic)
                 index++;
@@ -329,7 +387,26 @@ namespace EnglishTypingPractice
             ResetRound();
         }
 
-        private bool IsCode { get { return practiceKind.SelectedIndex >= 2; } }
+        private HashSet<string> ReviewBank(int index)
+        {
+            if (reviewBanks[index] != null)
+                return reviewBanks[index];
+            var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var reader = new StreamReader(typeof(Practice).Assembly.GetManifestResourceStream(index == 0 ? "Cet4.tsv" : "Cet6.tsv")))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    int separator = line.IndexOf('\t');
+                    if (separator > 0)
+                        words.Add(line.Substring(0, separator));
+                }
+            }
+            return reviewBanks[index] = words;
+        }
+
+        private bool IsReview { get { return practiceKind.SelectedIndex == passages.Length; } }
+        private bool IsCode { get { return practiceKind.SelectedIndex >= 2 && !IsReview; } }
         private bool IsChinese { get { return practiceKind.SelectedIndex == 1; } }
         private bool MatchExactCase { get { return IsCode || settings.MatchCase; } }
 
@@ -343,6 +420,7 @@ namespace EnglishTypingPractice
             settings.MatchCase = matchCase.IsChecked == true;
             settings.IncludePunctuation = includePunctuation.IsChecked == true;
             SaveSettings();
+            priorRoundResult = null;
             ResetRound();
         }
 
@@ -354,25 +432,38 @@ namespace EnglishTypingPractice
             clock.Reset();
             UpdatePracticeMusic();
             resetting = true;
+            roundGeneration++;
+            composingChinese = false;
+            committedChinese = "";
             typed.Clear();
-            typed.IsReadOnly = false;
+            typed.IsReadOnly = original.Length == 0;
+            retry.IsEnabled = original.Length != 0;
+            reviewMeaning.Visibility = Visibility.Collapsed;
+            practiceResult.Visibility = Visibility.Collapsed;
+            lastRoundResult = null;
+            codeExerciseKind.Visibility = IsCode ? Visibility.Visible : Visibility.Collapsed;
+            reviewLevel.Visibility = IsReview ? Visibility.Visible : Visibility.Collapsed;
+            newPassage.Content = IsReview ? "换个词" : IsCode ? "换一题" : "换一篇";
+            retry.Content = IsReview ? "重练本词" : IsCode ? "重练本题" : "重练本篇";
 
             matchCase.IsEnabled = !IsCode && !IsChinese;
-            includePunctuation.IsEnabled = !IsCode;
+            includePunctuation.IsEnabled = !IsCode && !IsReview;
             typed.AcceptsReturn = IsCode;
             InputMethod.SetIsInputMethodEnabled(typed, IsChinese);
             var font = new FontFamily(IsChinese ? "Microsoft YaHei UI" : "Consolas");
             passage.FontFamily = typed.FontFamily = font;
             passage.FontSize = typed.FontSize = IsCode ? 18 : 20;
             typed.Height = IsCode ? 155 : 96;
-            ((TextBlock)window.FindName("PracticeTitle")).Text = IsCode ? "练习代码" : "练习短文";
+            ((TextBlock)window.FindName("PracticeTitle")).Text = IsReview ? "复习单词" : IsCode ? "练习代码" : "练习短文";
             ((TextBlock)window.FindName("PracticeHint")).Text = IsCode
                 ? "照着示例输入，保留大小写、符号和换行。Tab 输入 4 个空格。"
                 : IsChinese ? "用中文输入法照着短文输入，汉字上屏后开始计时。"
+                : IsReview ? "复习本机贪吃蛇里打错或清空的词。拼写正确后揭晓中文释义。"
                 : "照着四级英语短文输入，敲下第一个字符开始计时。";
             ((TextBlock)window.FindName("SpeedLabel")).Text = IsChinese ? "速度（字/分）" : "速度 (WPM)";
             speed.ToolTip = IsChinese ? "每分钟输入的正确汉字数。" : "每 5 个正确字符折算为 1 个词。";
-            target = IsCode || settings.IncludePunctuation ? original : new string(original.Where(c => !char.IsPunctuation(c)).ToArray());
+            target = IsCode || IsReview || settings.IncludePunctuation ? original : new string(original.Where(c => !char.IsPunctuation(c)).ToArray());
+            round = new TypingRound(target, MatchExactCase, IsCode, IsChinese);
             typed.MaxLength = target.Length + target.Count(c => c == '\n');
             progress.Maximum = target.Length;
             letters = target.Select(c => new Run(c == '\n' ? "" : c.ToString())).ToArray();
@@ -384,15 +475,47 @@ namespace EnglishTypingPractice
                     passage.Inlines.Add(new LineBreak());
             }
 
-            roundStatus.Text = "未开始";
+            roundStatus.Text = original.Length != 0 ? "未开始" : IsReview ? "这个词库暂无待复习词" : "这个题型暂无练习";
             resetting = false;
             RefreshProgress();
             RefreshClock();
         }
 
+        private void OnCompositionStart(object sender, TextCompositionEventArgs e)
+        {
+            if (IsChinese && !typed.IsReadOnly)
+                composingChinese = true;
+        }
+
+        private void OnCompositionCommit(object sender, TextCompositionEventArgs e)
+        {
+            if (!IsChinese || !composingChinese)
+                return;
+            int generation = roundGeneration;
+            typed.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                if (generation != roundGeneration)
+                    return;
+                composingChinese = false;
+                AcceptInput(null);
+            }));
+        }
+
         private void OnTextChanged(object sender, TextChangedEventArgs e)
         {
-            if (resetting || typed.IsReadOnly || (typed.Text.Length == 0 && !clock.IsRunning))
+            if (!composingChinese)
+                AcceptInput(e);
+        }
+
+        private void AcceptInput(TextChangedEventArgs change)
+        {
+            if (resetting || typed.IsReadOnly)
+                return;
+
+            if (IsChinese)
+                committedChinese = typed.Text;
+            string input = ReadInput();
+            if (input.Length == 0 && !clock.IsRunning)
                 return;
 
             if (!clock.IsRunning)
@@ -404,12 +527,21 @@ namespace EnglishTypingPractice
             }
 
             int previousCorrect = correctCount;
+            bool inputChanged = round.Observe(input, clock.Elapsed.TotalSeconds);
             RefreshProgress();
-            bool complete = progress.Value >= target.Length;
+            bool complete = input.Length >= target.Length && (!IsReview || correctCount == target.Length);
             if (correctCount > previousCorrect)
                 HighlightProgress(complete);
             if (settings.TypingFeedback)
-                PlayFeedback(e, complete);
+            {
+                if (IsChinese)
+                {
+                    if (complete || inputChanged && (change == null || change.Changes.Any(item => item.AddedLength > 0)))
+                        effects.Play(null, null, complete);
+                }
+                else
+                    PlayFeedback(change, complete);
+            }
             if (complete)
             {
                 clock.Stop();
@@ -419,6 +551,18 @@ namespace EnglishTypingPractice
                 UpdatePracticeMusic();
             }
             RefreshClock();
+            if (complete)
+            {
+                lastRoundResult = speed.Text + (IsChinese ? " 字/分" : " WPM") + "　准确率 " + round.Accuracy;
+                practiceResult.Text = "本轮成绩　" + lastRoundResult +
+                    (priorRoundResult == null ? "" : "\n上次成绩　" + priorRoundResult) + "\n" + round.Summary();
+                practiceResult.Visibility = Visibility.Visible;
+                if (IsReview)
+                {
+                    reviewMeaning.Text = SnakeWords.Meaning(target);
+                    reviewMeaning.Visibility = Visibility.Visible;
+                }
+            }
         }
 
         private void HighlightProgress(bool complete)
@@ -436,12 +580,6 @@ namespace EnglishTypingPractice
         private void PlayFeedback(TextChangedEventArgs e, bool complete)
         {
             string input = ReadInput();
-            if (IsChinese)
-            {
-                if (complete || e.Changes.Any(change => change.AddedLength > 0))
-                    effects.Play(null, null, complete);
-                return;
-            }
             int wordStart = -1;
             int wordEnd = -1;
             bool letterTyped = false;
@@ -509,14 +647,12 @@ namespace EnglishTypingPractice
 
             count.Text = input.Length + " / " + target.Length;
             progress.Value = input.Length;
-            accuracy.Text = input.Length == 0
-                ? "—"
-                : (100.0 * correctCount / input.Length).ToString("0.#", CultureInfo.CurrentCulture) + "%";
+            accuracy.Text = round.Accuracy;
         }
 
         private string ReadInput()
         {
-            return typed.Text.Replace("\r\n", "\n");
+            return (IsChinese ? committedChinese : typed.Text).Replace("\r\n", "\n");
         }
 
         private void RefreshClock()
@@ -530,8 +666,8 @@ namespace EnglishTypingPractice
                 units = Enumerable.Range(0, Math.Min(input.Length, target.Length))
                     .Count(i => input[i] == target[i] && target[i] >= '\u3400' && target[i] <= '\u9fff');
             }
-            speed.Text = duration.TotalSeconds >= 1
-                ? Math.Round(units * (IsChinese ? 60.0 : 12.0) / duration.TotalSeconds).ToString(CultureInfo.CurrentCulture)
+            speed.Text = duration.TotalSeconds >= 1 || (typed.IsReadOnly && target.Length != 0)
+                ? Math.Round(units * (IsChinese ? 60.0 : 12.0) / Math.Max(1, duration.TotalSeconds)).ToString(CultureInfo.CurrentCulture)
                 : "0";
         }
 

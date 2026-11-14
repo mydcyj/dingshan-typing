@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Web.Script.Serialization;
 
 namespace EnglishTypingPractice
@@ -19,12 +21,15 @@ namespace EnglishTypingPractice
             RoomMasterVolume = 65;
             RoomMusicVolume = 65;
             RoomEffectsVolume = 50;
+            SnakeReviewWords = new Dictionary<string, int>();
         }
 
         public bool MatchCase { get; set; }
         public bool IncludePunctuation { get; set; }
         public bool TypingFeedback { get; set; }
         public bool SnakeVoiceEnabled { get; set; }
+        public bool SnakeLowEffects { get; set; }
+        public Dictionary<string, int> SnakeReviewWords { get; set; }
         public bool PlayMusic { get; set; }
         public string Folder { get; set; }
         public PlaybackMode MusicMode { get; set; }
@@ -46,6 +51,8 @@ namespace EnglishTypingPractice
                 settings.RoomMasterVolume = Math.Max(0, Math.Min(100, settings.RoomMasterVolume));
                 settings.RoomMusicVolume = Math.Max(0, Math.Min(100, settings.RoomMusicVolume));
                 settings.RoomEffectsVolume = Math.Max(0, Math.Min(100, settings.RoomEffectsVolume));
+                if (settings.SnakeReviewWords == null)
+                    settings.SnakeReviewWords = new Dictionary<string, int>();
                 return settings;
             }
             catch (Exception ex)
@@ -55,6 +62,43 @@ namespace EnglishTypingPractice
                     throw;
                 return new PracticeSettings();
             }
+        }
+
+        internal bool RecordSnakeReview(string input, IEnumerable<string> allowedWords)
+        {
+            if (string.IsNullOrEmpty(input) || input.Length < 2 || input.Length > 20 ||
+                !input.All(c => c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'))
+                return false;
+            input = input.ToLowerInvariant();
+            var matches = allowedWords.Where(SnakeWords.Contains).Distinct().ToArray();
+            var prefixes = matches.Where(word => word.StartsWith(input, StringComparison.Ordinal)).ToArray();
+            string selected;
+            if (prefixes.Length != 0)
+                selected = prefixes.Length == 1 ? prefixes[0] : null;
+            else
+            {
+                int best = 3;
+                selected = null;
+                foreach (string word in matches)
+                {
+                    int distance = TypingRound.EditDistance(input, word);
+                    if (distance < best)
+                    {
+                        best = distance;
+                        selected = word;
+                    }
+                    else if (distance == best)
+                        selected = null;
+                }
+            }
+            if (selected == null)
+                return false;
+            int count;
+            SnakeReviewWords.TryGetValue(selected, out count);
+            SnakeReviewWords[selected] = Math.Max(0, Math.Min(9999, count)) + 1;
+            if (SnakeReviewWords.Count > 300)
+                SnakeReviewWords.Remove(SnakeReviewWords.OrderBy(item => item.Value).First().Key);
+            return true;
         }
 
         internal bool Save()
