@@ -24,6 +24,10 @@
     <SolidColorBrush x:Key="WordEchoSecondary" Color="#E79AD5" />
     <SolidColorBrush x:Key="BoardBody" Color="#87C264" />
     <SolidColorBrush x:Key="BoardSurface" Color="#101E27" />
+    <SolidColorBrush x:Key="BoardCurrent" Color="#313F2A" />
+    <SolidColorBrush x:Key="BoardQuiet" Color="#9EB5BC" />
+    <SolidColorBrush x:Key="BoardLabel" Color="#E4F4ED" />
+    <SolidColorBrush x:Key="BoardStar" Color="#FFFFFF" />
     <SolidColorBrush x:Key="BoardGrid" Color="#354B55" />
     <SolidColorBrush x:Key="BoardBubble" Color="#1E313A" />
     <SolidColorBrush x:Key="BoardOuter" Color="#091017" />
@@ -514,6 +518,37 @@
       </Border.Background>
     </Border>
     <Border Background="{StaticResource GuideGrid}" />
+    <Viewbox x:Name="CyberpunkCity" Visibility="Collapsed" Height="290" VerticalAlignment="Bottom" Stretch="Fill" />
+    <Viewbox x:Name="SteampunkCity" Visibility="Collapsed" Height="310" VerticalAlignment="Bottom" Stretch="Fill" />
+    <Viewbox x:Name="VaporwaveBackground" Visibility="Collapsed" Height="290" VerticalAlignment="Bottom" Stretch="Fill">
+      <Canvas Width="1200" Height="290">
+        <Canvas.Resources>
+          <LinearGradientBrush x:Key="VaporHorizon" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#00D56DD4" Offset="0" />
+            <GradientStop Color="#73BE87E6" Offset=".51" />
+            <GradientStop Color="#A4A6ECF0" Offset="1" />
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="VaporSun" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFE0A7" Offset="0" />
+            <GradientStop Color="#FC88C9" Offset="1" />
+          </LinearGradientBrush>
+        </Canvas.Resources>
+        <Rectangle Width="1200" Height="290" Fill="{StaticResource VaporHorizon}" />
+        <Ellipse Canvas.Left="798" Canvas.Top="8" Width="150" Height="150" Fill="{StaticResource VaporSun}" Opacity=".84" />
+        <Path Data="M797,91 H951 M797,107 H951 M801,125 H946 M811,143 H937" Stroke="#EDD2F6" StrokeThickness="5" />
+        <Path Data="M0,161 H1200 M0,178 H1200 M0,196 H1200 M0,219 H1200 M0,248 H1200 M0,283 H1200
+                    M600,159 L-161,290 M600,159 L35,290 M600,159 L225,290 M600,159 L405,290
+                    M600,159 V290 M600,159 L795,290 M600,159 L975,290 M600,159 L1165,290 M600,159 L1361,290"
+              Stroke="#8B5AB7" StrokeThickness="1.2" Opacity=".44" />
+        <Path Data="M73,178 C84,142 93,109 90,78 M90,78 C77,58 56,58 41,70 C60,68 73,73 90,78
+                    M90,78 C80,54 92,39 111,35 C103,47 95,61 90,78 M90,78 C109,56 131,62 145,76 C123,68 108,73 90,78
+                    M90,78 C111,80 125,95 125,112 C112,96 102,88 90,78 M90,78 C73,82 65,95 60,110 C62,92 73,79 90,78
+                    M1119,178 C1126,145 1124,114 1110,88 M1110,88 C1094,69 1071,72 1060,82 C1079,79 1094,83 1110,88
+                    M1110,88 C1106,65 1119,53 1136,50 C1125,63 1115,76 1110,88 M1110,88 C1128,70 1150,77 1160,93
+                    C1142,84 1126,85 1110,88 M1110,88 C1130,90 1141,103 1142,120 C1130,106 1122,98 1110,88"
+              Stroke="#754A9F" StrokeThickness="2.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Opacity=".53" />
+      </Canvas>
+    </Viewbox>
     <Border x:Name="BackgroundPatternTop" Background="{StaticResource Halftone}" Height="176" VerticalAlignment="Top">
       <Border.OpacityMask><LinearGradientBrush StartPoint="1,0" EndPoint="0.36,1">
         <GradientStop Color="#DFFFFFFF" Offset="0" /><GradientStop Color="#00FFFFFF" Offset="1" />
@@ -540,7 +575,7 @@
             </LinearGradientBrush>
           </Border.Background>
         </Border>
-        <Viewbox x:Name="CyberpunkArtwork" Grid.RowSpan="2" Grid.ColumnSpan="2" Width="360" HorizontalAlignment="Right" VerticalAlignment="Center"
+        <Viewbox x:Name="ModernArtwork" Grid.RowSpan="2" Grid.ColumnSpan="2" Width="360" HorizontalAlignment="Right" VerticalAlignment="Center"
                  Margin="0,0,22,0" IsHitTestVisible="False" Opacity=".83">
           <Canvas Width="360" Height="124">
             <Path Data="M2,113 L178,17 L337,17 M84,124 L258,28 L359,28 M135,122 H355 M288,0 V118"
@@ -558,6 +593,8 @@
                   Fill="{StaticResource Accent}" />
           </Canvas>
         </Viewbox>
+        <Viewbox x:Name="CyberpunkArtwork" Grid.RowSpan="2" Grid.ColumnSpan="2" Width="392" HorizontalAlignment="Right"
+                 Margin="0,0,8,0" IsHitTestVisible="False" Visibility="Collapsed" />
         <Viewbox x:Name="MinimalArtwork" Grid.RowSpan="2" Grid.ColumnSpan="2" Width="315" HorizontalAlignment="Right"
                  Margin="0,0,20,0" IsHitTestVisible="False" Visibility="Collapsed">
           <Canvas Width="315" Height="124">
@@ -571,31 +608,35 @@
           </Canvas>
         </Viewbox>
         <Viewbox x:Name="SteampunkArtwork" Grid.RowSpan="2" Grid.ColumnSpan="2" Width="340" HorizontalAlignment="Right"
-                 Margin="0,0,15,0" IsHitTestVisible="False" Visibility="Collapsed">
-          <Canvas Width="340" Height="124">
-            <Path Data="M74,83 H175 Q194,83 194,64 V56 M194,72 V108 H278 M238,60 H315"
-                  Stroke="{StaticResource Line}" StrokeThickness="7" />
-            <Path Data="M74,83 H175 Q194,83 194,64 V56 M194,72 V108 H278 M238,60 H315"
-                  Stroke="{StaticResource Accent}" StrokeThickness="1" />
-            <Ellipse Canvas.Left="156" Canvas.Top="16" Width="84" Height="84"
-                     Fill="{StaticResource Field}" Stroke="{StaticResource Accent}" StrokeThickness="1.5" />
-            <Ellipse Canvas.Left="163" Canvas.Top="23" Width="70" Height="70"
-                     Stroke="{StaticResource Line}" StrokeThickness="4" StrokeDashArray="1,2" />
-            <Ellipse Canvas.Left="173" Canvas.Top="33" Width="50" Height="50"
-                     Fill="{StaticResource Panel}" Stroke="{StaticResource Line}" StrokeThickness="1" />
-            <Path Data="M184,71 A19,19 0 1 1 212,71 M198,58 L210,44 M188,75 H208"
-                  Stroke="{StaticResource Accent}" StrokeThickness="1.4" />
-            <Ellipse Canvas.Left="195" Canvas.Top="55" Width="6" Height="6" Fill="{StaticResource Accent}" />
-            <Path Data="M94,77 V89 M105,77 V89 M269,102 V114 M279,102 V114 M284,54 V66 M295,54 V66"
-                  Stroke="{StaticResource Accent}" StrokeThickness="2.2" />
-          </Canvas>
-        </Viewbox>
+                 Margin="0,0,15,0" IsHitTestVisible="False" Visibility="Collapsed" />
         <Border Grid.ColumnSpan="2" Grid.RowSpan="2" IsHitTestVisible="False">
           <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
             <GradientStop Color="#FF192832" Offset="0" /><GradientStop Color="#F0192832" Offset=".41" />
             <GradientStop Color="#00192832" Offset=".83" />
           </LinearGradientBrush></Border.Background>
         </Border>
+        <Viewbox x:Name="VaporwaveArtwork" Grid.RowSpan="2" Grid.ColumnSpan="2" Width="350"
+                 HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,23,0"
+                 Visibility="Collapsed" IsHitTestVisible="False">
+          <Canvas Width="350" Height="120">
+            <Rectangle Canvas.Left="60" Canvas.Top="20" Width="189" Height="92" RadiusX="7" RadiusY="7"
+                       Fill="#63B5F1EA" Stroke="#7552A4" StrokeThickness="1.7" />
+            <Rectangle Canvas.Left="82" Canvas.Top="8" Width="217" Height="94" RadiusX="7" RadiusY="7"
+                       Fill="#E3CBF5" Stroke="#65419A" StrokeThickness="2" />
+            <Path Data="M83,28 H298 M271,17 H277 M283,15 L289,21 M289,15 L283,21" Stroke="#65419A" StrokeThickness="1.5" />
+            <Rectangle Canvas.Left="95" Canvas.Top="35" Width="190" Height="54" RadiusX="4" RadiusY="4" Fill="#F5AEDE" />
+            <Ellipse Canvas.Left="194" Canvas.Top="40" Width="43" Height="43" Fill="#FFE2A7" />
+            <Path Data="M194,61 H237 M194,69 H237 M197,76 H234" Stroke="#F5AEDE" StrokeThickness="2.3" />
+            <Path Data="M96,74 H284 M96,80 H284 M96,86 H284 M139,88 L189,73 M172,88 L202,73 M207,88 L216,73 M244,88 L231,73 M277,88 L244,73"
+                  Stroke="#8555B9" StrokeThickness=".8" Opacity=".57" />
+            <Path Data="M147,86 C157,72 159,61 155,50 M155,50 Q146,37 132,44 Q144,45 155,50
+                        M155,50 Q153,35 165,32 Q161,42 155,50 M155,50 Q169,37 180,49 Q166,44 155,50
+                        M155,50 Q170,53 174,65 Q163,58 155,50 M30,33 H45 M37,26 V40 M313,55 H325 M319,49 V61"
+                  Stroke="#69429E" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+          </Canvas>
+        </Viewbox>
+        <Border x:Name="VaporwaveTitleBar" Grid.RowSpan="2" Grid.ColumnSpan="2" Height="4" VerticalAlignment="Top"
+                Background="#A163C5" Visibility="Collapsed" IsHitTestVisible="False" />
         <Border Grid.ColumnSpan="2" Width="97" Height="3" Background="{StaticResource Accent}"
                 HorizontalAlignment="Left" VerticalAlignment="Top" />
         <StackPanel Grid.RowSpan="2" Margin="18,14,6,16" VerticalAlignment="Center">
@@ -642,7 +683,7 @@
         <Button x:Name="NewPassage" Content="换一篇" Margin="13,0,0,4" MinHeight="28" Padding="10,4" />
         <Button x:Name="Retry" Content="重练本篇" Margin="6,0,0,4" MinHeight="28" Padding="10,4" />
         <Button x:Name="AutoPlay" Content="AutoPlay" Margin="6,0,0,4" MinHeight="28" Padding="10,4"
-                ToolTip="以 60 WPM 演示当前练习，不计入成绩。" />
+                ToolTip="以 100 WPM 演示当前练习，跟随打击感设置，不计入成绩。" />
         <StackPanel Orientation="Horizontal" Margin="12,0,0,4">
           <TextBlock Text="字体" Margin="0,0,8,0" VerticalAlignment="Center" />
           <ComboBox x:Name="PracticeFont" MinWidth="178" MinHeight="28" Padding="6,2"
@@ -1227,8 +1268,8 @@
   </Grid>
 
   <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-    <StackPanel MaxWidth="650" Margin="28,24,28,28">
-      <DockPanel Margin="0,0,0,15">
+    <StackPanel MaxWidth="650" Margin="28,18,28,18">
+      <DockPanel Margin="0,0,0,10">
         <Button DockPanel.Dock="Right" x:Name="CloseSettings" Content="返回练习" Margin="12,0,0,0"
                 VerticalAlignment="Center" />
         <StackPanel>
@@ -1236,30 +1277,42 @@
           <TextBlock Text="外观设置" Style="{StaticResource DisplayTitle}" Margin="0,5,0,0" />
         </StackPanel>
       </DockPanel>
-      <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="18">
+      <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="13">
         <StackPanel>
-          <TextBlock Text="界面风格" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
-          <RadioButton x:Name="ThemeMinimal" GroupName="Theme" Padding="8" Margin="0,0,0,8">
+          <TextBlock Text="界面风格" Style="{StaticResource SectionTitle}" Margin="0,0,0,8" />
+          <RadioButton x:Name="ThemeModern" GroupName="Theme" Padding="8,6" Margin="0,0,0,6">
+            <StackPanel Orientation="Horizontal">
+              <Border Width="27" Height="19" Background="#263946" BorderBrush="#EEF767" BorderThickness="2" Margin="0,0,9,0" />
+              <TextBlock Text="现代" VerticalAlignment="Center" />
+            </StackPanel>
+          </RadioButton>
+          <RadioButton x:Name="ThemeMinimal" GroupName="Theme" Padding="8,6" Margin="0,0,0,6">
             <StackPanel Orientation="Horizontal">
               <Border Width="27" Height="19" Background="#F0EEE7" BorderBrush="#557469" BorderThickness="2" Margin="0,0,9,0" />
               <TextBlock Text="极简" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
-          <RadioButton x:Name="ThemeCyberpunk" GroupName="Theme" Padding="8" Margin="0,0,0,8">
+          <RadioButton x:Name="ThemeCyberpunk" GroupName="Theme" Padding="8,6" Margin="0,0,0,6">
             <StackPanel Orientation="Horizontal">
               <Border Width="27" Height="19" Background="#261735" BorderBrush="#52F2E8" BorderThickness="2" Margin="0,0,9,0" />
               <TextBlock Text="赛博朋克" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
-          <RadioButton x:Name="ThemeSteampunk" GroupName="Theme" Padding="8">
+          <RadioButton x:Name="ThemeSteampunk" GroupName="Theme" Padding="8,6" Margin="0,0,0,6">
             <StackPanel Orientation="Horizontal">
               <Border Width="27" Height="19" Background="#412F23" BorderBrush="#E0B36E" BorderThickness="2" Margin="0,0,9,0" />
               <TextBlock Text="蒸汽朋克" VerticalAlignment="Center" />
             </StackPanel>
           </RadioButton>
+          <RadioButton x:Name="ThemeVaporwave" GroupName="Theme" Padding="8,6">
+            <StackPanel Orientation="Horizontal">
+              <Border Width="27" Height="19" Background="#F8A9DE" BorderBrush="#67D4CD" BorderThickness="2" Margin="0,0,9,0" />
+              <TextBlock Text="蒸汽波" VerticalAlignment="Center" />
+            </StackPanel>
+          </RadioButton>
         </StackPanel>
       </Border>
-      <DockPanel Margin="0,12,0,0">
+      <DockPanel Margin="0,8,0,0">
         <Button x:Name="RestartWithTheme" DockPanel.Dock="Right" Content="保存并重启" IsEnabled="False"
                 Style="{StaticResource PrimaryButton}" Margin="12,0,0,0" VerticalAlignment="Center" />
         <TextBlock x:Name="ThemeStatus" Foreground="{StaticResource Muted}" TextWrapping="Wrap" VerticalAlignment="Center" />

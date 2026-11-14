@@ -42,6 +42,9 @@ namespace EnglishTypingPractice
 
     internal sealed class Practice
     {
+        private const int AutoPlayWpm = 100;
+        private const int AutoPlayCharacterMilliseconds = 60000 / (AutoPlayWpm * 5);
+
         private readonly Brush correctBrush;
         private readonly Brush incorrectBrush;
         private readonly Brush incorrectBackground;
@@ -315,7 +318,7 @@ namespace EnglishTypingPractice
                 {
                     typed.IsReadOnly = true;
                     autoPlay.Content = "停止演示";
-                    roundStatus.Text = "自动演示 · 60 WPM";
+                    roundStatus.Text = "自动演示 · " + AutoPlayWpm + " WPM";
                     speed.Text = elapsed.Text = "—";
                     autoPlayClock.Start();
                     autoPlayTimer.Start();
@@ -408,7 +411,9 @@ namespace EnglishTypingPractice
             {
                 { UiTheme.Cyberpunk, (RadioButton)window.FindName("ThemeCyberpunk") },
                 { UiTheme.Minimal, (RadioButton)window.FindName("ThemeMinimal") },
-                { UiTheme.Steampunk, (RadioButton)window.FindName("ThemeSteampunk") }
+                { UiTheme.Steampunk, (RadioButton)window.FindName("ThemeSteampunk") },
+                { UiTheme.Modern, (RadioButton)window.FindName("ThemeModern") },
+                { UiTheme.Vaporwave, (RadioButton)window.FindName("ThemeVaporwave") }
             };
             bool resume = false;
             Func<UiTheme> selected = () => options.First(item => item.Value.IsChecked == true).Key;
@@ -575,8 +580,9 @@ namespace EnglishTypingPractice
 
         private void AdvanceAutoPlay()
         {
-            int length = (int)Math.Min(target.Length, autoPlayClock.ElapsedMilliseconds / 200);
-            if (length <= correctCount)
+            int length = (int)Math.Min(target.Length, autoPlayClock.ElapsedMilliseconds / AutoPlayCharacterMilliseconds);
+            int previousLength = correctCount;
+            if (length <= previousLength)
                 return;
             string sample = target.Substring(0, length);
             typed.Text = sample;
@@ -584,7 +590,20 @@ namespace EnglishTypingPractice
             if (IsChinese)
                 committedChinese = sample;
             RefreshProgress();
-            if (length == target.Length)
+            bool complete = length == target.Length;
+            HighlightProgress(complete);
+            if (settings.TypingFeedback)
+            {
+                if (IsChinese)
+                    effects.Play(null, null, complete);
+                else
+                {
+                    int wordStart = -1, wordEnd = -1;
+                    bool letterTyped = FindFeedbackWord(sample, previousLength, length, ref wordStart, ref wordEnd);
+                    PlayFeedback(wordStart, wordEnd, letterTyped, complete);
+                }
+            }
+            if (complete)
             {
                 autoPlayTimer.Stop();
                 autoPlayClock.Stop();
@@ -864,23 +883,34 @@ namespace EnglishTypingPractice
                     startOffset = rawInput.Substring(0, startOffset).Replace("\r\n", "\n").Length;
                     endOffset = rawInput.Substring(0, endOffset).Replace("\r\n", "\n").Length;
                 }
-                for (int i = startOffset; i < Math.Min(input.Length, endOffset); i++)
+                letterTyped |= FindFeedbackWord(input, startOffset, Math.Min(input.Length, endOffset), ref wordStart, ref wordEnd);
+            }
+            PlayFeedback(wordStart, wordEnd, letterTyped, complete);
+        }
+
+        private bool FindFeedbackWord(string input, int startOffset, int endOffset, ref int wordStart, ref int wordEnd)
+        {
+            bool letterTyped = false;
+            var comparison = MatchExactCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            for (int i = startOffset; i < endOffset; i++)
+            {
+                letterTyped |= IsCode || char.IsLetter(input[i]);
+                if (i >= target.Length || !IsWordCharacter(i) || (i + 1 < target.Length && IsWordCharacter(i + 1)))
+                    continue;
+                int start = i;
+                while (start > 0 && IsWordCharacter(start - 1))
+                    start--;
+                if (string.Compare(input, start, target, start, i - start + 1, comparison) == 0)
                 {
-                    letterTyped |= IsCode || char.IsLetter(input[i]);
-                    if (i >= target.Length || !IsWordCharacter(i) || (i + 1 < target.Length && IsWordCharacter(i + 1)))
-                        continue;
-                    int start = i;
-                    while (start > 0 && IsWordCharacter(start - 1))
-                        start--;
-                    int length = i - start + 1;
-                    var comparison = MatchExactCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-                    if (string.Compare(input, start, target, start, length, comparison) == 0)
-                    {
-                        wordStart = start;
-                        wordEnd = i;
-                    }
+                    wordStart = start;
+                    wordEnd = i;
                 }
             }
+            return letterTyped;
+        }
+
+        private void PlayFeedback(int wordStart, int wordEnd, bool letterTyped, bool complete)
+        {
             if (letterTyped || complete)
                 effects.Play(wordStart < 0 ? null : letters[wordStart],
                     wordStart < 0 ? null : target.Substring(wordStart, wordEnd - wordStart + 1), complete);

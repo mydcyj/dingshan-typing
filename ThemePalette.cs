@@ -8,7 +8,7 @@ using System.Windows.Media;
 
 namespace EnglishTypingPractice
 {
-    public enum UiTheme { Cyberpunk, Minimal, Steampunk }
+    public enum UiTheme { Cyberpunk, Minimal, Steampunk, Modern, Vaporwave }
 
     internal static class ThemePalette
     {
@@ -36,6 +36,9 @@ namespace EnglishTypingPractice
             { "E79AD5", new[] { "F995E8", "667F75", "D98C67" } },
             { "87C264", new[] { "54C98B", "297454", "85BE71" } },
             { "101E27", new[] { "191221", "F1F6F2", "251910" } },
+            { "313F2A", new[] { "375158", "D4EBE2", "654824" } },
+            { "9EB5BC", new[] { "C7B9D8", "4D6059", "DCC3A3" } },
+            { "E4F4ED", new[] { "F7F0FC", "202D29", "FFF0D7" } },
             { "354B55", new[] { "473453", "C5D4CD", "523924" } },
             { "1E313A", new[] { "30223E", "FDFFFC", "3F2C1F" } },
             { "091017", new[] { "100A18", "DCE6DF", "1A120C" } },
@@ -91,27 +94,68 @@ namespace EnglishTypingPractice
             { "193242", new[] { "39294B", "E5ECE7", "4A3426" } }
         };
 
+        private static readonly Dictionary<string, string> VaporwaveColors = new Dictionary<string, string>
+        {
+            { "101C24", "F4C3EB" }, { "EDF4F2", "301A4D" }, { "ECF664", "61399B" },
+            { "182015", "FFFFFF" }, { "B0C7CC", "59436F" }, { "52717B", "8C68AF" },
+            { "192A34", "FFF3FA" }, { "101D25", "FFF9FE" }, { "2B414B", "E8C7FA" },
+            { "43626C", "C9F1EA" }, { "FFAA98", "A12F5F" }, { "A0E0C8", "175D60" },
+            { "FFBEB2", "9C235C" }, { "54282F", "FFD8E7" }, { "535B23", "CEFAF0" },
+            { "7ED1EF", "257E82" }, { "E79AD5", "AD4D96" }, { "87C264", "20776C" },
+            { "101E27", "FAE9FC" }, { "313F2A", "BFF2E9" }, { "9EB5BC", "5A436E" },
+            { "E4F4ED", "301A4D" }, { "354B55", "E5C1EE" }, { "1E313A", "FFF3F9" },
+            { "091017", "EBCBEF" }, { "2F3A42", "CFACE8" }, { "5D767F", "9069B0" },
+            { "99ADB2", "8D6DAB" }, { "24402F", "C1EEE2" }, { "223E53", "C3EBF8" },
+            { "3F2E4E", "E7CCF4" }, { "4B3C26", "F8DFB5" }, { "67BDEF", "22568E" },
+            { "D192F1", "863F9B" }, { "F7C15D", "915514" }, { "0B1218", "FEBADB" },
+            { "14252E", "F5C1F1" }, { "3E626B", "AAE9EC" }, { "5E9097", "B986CF" },
+            { "7DABB1", "B186CA" }, { "83B5BC", "AB77C5" }, { "D9FFFF", "FFFFFF" },
+            { "F7FFC7", "21A299" }, { "070D10", "61399B" }, { "AEB748", "7950B6" },
+            { "7BC5C7", "FFF4FC" }, { "548E9E", "FFF9F4" }, { "192832", "FCE0F3" },
+            { "4D737B", "D6B3F6" }, { "FFF5B3", "A6F8ED" }, { "21343D", "F9E4F8" },
+            { "5DB5D4", "216A85" }, { "D285AF", "893880" }, { "9DE4EB", "285E77" },
+            { "FFD48C", "885617" }, { "091218", "53346A" }, { "0B141B", "F1D0F1" },
+            { "4D727D", "C6A2DF" }, { "5E8C97", "B890D4" }, { "5A7B86", "A779CB" },
+            { "59A4B4", "55C4C1" }, { "5F8890", "A785C6" }, { "15232B", "FFF6FC" },
+            { "89B0B5", "8C68AF" }, { "7DAAB2", "8D67B4" }, { "A8D5D9", "8755AE" },
+            { "193242", "E5C5FA" }
+        };
+
         internal static Window LoadWindow(UiTheme theme)
         {
-            int palette = (int)theme;
-            if (palette < 0 || palette > (int)UiTheme.Steampunk)
-                palette = (int)UiTheme.Cyberpunk;
+            if (!System.Enum.IsDefined(typeof(UiTheme), theme))
+                theme = UiTheme.Modern;
             string xaml;
             using (var reader = new StreamReader(typeof(ThemePalette).Assembly.GetManifestResourceStream("Window.xaml")))
                 xaml = reader.ReadToEnd();
-            xaml = ColorLiteral.Replace(xaml, match =>
-            {
-                string[] variants;
-                return Colors.TryGetValue(match.Groups["rgb"].Value, out variants)
-                    ? "#" + match.Groups["alpha"].Value + variants[palette] : match.Value;
-            });
+            if (theme != UiTheme.Modern)
+                xaml = ColorLiteral.Replace(xaml, match =>
+                {
+                    string rgb = match.Groups["rgb"].Value;
+                    string vapor;
+                    if (theme == UiTheme.Vaporwave)
+                        return VaporwaveColors.TryGetValue(rgb, out vapor)
+                            ? "#" + match.Groups["alpha"].Value + vapor : match.Value;
+                    string[] variants;
+                    return Colors.TryGetValue(rgb, out variants)
+                        ? "#" + match.Groups["alpha"].Value + variants[(int)theme] : match.Value;
+                });
             if (theme == UiTheme.Steampunk)
                 xaml = xaml.Replace(">Microsoft YaHei UI, Segoe UI</FontFamily>", ">SimSun, Cambria</FontFamily>");
 
             var window = (Window)XamlReader.Parse(xaml);
+            if (theme != UiTheme.Modern)
+            {
+                window.Resources["BoardStar"] = window.FindResource("Muted");
+                Find(window, "ModernArtwork").Visibility = Visibility.Collapsed;
+            }
+            if (theme == UiTheme.Cyberpunk)
+            {
+                Find(window, "CyberpunkArtwork").Visibility = Visibility.Visible;
+                Find(window, "CyberpunkCity").Visibility = Visibility.Visible;
+            }
             if (theme == UiTheme.Minimal)
             {
-                Find(window, "CyberpunkArtwork").Visibility = Visibility.Collapsed;
                 Find(window, "MinimalArtwork").Visibility = Visibility.Visible;
                 Find(window, "BackgroundLight").Visibility = Visibility.Collapsed;
                 Find(window, "BackgroundPatternTop").Visibility = Visibility.Collapsed;
@@ -120,12 +164,20 @@ namespace EnglishTypingPractice
             }
             else if (theme == UiTheme.Steampunk)
             {
-                Find(window, "CyberpunkArtwork").Visibility = Visibility.Collapsed;
                 Find(window, "SteampunkArtwork").Visibility = Visibility.Visible;
+                Find(window, "SteampunkCity").Visibility = Visibility.Visible;
                 var rivets = (Brush)window.FindResource("Rivets");
                 foreach (string name in new[] { "BackgroundPatternTop", "BackgroundPatternBottom", "StartupPattern" })
                     ((Border)Find(window, name)).Background = rivets;
             }
+            else if (theme == UiTheme.Vaporwave)
+            {
+                foreach (string name in new[] { "VaporwaveBackground", "VaporwaveArtwork", "VaporwaveTitleBar" })
+                    Find(window, name).Visibility = Visibility.Visible;
+                Find(window, "BackgroundPatternTop").Visibility = Visibility.Collapsed;
+                Find(window, "BackgroundPatternBottom").Visibility = Visibility.Collapsed;
+            }
+            DenseCityArtwork.Apply(window, theme);
             return window;
         }
 

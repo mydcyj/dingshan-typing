@@ -22,6 +22,7 @@ namespace EnglishTypingPractice
         private readonly TextBox nickname;
         private readonly Button confirm, skip;
         private readonly DispatcherTimer timer;
+        private readonly StartupThemeEffects themeEffects;
         private Action next;
         private Stage stage;
 
@@ -49,6 +50,9 @@ namespace EnglishTypingPractice
             confirm = (Button)window.FindName("StartupConfirm");
             skip = (Button)window.FindName("StartupSkip");
             ((Image)window.FindName("StartupIcon")).Source = window.Icon;
+            themeEffects = new StartupThemeEffects(window, settings.Theme);
+            var startupLayers = (Grid)overlay;
+            startupLayers.Children.Insert(startupLayers.Children.IndexOf(brand), themeEffects);
 
             timer = new DispatcherTimer(DispatcherPriority.Normal, window.Dispatcher);
             timer.Tick += (sender, e) =>
@@ -71,7 +75,11 @@ namespace EnglishTypingPractice
                 }
             };
             window.Loaded += OnLoaded;
-            window.Closed += (sender, e) => timer.Stop();
+            window.Closed += (sender, e) =>
+            {
+                timer.Stop();
+                themeEffects.Dispose();
+            };
             practicePage.IsEnabled = false;
             overlay.Visibility = Visibility.Visible;
         }
@@ -88,6 +96,7 @@ namespace EnglishTypingPractice
                 return;
             }
             Animate(brand, UIElement.OpacityProperty, 0, 1, 180);
+            themeEffects.Play(false);
             After(550, () => ShowProfile(true));
         }
 
@@ -96,6 +105,7 @@ namespace EnglishTypingPractice
             if (stage != Stage.Brand)
                 return;
             stage = Stage.Profile;
+            themeEffects.Dispose();
             timer.Stop();
             next = null;
             skip.Visibility = Visibility.Collapsed;
@@ -178,8 +188,10 @@ namespace EnglishTypingPractice
                 form.Visibility = Visibility.Collapsed;
                 orbit.Visibility = Visibility.Visible;
                 orbitText.Text = "准备就绪";
+                themeEffects.Play(true);
                 Animate(orbit, UIElement.OpacityProperty, 0, 1, 160);
-                Animate(orbitRotation, RotateTransform.AngleProperty, -32, 106, 450);
+                if (settings.Theme != UiTheme.Minimal)
+                    Animate(orbitRotation, RotateTransform.AngleProperty, -32, 106, 450);
                 Sweep(410);
                 After(480, () =>
                 {
@@ -200,6 +212,7 @@ namespace EnglishTypingPractice
         private void Finish()
         {
             stage = Stage.Finished;
+            themeEffects.Dispose();
             overlay.Visibility = Visibility.Collapsed;
             practicePage.IsEnabled = true;
             focusPractice();

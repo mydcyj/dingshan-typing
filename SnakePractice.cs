@@ -1349,7 +1349,7 @@ namespace EnglishTypingPractice
             }
         }
 
-        internal SnakeBoard() : this(ThemePalette.LoadWindow(UiTheme.Cyberpunk))
+        internal SnakeBoard() : this(ThemePalette.LoadWindow(UiTheme.Modern))
         {
         }
 
@@ -1357,9 +1357,9 @@ namespace EnglishTypingPractice
         {
             Func<string, Brush> brush = key => (Brush)window.FindResource(key);
             Head = brush("Accent");
-            Current = brush("PracticeNextBackground");
-            Quiet = brush("Muted");
-            Label = brush("Text");
+            Current = brush("BoardCurrent");
+            Quiet = brush("BoardQuiet");
+            Label = brush("BoardLabel");
             Board = brush("BoardSurface");
             Bubble = brush("BoardBubble");
             Body = brush("BoardBody");
@@ -1372,7 +1372,7 @@ namespace EnglishTypingPractice
             Rivals = new[] { brush("BoardBluePlayer"), brush("BoardPurplePlayer"), brush("BoardGoldPlayer") };
             TerritoryColors = new[] { Body, Rivals[0], Rivals[1], Rivals[2] };
             LandColors = new[] { brush("BoardGreenLand"), brush("BoardBlueLand"), brush("BoardPurpleLand"), brush("BoardGoldLand") };
-            var star = ((SolidColorBrush)Quiet).Color;
+            var star = ((SolidColorBrush)brush("BoardStar")).Color;
             Stars = new[] { MakeBrush(star.R, star.G, star.B, 82), MakeBrush(star.R, star.G, star.B, 135),
                 MakeBrush(star.R, star.G, star.B, 197) };
             Minimap = new MapOverview(this);

@@ -21,6 +21,7 @@ namespace EnglishTypingPractice
             RoomMasterVolume = 65;
             RoomMusicVolume = 65;
             RoomEffectsVolume = 50;
+            Theme = UiTheme.Modern;
             SnakeReviewWords = new Dictionary<string, int>();
             SnakeRaceBest = new Dictionary<string, int>();
             PracticeRecords = new PracticeLeaderboard();
@@ -55,7 +56,7 @@ namespace EnglishTypingPractice
                 if (!Enum.IsDefined(typeof(PlaybackMode), settings.MusicMode))
                     settings.MusicMode = PlaybackMode.Sequential;
                 if (!Enum.IsDefined(typeof(UiTheme), settings.Theme))
-                    settings.Theme = UiTheme.Cyberpunk;
+                    settings.Theme = UiTheme.Modern;
                 settings.MusicVolume = Math.Max(0, Math.Min(100, settings.MusicVolume));
                 settings.RoomMasterVolume = Math.Max(0, Math.Min(100, settings.RoomMasterVolume));
                 settings.RoomMusicVolume = Math.Max(0, Math.Min(100, settings.RoomMusicVolume));

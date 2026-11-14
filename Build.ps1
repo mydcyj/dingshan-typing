@@ -38,7 +38,9 @@ try {
         (Join-Path $PSScriptRoot 'Program.cs') (Join-Path $PSScriptRoot 'PracticeSettings.cs') `
         (Join-Path $PSScriptRoot 'PracticeLeaderboard.cs') `
         (Join-Path $PSScriptRoot 'ThemePalette.cs') `
+        (Join-Path $PSScriptRoot 'DenseCityArtwork.cs') `
         (Join-Path $PSScriptRoot 'StartupExperience.cs') `
+        (Join-Path $PSScriptRoot 'StartupThemeEffects.cs') `
         (Join-Path $PSScriptRoot 'InteractionMotion.cs') (Join-Path $PSScriptRoot 'SnakeBot.cs') `
         (Join-Path $PSScriptRoot 'TypingRound.cs') (Join-Path $PSScriptRoot 'SnakeTutorial.cs') `
         (Join-Path $PSScriptRoot 'TypingEffects.cs') (Join-Path $PSScriptRoot 'SnakeModes.cs') `
