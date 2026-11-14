@@ -98,7 +98,7 @@ namespace EnglishTypingPractice
             if (bounds.IsEmpty)
                 return;
             Point origin = passage.TranslatePoint(bounds.Location, echo);
-            var colors = new[] { Color.FromRgb(51, 117, 202), Color.FromRgb(146, 83, 201) };
+            var colors = new[] { Color.FromRgb(126, 209, 239), Color.FromRgb(231, 154, 213) };
             for (int i = 0; i < colors.Length; i++)
             {
                 double direction = i == 0 ? -1 : 1;

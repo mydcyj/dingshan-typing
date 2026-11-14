@@ -1,19 +1,65 @@
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="鼎山打字通" Width="920" Height="755" MinWidth="565" MinHeight="420"
-        WindowStartupLocation="CenterScreen" Background="#EAF0F8"
-        Foreground="#182943" FontFamily="Segoe UI, Microsoft YaHei UI" FontSize="14"
+        Title="鼎山打字通" Width="1160" Height="815" MinWidth="565" MinHeight="420"
+        WindowStartupLocation="CenterScreen" Background="#101C24"
+        Foreground="#EDF4F2" FontFamily="Microsoft YaHei UI, Segoe UI" FontSize="14"
         UseLayoutRounding="True">
   <Window.Resources>
-    <SolidColorBrush x:Key="Accent" Color="#244FB7" />
-    <SolidColorBrush x:Key="Muted" Color="#52647C" />
-    <SolidColorBrush x:Key="Line" Color="#CBD6E7" />
+    <SolidColorBrush x:Key="Accent" Color="#ECF664" />
+    <SolidColorBrush x:Key="Text" Color="#EDF4F2" />
+    <SolidColorBrush x:Key="Ink" Color="#182015" />
+    <SolidColorBrush x:Key="Muted" Color="#B0C7CC" />
+    <SolidColorBrush x:Key="Line" Color="#52717B" />
+    <SolidColorBrush x:Key="Panel" Color="#E6192A34" />
+    <SolidColorBrush x:Key="Field" Color="#101D25" />
+    <SolidColorBrush x:Key="Raised" Color="#2B414B" />
+    <SolidColorBrush x:Key="Active" Color="#43626C" />
+    <SolidColorBrush x:Key="Coral" Color="#FFAA98" />
+    <LinearGradientBrush x:Key="Backplate" StartPoint="0,1" EndPoint="1,0">
+      <GradientStop Color="#0B1218" Offset="0" />
+      <GradientStop Color="#14252E" Offset=".54" />
+      <GradientStop Color="#3E626B" Offset="1" />
+    </LinearGradientBrush>
+    <DrawingBrush x:Key="GuideGrid" TileMode="Tile" Viewport="0,0,92,92" ViewportUnits="Absolute" Stretch="Fill">
+      <DrawingBrush.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="Transparent" Geometry="M0,0 H92 V92 H0 Z" />
+          <GeometryDrawing Geometry="M0,0 H92 M0,0 V92">
+            <GeometryDrawing.Pen><Pen Brush="#265E9097" Thickness="1" /></GeometryDrawing.Pen>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#677DABB1" Geometry="M0,0 H2 V2 H0 Z" />
+        </DrawingGroup>
+      </DrawingBrush.Drawing>
+    </DrawingBrush>
+    <DrawingBrush x:Key="Halftone" TileMode="Tile" Viewport="0,0,12,12" ViewportUnits="Absolute">
+      <DrawingBrush.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="Transparent" Geometry="M0,0 H12 V12 H0 Z" />
+          <GeometryDrawing Brush="#6783B5BC">
+            <GeometryDrawing.Geometry><GeometryGroup>
+              <EllipseGeometry Center="3,3" RadiusX="1.9" RadiusY="1.9" />
+              <EllipseGeometry Center="9,9" RadiusX="1.9" RadiusY="1.9" />
+            </GeometryGroup></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+        </DrawingGroup>
+      </DrawingBrush.Drawing>
+    </DrawingBrush>
+    <Style x:Key="DisplayTitle" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="38" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{StaticResource Text}" />
+    </Style>
+    <Style x:Key="SectionTitle" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource Accent}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
     <Style TargetType="Button">
       <Setter Property="Padding" Value="14,7" />
       <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Background" Value="White" />
+      <Setter Property="Background" Value="{StaticResource Raised}" />
       <Setter Property="BorderBrush" Value="{StaticResource Line}" />
-      <Setter Property="Foreground" Value="#182943" />
+      <Setter Property="Foreground" Value="{StaticResource Text}" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="Template">
@@ -21,7 +67,7 @@
           <ControlTemplate TargetType="Button">
             <Border x:Name="Chrome" Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
-                    CornerRadius="6" Padding="{TemplateBinding Padding}">
+                    Padding="{TemplateBinding Padding}">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                 RecognizesAccessKey="True" />
             </Border>
@@ -33,6 +79,9 @@
               <Trigger Property="IsPressed" Value="True">
                 <Setter TargetName="Chrome" Property="Opacity" Value="0.74" />
               </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource Accent}" />
+              </Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="Chrome" Property="Opacity" Value="0.46" />
               </Trigger>
@@ -41,47 +90,283 @@
         </Setter.Value>
       </Setter>
     </Style>
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{StaticResource Accent}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+    </Style>
     <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{StaticResource Text}" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="Padding" Value="5,0,0,0" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <DockPanel Background="Transparent" LastChildFill="True">
+              <Border x:Name="Mark" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,5,0"
+                      Background="{StaticResource Field}" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <Path x:Name="Tick" Visibility="Hidden" Stroke="{StaticResource Ink}" StrokeThickness="2"
+                      Data="M2,6 L5,9 L11,3" VerticalAlignment="Center" HorizontalAlignment="Center" />
+              </Border>
+              <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True" />
+            </DockPanel>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Mark" Property="Background" Value="{StaticResource Accent}" />
+                <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Mark" Property="BorderBrush" Value="{StaticResource Accent}" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".5" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="TextBox">
+      <Setter Property="Background" Value="{StaticResource Field}" />
+      <Setter Property="Foreground" Value="{StaticResource Text}" />
+      <Setter Property="CaretBrush" Value="{StaticResource Accent}" />
+      <Setter Property="SelectionBrush" Value="{StaticResource Active}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}">
+              <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" Focusable="False" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+          <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="ScrollStep" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" /></ControlTemplate></Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="11" />
+      <Setter Property="MinWidth" Value="11" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Border Background="{StaticResource Field}" Padding="2">
+              <Track x:Name="PART_Track" IsDirectionReversed="True">
+                <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource ScrollStep}" /></Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb>
+                    <Thumb.Template>
+                      <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="Grip" Background="{StaticResource Line}" />
+                        <ControlTemplate.Triggers>
+                          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Grip" Property="Background" Value="{StaticResource Accent}" /></Trigger>
+                        </ControlTemplate.Triggers>
+                      </ControlTemplate>
+                    </Thumb.Template>
+                  </Thumb>
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource ScrollStep}" /></Track.IncreaseRepeatButton>
+              </Track>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="Orientation" Value="Horizontal">
+                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="Orientation" Value="Horizontal">
+          <Setter Property="Width" Value="Auto" /><Setter Property="MinWidth" Value="0" /><Setter Property="Height" Value="11" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style TargetType="Slider">
+      <Setter Property="MinHeight" Value="17" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Slider">
+            <Grid Background="Transparent">
+              <Border Height="4" VerticalAlignment="Center" Background="{StaticResource Line}" />
+              <Track x:Name="PART_Track" VerticalAlignment="Center">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
+                    <RepeatButton.Template>
+                      <ControlTemplate TargetType="RepeatButton">
+                        <Grid Background="Transparent"><Border Height="4" VerticalAlignment="Center" Background="{StaticResource Accent}" /></Grid>
+                      </ControlTemplate>
+                    </RepeatButton.Template>
+                  </RepeatButton>
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb Width="8" Height="15">
+                    <Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{StaticResource Accent}" /></ControlTemplate></Thumb.Template>
+                  </Thumb>
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource ScrollStep}" /></Track.IncreaseRepeatButton>
+              </Track>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".45" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="ListBox">
+      <Setter Property="Background" Value="{StaticResource Field}" />
+      <Setter Property="Foreground" Value="{StaticResource Text}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+    </Style>
+    <Style TargetType="ComboBoxItem">
+      <Setter Property="Foreground" Value="{StaticResource Text}" />
+      <Setter Property="Padding" Value="9,6" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBoxItem">
+            <Border x:Name="Item" Background="Transparent" Padding="{TemplateBinding Padding}">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{StaticResource Active}" /></Trigger>
+              <Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="{StaticResource Accent}" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="ComboBox">
+      <Setter Property="Foreground" Value="{StaticResource Text}" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ComboBox">
+            <Grid>
+              <ToggleButton Focusable="False" ClickMode="Press"
+                            IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                <ToggleButton.Template>
+                  <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Box" BorderBrush="{StaticResource Line}" BorderThickness="1" Background="{StaticResource Raised}">
+                      <Path Data="M0,0 H8 L4,5 Z" Fill="{StaticResource Accent}" HorizontalAlignment="Right"
+                            VerticalAlignment="Center" Margin="0,0,10,0" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}" /></Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </ToggleButton.Template>
+              </ToggleButton>
+              <ContentPresenter IsHitTestVisible="False" Margin="9,0,27,0" VerticalAlignment="Center"
+                                Content="{TemplateBinding SelectionBoxItem}"
+                                ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+              <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
+                     Focusable="False" AllowsTransparency="True">
+                <Border Background="{StaticResource Field}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                        MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsPresenter /></ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value=".55" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style x:Key="StatLabel" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{StaticResource Muted}" />
       <Setter Property="FontSize" Value="13" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
     <Style x:Key="StatValue" TargetType="TextBlock">
       <Setter Property="Foreground" Value="{StaticResource Accent}" />
       <Setter Property="FontFamily" Value="Consolas" />
       <Setter Property="FontSize" Value="31" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
       <Setter Property="Margin" Value="0,2,0,0" />
     </Style>
   </Window.Resources>
 
   <Grid>
+  <Grid IsHitTestVisible="False">
+    <Border Background="{StaticResource Backplate}" />
+    <Border Background="{StaticResource GuideGrid}" />
+    <Border Background="{StaticResource Halftone}" Height="176" VerticalAlignment="Top">
+      <Border.OpacityMask><LinearGradientBrush StartPoint="1,0" EndPoint="0.36,1">
+        <GradientStop Color="#DFFFFFFF" Offset="0" /><GradientStop Color="#00FFFFFF" Offset="1" />
+      </LinearGradientBrush></Border.OpacityMask>
+    </Border>
+    <Border Background="{StaticResource Halftone}" Height="106" VerticalAlignment="Bottom">
+      <Border.OpacityMask><LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+        <GradientStop Color="#73FFFFFF" Offset="0" /><GradientStop Color="#00FFFFFF" Offset="1" />
+      </LinearGradientBrush></Border.OpacityMask>
+    </Border>
+  </Grid>
   <ScrollViewer x:Name="PracticePage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="28,23,28,20" MaxWidth="1000">
-      <Grid>
+    <StackPanel Margin="30,22,30,24" MaxWidth="1200">
+      <Grid ClipToBounds="True">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <StackPanel>
-          <TextBlock Text="鼎山打字通" FontSize="34" FontWeight="Bold" />
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <Border Grid.ColumnSpan="2" Grid.RowSpan="2" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,1">
+          <Border.Background>
+            <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
+              <GradientStop Color="#192832" Offset="0" /><GradientStop Color="#4D737B" Offset="1" />
+            </LinearGradientBrush>
+          </Border.Background>
+        </Border>
+        <Viewbox Grid.RowSpan="2" Grid.ColumnSpan="2" Width="360" HorizontalAlignment="Right" VerticalAlignment="Center"
+                 Margin="0,0,22,0" IsHitTestVisible="False" Opacity=".83">
+          <Canvas Width="360" Height="124">
+            <Path Data="M2,113 L178,17 L337,17 M84,124 L258,28 L359,28 M135,122 H355 M288,0 V118"
+                  Stroke="#586E989F" StrokeThickness="1" />
+            <Path Data="M72,103 L136,71 L110,49 L179,56 L219,9 L227,43 L269,19 L254,63 L318,39 L282,83 L347,81 L283,111 L231,91 L179,123 Z"
+                  Fill="#4C5D8E9F" Stroke="#9BA8C7C9" StrokeThickness="1" />
+            <Path Data="M136,71 L227,43 L206,95 L179,123 Z" Fill="#7FA8BDBF" />
+            <Path Data="M179,56 L219,9 L227,43 L206,95 Z" Fill="#BCD1CB" />
+            <Path Data="M227,43 L269,19 L254,63 L206,95 Z" Fill="#F1F6D9" />
+            <Path Data="M206,95 L254,63 L318,39 L282,83 L231,91 Z" Fill="#8BAFB4" />
+            <Path Data="M231,91 L282,83 L283,111 Z" Fill="#C5D8CE" />
+            <Path Data="M55,93 L140,59 L156,82 L238,23 L295,24 M172,106 L217,75 L306,76 L334,59"
+                  Stroke="{StaticResource Accent}" StrokeThickness="1.2" />
+            <Path Data="M301,12 H357 V15 H301 Z M127,109 H155 V112 H127 Z M26,100 H31 V105 H26 Z"
+                  Fill="{StaticResource Accent}" />
+          </Canvas>
+        </Viewbox>
+        <Border Grid.ColumnSpan="2" Grid.RowSpan="2" IsHitTestVisible="False">
+          <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#FF192832" Offset="0" /><GradientStop Color="#F0192832" Offset=".41" />
+            <GradientStop Color="#00192832" Offset=".83" />
+          </LinearGradientBrush></Border.Background>
+        </Border>
+        <Border Grid.ColumnSpan="2" Width="97" Height="3" Background="{StaticResource Accent}"
+                HorizontalAlignment="Left" VerticalAlignment="Top" />
+        <StackPanel Grid.RowSpan="2" Margin="18,14,6,16" VerticalAlignment="Center">
+          <TextBlock Text="打字练习" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="鼎山打字通" Style="{StaticResource DisplayTitle}" Margin="-2,2,0,3" />
           <TextBlock x:Name="PracticeHint" Text="照着四级英语短文输入，敲下第一个字符开始计时。"
-                     Foreground="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                     Foreground="{StaticResource Muted}" MaxWidth="385" HorizontalAlignment="Left" TextWrapping="Wrap" />
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-          <Button x:Name="NewPassage" Content="换一篇" Background="{StaticResource Accent}"
-                  BorderBrush="{StaticResource Accent}" Foreground="White" />
-          <Button x:Name="Retry" Content="重练本篇" Margin="8,0,0,0" />
-        </StackPanel>
+        <Button Grid.RowSpan="2" Grid.Column="1" x:Name="OpenSnake" Content="贪吃蛇模式  ↗" Style="{StaticResource PrimaryButton}"
+                Margin="8,0,17,13" VerticalAlignment="Bottom" />
       </Grid>
 
-      <WrapPanel Margin="1,15,0,14">
+      <WrapPanel Margin="0,11,0,9">
         <ComboBox x:Name="PracticeKind" SelectedIndex="0" Width="123" MinHeight="28" Margin="0,0,12,4"
                   VerticalContentAlignment="Center" AutomationProperties.Name="练习内容">
           <ComboBoxItem Content="四级英语" />
@@ -96,21 +381,29 @@
                   ToolTip="取消勾选后，短文会去掉标点。更改后重练本篇。" />
         <CheckBox x:Name="TypingFeedback" Content="打击感" Margin="19,0,0,0"
                   ToolTip="开启按键音、单词回响和完成震动。" />
-        <Button x:Name="OpenSnake" Content="贪吃蛇模式" Margin="18,0,0,0" Padding="11,4" MinHeight="28" />
+        <Button x:Name="NewPassage" Content="换一篇" Margin="13,0,0,4" MinHeight="28" Padding="10,4" />
+        <Button x:Name="Retry" Content="重练本篇" Margin="6,0,0,4" MinHeight="28" Padding="10,4" />
       </WrapPanel>
 
-      <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="10">
+      <Grid x:Name="PracticeWorkbench">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition x:Name="PracticeSidebarColumn" Width="0" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+      <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+              VerticalAlignment="Top">
         <StackPanel>
-          <Border Background="#F4F7FD" CornerRadius="9,9,0,0" Padding="20,15,20,17">
+          <Border Background="{StaticResource Field}" Padding="19,10,19,11">
             <StackPanel>
               <DockPanel LastChildFill="False">
-                <TextBlock x:Name="PracticeTitle" Text="练习短文" FontWeight="SemiBold" />
+                <TextBlock x:Name="PracticeTitle" Text="练习短文" Style="{StaticResource SectionTitle}" />
                 <TextBlock x:Name="Count" DockPanel.Dock="Right" FontFamily="Consolas"
                            Foreground="{StaticResource Muted}" VerticalAlignment="Center" />
               </DockPanel>
               <Grid>
-                <TextBlock x:Name="Passage" MinHeight="63" Margin="0,9,0,0" FontFamily="Consolas"
-                           FontSize="22" LineHeight="31" LineStackingStrategy="BlockLineHeight"
+                <TextBlock x:Name="Passage" MinHeight="63" Margin="0,7,0,0" FontFamily="Consolas"
+                           FontSize="22" LineHeight="28" LineStackingStrategy="BlockLineHeight"
                            TextWrapping="Wrap" Language="en-US" />
                 <Canvas x:Name="WordEcho" IsHitTestVisible="False" ClipToBounds="True" />
               </Grid>
@@ -119,63 +412,55 @@
           <ProgressBar x:Name="Progress" Height="3" BorderThickness="0"
                        Foreground="{StaticResource Accent}" Background="{StaticResource Line}"
                        AutomationProperties.Name="打字进度" />
-          <StackPanel Margin="20,13,20,17">
+          <StackPanel Margin="19,11,19,13">
             <DockPanel LastChildFill="False">
-              <TextBlock Text="在这里输入" FontWeight="SemiBold" />
+              <TextBlock Text="在这里输入" Style="{StaticResource SectionTitle}" />
               <TextBlock x:Name="RoundStatus" DockPanel.Dock="Right"
                          Foreground="{StaticResource Muted}" FontSize="13" />
             </DockPanel>
             <TextBox x:Name="Typed" Height="96" Margin="0,8,0,0" Padding="10,7"
-                     Background="White" Foreground="#182943"
                      FontFamily="Consolas" FontSize="22" TextWrapping="Wrap" AcceptsReturn="False"
                      VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="False"
                      InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
                      AutomationProperties.Name="在这里输入" Language="en-US">
-              <TextBox.Style>
-                <Style TargetType="TextBox">
-                  <Setter Property="BorderBrush" Value="{StaticResource Line}" />
-                  <Style.Triggers>
-                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
-                    </Trigger>
-                  </Style.Triggers>
-                </Style>
-              </TextBox.Style>
             </TextBox>
           </StackPanel>
         </StackPanel>
       </Border>
 
-      <Grid Margin="0,17,0,17">
+      <StackPanel x:Name="PracticeSidebar" Grid.Row="1" Margin="0,10,0,0">
+      <Border Margin="0,0,0,10" BorderBrush="{StaticResource Line}" BorderThickness="1" Background="{StaticResource Panel}">
+      <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <StackPanel>
+        <StackPanel Margin="17,8,6,8">
           <TextBlock x:Name="SpeedLabel" Text="速度 (WPM)" Style="{StaticResource StatLabel}" />
           <TextBlock x:Name="Speed" Style="{StaticResource StatValue}"
                      ToolTip="每 5 个正确字符折算为 1 个词。" />
         </StackPanel>
         <Border Grid.Column="1" BorderBrush="{StaticResource Line}" BorderThickness="1,0,1,0">
-          <StackPanel>
+          <StackPanel Margin="17,8,6,8">
             <TextBlock Text="正确率" Style="{StaticResource StatLabel}" />
             <TextBlock x:Name="Accuracy" Style="{StaticResource StatValue}" />
           </StackPanel>
         </Border>
-        <StackPanel Grid.Column="2">
+        <StackPanel Grid.Column="2" Margin="17,8,6,8">
           <TextBlock Text="用时" Style="{StaticResource StatLabel}" />
           <TextBlock x:Name="Elapsed" Style="{StaticResource StatValue}" />
         </StackPanel>
       </Grid>
+      </Border>
 
-      <Border BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+      <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" Padding="16,9,16,10">
         <StackPanel>
           <DockPanel>
             <Button DockPanel.Dock="Right" x:Name="ChooseFolder" Content="选择音乐文件夹"
-                    Margin="12,0,0,0" VerticalAlignment="Center" />
+                    Margin="8,0,0,0" Padding="9,5" VerticalAlignment="Center" />
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="背景音乐" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Text="背景音乐" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
               <CheckBox x:Name="PlayMusic" Content="练习时播放" Margin="13,0,0,0" />
             </StackPanel>
           </DockPanel>
@@ -204,7 +489,7 @@
             <Slider x:Name="MusicPosition" Minimum="0" Maximum="1" SmallChange="1" LargeChange="5"
                     IsEnabled="False" IsMoveToPointEnabled="True" AutomationProperties.Name="音乐播放进度" />
           </DockPanel>
-          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+          <WrapPanel Margin="0,8,0,0">
             <TextBlock Text="模式" Margin="0,0,8,0" VerticalAlignment="Center" />
             <ComboBox x:Name="MusicMode" MinWidth="112" MinHeight="28" Padding="6,2"
                       VerticalContentAlignment="Center" AutomationProperties.Name="播放模式">
@@ -212,23 +497,25 @@
               <ComboBoxItem Content="随机播放" />
               <ComboBoxItem Content="单曲循环" />
             </ComboBox>
-            <TextBlock Text="音量" Margin="21,0,7,0" VerticalAlignment="Center" />
-            <Slider x:Name="MusicVolume" Width="108" Minimum="0" Maximum="100"
+            <TextBlock Text="音量" Margin="10,0,6,0" VerticalAlignment="Center" />
+            <Slider x:Name="MusicVolume" Width="68" Minimum="0" Maximum="100"
                     SmallChange="1" LargeChange="10" TickFrequency="1" IsSnapToTickEnabled="True"
                     VerticalAlignment="Center" AutomationProperties.Name="音乐音量" />
-            <TextBlock x:Name="VolumeLabel" MinWidth="40" Margin="5,0,0,0" VerticalAlignment="Center"
+            <TextBlock x:Name="VolumeLabel" Margin="5,0,0,0" VerticalAlignment="Center"
                        Foreground="{StaticResource Muted}" />
-          </StackPanel>
+          </WrapPanel>
           <TextBlock x:Name="MusicStatus" Foreground="{StaticResource Muted}" FontSize="13"
                      Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
         </StackPanel>
       </Border>
       <TextBlock x:Name="SettingsNotice" Visibility="Collapsed" Margin="0,8,0,0"
-                 Foreground="#972942" Text="设置未能保存，下次打开时可能需要重新选择。" />
+                 Foreground="{StaticResource Coral}" Text="设置未能保存，下次打开时可能需要重新选择。" />
+      </StackPanel>
+      </Grid>
     </StackPanel>
   </ScrollViewer>
 
-  <Grid x:Name="SnakePage" Margin="28,19,28,20" MaxWidth="1000" Visibility="Collapsed">
+  <Grid x:Name="SnakePage" Margin="30,19,30,22" MaxWidth="1200" Visibility="Collapsed">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
@@ -236,28 +523,30 @@
     <DockPanel Margin="0,0,0,14">
       <Button DockPanel.Dock="Right" x:Name="CloseSnake" Content="返回短文"
               Margin="12,0,0,0" VerticalAlignment="Center" />
-      <Button DockPanel.Dock="Right" x:Name="OpenSnakeRules" Content="玩法规则"
+      <Button DockPanel.Dock="Right" x:Name="OpenSnakeRules" Content="玩法规则" Style="{StaticResource PrimaryButton}"
               Margin="12,0,0,0" VerticalAlignment="Center" />
       <StackPanel>
-        <TextBlock Text="贪吃蛇" FontSize="34" FontWeight="Bold" />
+        <Border Width="66" Height="3" Background="{StaticResource Accent}" HorizontalAlignment="Left" Margin="0,0,0,4" />
+        <TextBlock Text="贪吃蛇" Style="{StaticResource DisplayTitle}" />
         <TextBlock Text="打完方向词就转向，按空格清空当前输入。" Margin="0,3,0,0"
                    Foreground="{StaticResource Muted}" />
       </StackPanel>
     </DockPanel>
 
-    <Border Grid.Row="1" Background="White" BorderBrush="{StaticResource Line}"
-            BorderThickness="1" CornerRadius="10" Padding="14">
+    <Border Grid.Row="1" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}"
+            BorderThickness="1" Padding="10">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="295" />
+          <ColumnDefinition Width="0.67*" MinWidth="228" MaxWidth="318" />
         </Grid.ColumnDefinitions>
         <Grid>
-          <Border x:Name="SnakeBoardHost" ClipToBounds="True" Background="#F4F8F5" CornerRadius="6"
+          <Border x:Name="SnakeBoardHost" ClipToBounds="True" Background="{StaticResource Field}"
+                  BorderBrush="{StaticResource Line}" BorderThickness="1"
                   AutomationProperties.Name="贪吃蛇棋盘" />
           <Border x:Name="SnakeWordFlash" Opacity="0" IsHitTestVisible="False" VerticalAlignment="Top"
                   HorizontalAlignment="Center" Margin="7,8,7,0" Padding="13,5,13,6"
-                  Background="#F6FFFFFF" CornerRadius="8">
+                  Background="#F521343D" BorderBrush="{StaticResource Accent}" BorderThickness="1">
             <StackPanel>
               <Grid>
                 <Grid.Resources>
@@ -269,22 +558,22 @@
                     <Setter Property="TextAlignment" Value="Center" />
                   </Style>
                 </Grid.Resources>
-                <TextBlock x:Name="SnakeFlashBlue" Foreground="#327AD7" Opacity="0.53">
+                <TextBlock x:Name="SnakeFlashBlue" Foreground="#5DB5D4" Opacity="0.72">
                   <TextBlock.RenderTransform><TranslateTransform X="-2" Y="1" /></TextBlock.RenderTransform>
                 </TextBlock>
-                <TextBlock x:Name="SnakeFlashRose" Foreground="#D45E9A" Opacity="0.53">
+                <TextBlock x:Name="SnakeFlashRose" Foreground="#D285AF" Opacity="0.67">
                   <TextBlock.RenderTransform><TranslateTransform X="2" Y="-1" /></TextBlock.RenderTransform>
                 </TextBlock>
-                <TextBlock x:Name="SnakeFlashWord" Foreground="#172B47" />
+                <TextBlock x:Name="SnakeFlashWord" Foreground="{StaticResource Accent}" />
               </Grid>
               <TextBlock x:Name="SnakeFlashMeaning" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" />
             </StackPanel>
           </Border>
-          <Border x:Name="LanPanel" Background="#F4F7FD" BorderBrush="{StaticResource Line}"
-                  BorderThickness="1" CornerRadius="6" Visibility="Collapsed">
+          <Border x:Name="LanPanel" Background="{StaticResource Field}" BorderBrush="{StaticResource Line}"
+                  BorderThickness="1" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
               <StackPanel Margin="16">
-                <TextBlock Text="局域网房间" FontSize="21" FontWeight="Bold" />
+                <TextBlock Text="局域网房间" FontSize="21" FontWeight="Bold" Foreground="{StaticResource Accent}" />
                 <TextBlock Text="同一 Wi-Fi 或有线网络，最多 4 人。" Margin="0,4,0,12"
                            TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
                 <TextBlock Text="你的昵称" FontWeight="SemiBold" />
@@ -305,18 +594,18 @@
                 <TextBox x:Name="LanAddress" MaxLength="15" MinHeight="30" Padding="5,3"
                          AutomationProperties.Name="房主 IPv4" />
                 <Button x:Name="LanJoin" Content="加入房间" HorizontalAlignment="Left" Margin="0,8,0,0"
-                        Background="{StaticResource Accent}" BorderBrush="{StaticResource Accent}" Foreground="White" />
+                        Style="{StaticResource PrimaryButton}" />
                 <TextBlock x:Name="LanNotice" TextWrapping="Wrap" Margin="0,8,0,0"
                            Foreground="{StaticResource Muted}" />
               </StackPanel>
             </ScrollViewer>
           </Border>
         </Grid>
-        <ScrollViewer Grid.Column="1" Margin="14,0,0,0" VerticalScrollBarVisibility="Auto"
+        <ScrollViewer Grid.Column="1" Margin="12,0,0,0" VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
           <StackPanel>
             <DockPanel LastChildFill="False">
-              <TextBlock Text="棋盘" FontWeight="SemiBold" />
+              <TextBlock Text="对局控制" Style="{StaticResource SectionTitle}" />
               <TextBlock DockPanel.Dock="Right" x:Name="SnakeBoardSize" Text="32 × 32 格" Foreground="{StaticResource Muted}" />
             </DockPanel>
             <DockPanel Margin="0,8,0,0">
@@ -353,18 +642,21 @@
             </DockPanel>
             <TextBlock x:Name="SnakeRoleGuide" Foreground="{StaticResource Muted}" FontSize="12"
                        TextWrapping="Wrap" Margin="0,4,0,1" />
-            <DockPanel Margin="0,7,0,9" LastChildFill="False">
+            <Border Margin="0,7,0,9" BorderBrush="{StaticResource Accent}" BorderThickness="2,0,0,0"
+                    Background="{StaticResource Field}" Padding="9,2,8,3">
+            <DockPanel LastChildFill="False">
               <TextBlock x:Name="SnakeScoreLabel" Text="分数" VerticalAlignment="Center"
                          Foreground="{StaticResource Muted}" FontSize="12" />
               <TextBlock DockPanel.Dock="Right" x:Name="SnakeScore" Text="0" FontFamily="Consolas"
-                         FontSize="27" FontWeight="Bold" Foreground="#1A5F44" />
+                         FontSize="27" FontWeight="Bold" Foreground="{StaticResource Accent}" />
             </DockPanel>
+            </Border>
             <TextBlock x:Name="SnakeScoreGuide" Text="有效转向 +6 或 +7 · 吃果 +10" Foreground="{StaticResource Muted}"
                        FontSize="12" Margin="0,-3,0,9" />
             <TextBlock x:Name="SnakeFruitLegend" Foreground="{StaticResource Muted}" FontSize="12"
                        Margin="0,-4,0,9" Visibility="Collapsed">
-              <Run Foreground="#B5452B" Text="■" /><Run Text=" 小果 +10　" />
-              <Run Foreground="#AC6315" Text="■" /><Run Text=" 大果 +30" />
+              <Run Foreground="{StaticResource Coral}" Text="■" /><Run Text=" 小果 +10　" />
+              <Run Foreground="#FFD48C" Text="■" /><Run Text=" 大果 +30" />
             </TextBlock>
 
             <Grid>
@@ -378,14 +670,13 @@
                 <Style x:Key="DirectionName" TargetType="TextBlock">
                   <Setter Property="FontSize" Value="13" />
                   <Setter Property="FontWeight" Value="SemiBold" />
-                  <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                  <Setter Property="Foreground" Value="{StaticResource Accent}" />
                   <Setter Property="Margin" Value="0,0,0,3" />
                 </Style>
                 <Style x:Key="DirectionCard" TargetType="Border">
-                  <Setter Property="Background" Value="#F4F7FD" />
+                  <Setter Property="Background" Value="{StaticResource Field}" />
                   <Setter Property="BorderBrush" Value="{StaticResource Line}" />
                   <Setter Property="BorderThickness" Value="1" />
-                  <Setter Property="CornerRadius" Value="5" />
                   <Setter Property="Padding" Value="7,4" />
                   <Setter Property="Margin" Value="3" />
                 </Style>
@@ -429,13 +720,13 @@
 
             <TextBlock Text="— 当前方向   × 禁止掉头" Foreground="{StaticResource Muted}"
                        FontSize="12" HorizontalAlignment="Center" Margin="0,6,0,0" />
-            <TextBlock Text="输入指令" FontWeight="SemiBold" Margin="0,11,0,4" />
+            <TextBlock Text="输入指令" Style="{StaticResource SectionTitle}" Margin="0,11,0,4" />
             <TextBox x:Name="SnakeCommand" MinHeight="35" Padding="6,3" FontFamily="Consolas"
                      FontSize="19" MaxLength="10" AcceptsReturn="False" SpellCheck.IsEnabled="False"
                      InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
                      AutomationProperties.Name="输入开始或方向词" />
             <StackPanel x:Name="SnakeChargePanel" Visibility="Collapsed" Margin="0,7,0,0">
-              <TextBlock x:Name="SnakeChargeWord" TextWrapping="Wrap" Foreground="#1A5F44" FontWeight="SemiBold" />
+              <TextBlock x:Name="SnakeChargeWord" TextWrapping="Wrap" Foreground="#9DE4EB" FontWeight="SemiBold" />
               <TextBox x:Name="SnakeChargeInput" MinHeight="31" Padding="6,2" Margin="0,3,0,0"
                        FontFamily="Consolas" FontSize="16" MaxLength="20" SpellCheck.IsEnabled="False"
                        InputMethod.IsInputMethodEnabled="False" AllowDrop="False"
@@ -482,6 +773,7 @@
         <Setter Property="FontSize" Value="20" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Margin" Value="0,14,0,6" />
+        <Setter Property="Foreground" Value="{StaticResource Accent}" />
       </Style>
       <Style x:Key="RuleText" TargetType="TextBlock">
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -495,9 +787,12 @@
     </Grid.RowDefinitions>
     <DockPanel Margin="0,0,0,14">
       <Button DockPanel.Dock="Right" x:Name="CloseSnakeRules" Content="返回棋盘" Margin="12,0,0,0" VerticalAlignment="Center" />
-      <TextBlock Text="玩法规则" FontSize="34" FontWeight="Bold" />
+      <StackPanel>
+        <Border Width="66" Height="3" Background="{StaticResource Accent}" HorizontalAlignment="Left" Margin="0,0,0,4" />
+        <TextBlock Text="玩法规则" Style="{StaticResource DisplayTitle}" />
+      </StackPanel>
     </DockPanel>
-    <Border Grid.Row="1" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="10">
+    <Border Grid.Row="1" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1">
       <ScrollViewer x:Name="SnakeRulesScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="20,5,20,16">
           <TextBlock Text="快速开局" Style="{StaticResource RuleHeading}" />

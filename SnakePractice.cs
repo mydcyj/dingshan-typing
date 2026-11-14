@@ -348,7 +348,7 @@ namespace EnglishTypingPractice
                         string word = words[(int)direction * variants + variant];
                         return word + " " + SnakeWords.Meaning(word) + (opposite ? " ×" : "");
                     }).Where(line => line != null));
-                label.Foreground = opposite || !running ? Brushes.SlateGray : SnakeBoard.Head;
+                label.Foreground = opposite || !running ? SnakeBoard.Quiet : SnakeBoard.Label;
                 label.ToolTip = current ? "当前方向" : opposite ? "禁止掉头" : null;
                 var card = (Border)((StackPanel)label.Parent).Parent;
                 if (current)
@@ -629,30 +629,33 @@ namespace EnglishTypingPractice
 
     internal sealed class SnakeBoard : FrameworkElement
     {
-        internal static readonly Brush Head = MakeBrush(26, 95, 68);
-        internal static readonly Brush Current = MakeBrush(216, 237, 226);
-        private static readonly Brush Board = MakeBrush(232, 243, 236);
-        private static readonly Brush Body = MakeBrush(75, 151, 107);
-        private static readonly Brush Fruit = MakeBrush(181, 69, 43);
-        private static readonly Brush LargeFruit = MakeBrush(224, 148, 44);
+        private static readonly Brush Head = MakeBrush(236, 246, 100);
+        internal static readonly Brush Current = MakeBrush(49, 63, 42);
+        internal static readonly Brush Quiet = MakeBrush(158, 181, 188);
+        internal static readonly Brush Label = MakeBrush(228, 244, 237);
+        private static readonly Brush Board = MakeBrush(16, 30, 39);
+        private static readonly Brush Bubble = MakeBrush(30, 49, 58);
+        private static readonly Brush Body = MakeBrush(135, 194, 100);
+        private static readonly Brush Fruit = MakeBrush(255, 139, 113);
+        private static readonly Brush LargeFruit = MakeBrush(255, 192, 99);
         private static readonly Brush FruitHighlight = MakeBrush(255, 240, 183);
-        private static readonly Brush ChargeGlow = MakeBrush(26, 154, 165);
-        private static readonly Brush StunFill = MakeBrush(105, 117, 132);
-        private static readonly Brush ClosedZone = MakeBrush(128, 139, 149);
-        private static readonly Brush ShotFill = MakeBrush(190, 78, 26);
+        private static readonly Brush ChargeGlow = MakeBrush(129, 230, 238);
+        private static readonly Brush StunFill = MakeBrush(149, 154, 167);
+        private static readonly Brush ClosedZone = MakeBrush(47, 58, 66);
+        private static readonly Brush ShotFill = MakeBrush(255, 149, 99);
         private static readonly Pen BurstOutline = MakeBurstPen();
-        private static readonly Brush Obstacle = MakeBrush(71, 77, 91);
+        private static readonly Brush Obstacle = MakeBrush(93, 118, 127);
         private static readonly Pen ObstacleOutline = MakeObstaclePen();
         private static readonly Pen Grid = MakeGridPen();
         private static readonly Brush[] Rivals =
         {
-            MakeBrush(49, 99, 184), MakeBrush(126, 75, 161), MakeBrush(151, 105, 26)
+            MakeBrush(103, 189, 239), MakeBrush(209, 146, 241), MakeBrush(247, 193, 93)
         };
         private static readonly Brush[] TerritoryColors = { Body, Rivals[0], Rivals[1], Rivals[2] };
         private static readonly string[] TeamNames = { "绿队", "蓝队", "紫队", "金队" };
         private static readonly Brush[] LandColors =
         {
-            MakeBrush(168, 219, 185), MakeBrush(180, 207, 245), MakeBrush(215, 190, 237), MakeBrush(247, 218, 158)
+            MakeBrush(36, 64, 47), MakeBrush(34, 62, 83), MakeBrush(63, 46, 78), MakeBrush(75, 60, 38)
         };
         private int size = SnakeGame.BaseSize;
         private int[] smallFruits = new int[0];
@@ -809,7 +812,7 @@ namespace EnglishTypingPractice
                 var head = CellBounds(player.Body[0], area, cell);
                 var center = new Point(head.X + cell / 2, head.Y + cell / 2);
                 var label = new FormattedText(player.Name, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-                    new Typeface("Segoe UI, Microsoft YaHei UI"), 11, Brushes.Black, VisualTreeHelper.GetDpi(this).PixelsPerDip)
+                    new Typeface("Segoe UI, Microsoft YaHei UI"), 11, Label, VisualTreeHelper.GetDpi(this).PixelsPerDip)
                     { MaxTextWidth = Math.Max(1, Math.Min(138, area.Width - 14)), MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
                 FormattedText typing = null;
                 if (!string.IsNullOrEmpty(player.Typing) || player.TypingSkill)
@@ -838,7 +841,7 @@ namespace EnglishTypingPractice
                 var pen = new Pen(color, 1);
                 drawing.DrawLine(pen, center, new Point(bubble.X + bubble.Width / 2,
                     bubble.Y < head.Top ? bubble.Bottom : bubble.Top));
-                drawing.DrawRoundedRectangle(Brushes.White, pen, bubble, 5, 5);
+                drawing.DrawRectangle(Bubble, pen, bubble);
                 drawing.DrawText(label, new Point(bubble.X + 6, bubble.Y + 3));
                 if (typing != null)
                     drawing.DrawText(typing, new Point(bubble.X + 6, bubble.Y + label.Height + 4));
@@ -864,7 +867,7 @@ namespace EnglishTypingPractice
 
         private static Pen MakeObstaclePen()
         {
-            var pen = new Pen(MakeBrush(110, 120, 139), 0.8);
+            var pen = new Pen(MakeBrush(153, 173, 178), 0.8);
             pen.Freeze();
             return pen;
         }
@@ -885,7 +888,7 @@ namespace EnglishTypingPractice
 
         private static Pen MakeGridPen()
         {
-            var pen = new Pen(MakeBrush(208, 226, 214), 0.65);
+            var pen = new Pen(MakeBrush(53, 75, 85), 0.65);
             pen.Freeze();
             return pen;
         }

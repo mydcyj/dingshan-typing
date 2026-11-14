@@ -19,7 +19,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("1.10.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.11.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -42,10 +42,10 @@ namespace EnglishTypingPractice
 
     internal sealed class Practice
     {
-        private static readonly Brush Correct = new SolidColorBrush(Color.FromRgb(38, 101, 84));
-        private static readonly Brush Incorrect = new SolidColorBrush(Color.FromRgb(151, 41, 66));
-        private static readonly Brush IncorrectBackground = new SolidColorBrush(Color.FromRgb(251, 224, 231));
-        private static readonly Brush NextBackground = new SolidColorBrush(Color.FromRgb(220, 231, 255));
+        private static readonly Brush Correct = new SolidColorBrush(Color.FromRgb(160, 224, 200));
+        private static readonly Brush Incorrect = new SolidColorBrush(Color.FromRgb(255, 190, 178));
+        private static readonly Brush IncorrectBackground = new SolidColorBrush(Color.FromRgb(84, 40, 47));
+        private static readonly Brush NextBackground = new SolidColorBrush(Color.FromRgb(83, 91, 35));
 
         private readonly Window window;
         private readonly PracticeSettings settings = PracticeSettings.Load();
@@ -94,6 +94,17 @@ namespace EnglishTypingPractice
                 passages = new JavaScriptSerializer().Deserialize<string[][]>(reader.ReadToEnd());
 
             practiceKind = (ComboBox)window.FindName("PracticeKind");
+            var workbench = (Grid)window.FindName("PracticeWorkbench");
+            var sidebar = (FrameworkElement)window.FindName("PracticeSidebar");
+            var sidebarColumn = (ColumnDefinition)window.FindName("PracticeSidebarColumn");
+            workbench.SizeChanged += (sender, e) =>
+            {
+                bool wide = e.NewSize.Width >= 900;
+                sidebarColumn.Width = new GridLength(wide ? 349 : 0);
+                Grid.SetRow(sidebar, wide ? 0 : 1);
+                Grid.SetColumn(sidebar, wide ? 1 : 0);
+                sidebar.Margin = wide ? new Thickness(13, 0, 0, 0) : new Thickness(0, 10, 0, 0);
+            };
             matchCase = (CheckBox)window.FindName("MatchCase");
             includePunctuation = (CheckBox)window.FindName("IncludePunctuation");
             playMusic = (CheckBox)window.FindName("PlayMusic");
@@ -285,7 +296,7 @@ namespace EnglishTypingPractice
             InputMethod.SetIsInputMethodEnabled(typed, IsChinese);
             var font = new FontFamily(IsChinese ? "Microsoft YaHei UI" : "Consolas");
             passage.FontFamily = typed.FontFamily = font;
-            passage.FontSize = typed.FontSize = IsCode ? 18 : 22;
+            passage.FontSize = typed.FontSize = IsCode ? 18 : 20;
             typed.Height = IsCode ? 155 : 96;
             ((TextBlock)window.FindName("PracticeTitle")).Text = IsCode ? "练习代码" : "练习短文";
             ((TextBlock)window.FindName("PracticeHint")).Text = IsCode
