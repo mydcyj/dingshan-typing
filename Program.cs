@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -19,7 +20,7 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("鼎山打字通")]
 [assembly: System.Reflection.AssemblyProduct("鼎山打字通")]
 [assembly: System.Reflection.AssemblyDescription("中英文与代码打字练习、局域网贪吃蛇")]
-[assembly: System.Reflection.AssemblyVersion("1.11.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.12.0.0")]
 
 namespace EnglishTypingPractice
 {
@@ -68,6 +69,7 @@ namespace EnglishTypingPractice
         private readonly TextBlock passage;
         private readonly TextBox typed;
         private readonly ProgressBar progress;
+        private readonly Border progressGlint;
         private readonly TextBlock count;
         private readonly TextBlock roundStatus;
         private readonly TextBlock speed;
@@ -111,6 +113,7 @@ namespace EnglishTypingPractice
             passage = (TextBlock)window.FindName("Passage");
             typed = (TextBox)window.FindName("Typed");
             progress = (ProgressBar)window.FindName("Progress");
+            progressGlint = (Border)window.FindName("ProgressGlint");
             count = (TextBlock)window.FindName("Count");
             roundStatus = (TextBlock)window.FindName("RoundStatus");
             speed = (TextBlock)window.FindName("Speed");
@@ -141,13 +144,13 @@ namespace EnglishTypingPractice
             Action returnToSnake = () =>
             {
                 rulesPage.Visibility = Visibility.Collapsed;
-                snakePage.Visibility = Visibility.Visible;
+                RevealPage(snakePage, -10);
                 snake.Focus();
             };
             ((Button)window.FindName("OpenSnakeRules")).Click += (sender, e) =>
             {
                 snakePage.Visibility = Visibility.Collapsed;
-                rulesPage.Visibility = Visibility.Visible;
+                RevealPage(rulesPage, 10);
                 ((ScrollViewer)window.FindName("SnakeRulesScroll")).ScrollToTop();
                 closeRules.Focus();
             };
@@ -168,14 +171,14 @@ namespace EnglishTypingPractice
                 timer.Stop();
                 music.SetPlaying(false);
                 practicePage.Visibility = Visibility.Collapsed;
-                snakePage.Visibility = Visibility.Visible;
+                RevealPage(snakePage, 10);
                 snake.Focus();
             };
             ((Button)window.FindName("CloseSnake")).Click += (sender, e) =>
             {
                 snake.Leave();
                 snakePage.Visibility = Visibility.Collapsed;
-                practicePage.Visibility = Visibility.Visible;
+                RevealPage(practicePage, -10);
                 if (resumePractice)
                 {
                     clock.Start();
@@ -249,7 +252,50 @@ namespace EnglishTypingPractice
                 music.Dispose();
                 effects.Dispose();
             };
+            ConfigureBackgroundMotion((TranslateTransform)window.FindName("BackgroundDrift"));
             ChoosePassage();
+        }
+
+        private static void RevealPage(FrameworkElement page, double offset)
+        {
+            page.Visibility = Visibility.Visible;
+            if (!SystemParameters.ClientAreaAnimation)
+                return;
+            var slide = new TranslateTransform();
+            page.RenderTransform = slide;
+            var duration = TimeSpan.FromMilliseconds(190);
+            var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+            slide.BeginAnimation(TranslateTransform.XProperty,
+                new DoubleAnimation(offset, 0, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
+            page.BeginAnimation(UIElement.OpacityProperty,
+                new DoubleAnimation(.86, 1, duration) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
+        }
+
+        private void ConfigureBackgroundMotion(TranslateTransform drift)
+        {
+            Action update = () =>
+            {
+                bool animate = SystemParameters.ClientAreaAnimation && window.WindowState != WindowState.Minimized;
+                if (animate == drift.HasAnimatedProperties)
+                    return;
+                var ease = new SineEase { EasingMode = EasingMode.EaseInOut };
+                var duration = TimeSpan.FromSeconds(13);
+                drift.BeginAnimation(TranslateTransform.XProperty, animate
+                    ? new DoubleAnimation(-.16, .13, duration) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease }
+                    : null);
+                drift.BeginAnimation(TranslateTransform.YProperty, animate
+                    ? new DoubleAnimation(.06, -.08, duration) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = ease }
+                    : null);
+            };
+            System.ComponentModel.PropertyChangedEventHandler changed = (sender, e) =>
+            {
+                if (e.PropertyName == "ClientAreaAnimation")
+                    update();
+            };
+            SystemParameters.StaticPropertyChanged += changed;
+            window.StateChanged += (sender, e) => update();
+            window.Loaded += (sender, e) => update();
+            window.Closed += (sender, e) => SystemParameters.StaticPropertyChanged -= changed;
         }
 
         private void ChoosePassage()
@@ -283,6 +329,7 @@ namespace EnglishTypingPractice
         private void ResetRound()
         {
             effects.Reset();
+            progressGlint.BeginAnimation(UIElement.OpacityProperty, null);
             timer.Stop();
             clock.Reset();
             UpdatePracticeMusic();
@@ -336,8 +383,11 @@ namespace EnglishTypingPractice
                 UpdatePracticeMusic();
             }
 
+            int previousCorrect = correctCount;
             RefreshProgress();
-            bool complete = ReadInput().Length >= target.Length;
+            bool complete = progress.Value >= target.Length;
+            if (correctCount > previousCorrect)
+                HighlightProgress(complete);
             if (settings.TypingFeedback)
                 PlayFeedback(e, complete);
             if (complete)
@@ -349,6 +399,18 @@ namespace EnglishTypingPractice
                 UpdatePracticeMusic();
             }
             RefreshClock();
+        }
+
+        private void HighlightProgress(bool complete)
+        {
+            if (!SystemParameters.ClientAreaAnimation || !progress.IsVisible || progress.ActualWidth == 0)
+                return;
+            double edge = progress.ActualWidth * progress.Value / progress.Maximum;
+            var duration = TimeSpan.FromMilliseconds(complete ? 420 : 185);
+            ((TranslateTransform)progressGlint.RenderTransform).BeginAnimation(TranslateTransform.XProperty,
+                new DoubleAnimation(edge - progressGlint.Width, edge - 7, duration) { FillBehavior = FillBehavior.Stop });
+            progressGlint.BeginAnimation(UIElement.OpacityProperty,
+                new DoubleAnimation(complete ? 1 : .78, 0, duration) { FillBehavior = FillBehavior.Stop });
         }
 
         private void PlayFeedback(TextChangedEventArgs e, bool complete)

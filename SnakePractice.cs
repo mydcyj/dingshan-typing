@@ -234,6 +234,7 @@ namespace EnglishTypingPractice
                 if (game.TryWord(word, game.WordGroup, clock.ElapsedMilliseconds))
                 {
                     FlashWord(game.LastWord);
+                    PulseDirection(game.Direction);
                     status.Text = "";
                     Render();
                 }
@@ -512,7 +513,12 @@ namespace EnglishTypingPractice
             var own = state.Players.First(player => player.Slot == slot);
             if (previous != null && previous.Round == state.Round &&
                 own.WordCount > previous.Players.First(player => player.Slot == slot).WordCount)
+            {
                 FlashWord(own.LastWord);
+                if (previous.WordGroup != state.WordGroup &&
+                    previous.Players.First(player => player.Slot == slot).Respawns == own.Respawns)
+                    PulseDirection(own.Direction);
+            }
             if (state.Phase == MatchPhase.Playing && rolePicker.SelectedIndex != (int)own.Role)
             {
                 updatingRole = true;
@@ -624,6 +630,25 @@ namespace EnglishTypingPractice
                 transform.BeginAnimation(TranslateTransform.XProperty,
                     new DoubleAnimation(i == 0 ? -8 : 8, i == 0 ? -2 : 2, TimeSpan.FromMilliseconds(300)));
             }
+        }
+
+        private void PulseDirection(SnakeDirection direction)
+        {
+            if (!SystemParameters.ClientAreaAnimation)
+                return;
+            var card = (Border)((StackPanel)directionWords[(int)direction].Parent).Parent;
+            var current = (SolidColorBrush)card.FindResource("Line");
+            var accent = (SolidColorBrush)card.FindResource("Accent");
+            var edge = new SolidColorBrush(current.Color);
+            card.BorderBrush = edge;
+            var fade = new ColorAnimation(accent.Color, current.Color, TimeSpan.FromMilliseconds(340))
+                { FillBehavior = FillBehavior.Stop };
+            fade.Completed += (sender, e) =>
+            {
+                if (ReferenceEquals(card.BorderBrush, edge))
+                    card.ClearValue(Border.BorderBrushProperty);
+            };
+            edge.BeginAnimation(SolidColorBrush.ColorProperty, fade);
         }
     }
 

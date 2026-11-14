@@ -303,6 +303,16 @@
   <Grid>
   <Grid IsHitTestVisible="False">
     <Border Background="{StaticResource Backplate}" />
+    <Border>
+      <Border.Background>
+        <RadialGradientBrush Center=".70,.28" GradientOrigin=".70,.28" RadiusX=".46" RadiusY=".62">
+          <RadialGradientBrush.RelativeTransform><TranslateTransform x:Name="BackgroundDrift" /></RadialGradientBrush.RelativeTransform>
+          <GradientStop Color="#647BC5C7" Offset="0" />
+          <GradientStop Color="#31548E9E" Offset=".52" />
+          <GradientStop Color="#00548E9E" Offset="1" />
+        </RadialGradientBrush>
+      </Border.Background>
+    </Border>
     <Border Background="{StaticResource GuideGrid}" />
     <Border Background="{StaticResource Halftone}" Height="176" VerticalAlignment="Top">
       <Border.OpacityMask><LinearGradientBrush StartPoint="1,0" EndPoint="0.36,1">
@@ -409,9 +419,21 @@
               </Grid>
             </StackPanel>
           </Border>
-          <ProgressBar x:Name="Progress" Height="3" BorderThickness="0"
-                       Foreground="{StaticResource Accent}" Background="{StaticResource Line}"
-                       AutomationProperties.Name="打字进度" />
+          <Grid ClipToBounds="True">
+            <ProgressBar x:Name="Progress" Height="3" BorderThickness="0"
+                         Foreground="{StaticResource Accent}" Background="{StaticResource Line}"
+                         AutomationProperties.Name="打字进度" />
+            <Border x:Name="ProgressGlint" Width="44" HorizontalAlignment="Left" Opacity="0" IsHitTestVisible="False">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                  <GradientStop Color="#00ECF664" Offset="0" />
+                  <GradientStop Color="#FFFFF5B3" Offset=".68" />
+                  <GradientStop Color="#00FFF5B3" Offset="1" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <Border.RenderTransform><TranslateTransform /></Border.RenderTransform>
+            </Border>
+          </Grid>
           <StackPanel Margin="19,11,19,13">
             <DockPanel LastChildFill="False">
               <TextBlock Text="在这里输入" Style="{StaticResource SectionTitle}" />
