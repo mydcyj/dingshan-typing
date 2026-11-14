@@ -5,14 +5,23 @@ using System.Linq;
 
 namespace EnglishTypingPractice
 {
-    internal enum SnakeRole { Standard, Timewalker, Timid, Fearless, Hunter, Bard }
+    internal enum SnakeRole { Standard, Timewalker, Timid, Fearless, Hunter, Bard, Navigator, Collector, Stabilizer }
 
     internal static class SnakeWords
     {
+        internal const int NavigatorLongTurns = 3;
+        internal const int NavigatorShortLength = 4;
+        internal const int NavigatorMinLength = 7;
+        internal const int NavigatorMaxLength = 8;
+        internal const int StabilizerMinLength = 9;
+        internal const int StabilizerMaxLength = 11;
+
         private static readonly Dictionary<string, string> Meanings = LoadMeanings();
         private static readonly Dictionary<int, string[]> ByLength = Meanings.Keys.GroupBy(word => word.Length)
             .ToDictionary(group => group.Key, group => group.ToArray());
         private static readonly string[] ChargeWords = Meanings.Keys.Where(word => word.Length >= 11).ToArray();
+        private static readonly string[] StabilizerWords = Meanings.Keys.Where(word =>
+            word.Length >= StabilizerMinLength && word.Length <= StabilizerMaxLength).ToArray();
         private static readonly Dictionary<string, string> SkillPhrases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "environmental impact", "环境影响" },
@@ -62,9 +71,18 @@ namespace EnglishTypingPractice
             return role == SnakeRole.Timewalker ? 3 : 1;
         }
 
-        internal static string[] Draw(Random random, SnakeRole role, string[] previous)
+        internal static int NavigatorMinLengthFor(SnakeMode mode) { return mode == SnakeMode.Territory ? 6 : NavigatorMinLength; }
+        internal static int NavigatorMaxLengthFor(SnakeMode mode) { return mode == SnakeMode.Territory ? 7 : NavigatorMaxLength; }
+        internal static int NavigatorShortLengthFor(SnakeMode mode) { return mode == SnakeMode.Territory ? 5 : NavigatorShortLength; }
+
+        internal static string[] Draw(Random random, SnakeRole role, string[] previous, int completedWords, SnakeMode mode)
         {
-            int length = role == SnakeRole.Timid ? random.Next(5, 7) : role == SnakeRole.Timewalker ? 6 : 6 + random.Next(2);
+            int length;
+            if (role == SnakeRole.Navigator)
+                length = completedWords % (NavigatorLongTurns + 1) == NavigatorLongTurns ? NavigatorShortLengthFor(mode) :
+                    random.Next(NavigatorMinLengthFor(mode), NavigatorMaxLengthFor(mode) + 1);
+            else
+                length = role == SnakeRole.Timid ? random.Next(5, 7) : role == SnakeRole.Timewalker ? 6 : 6 + random.Next(2);
             int variants = Variants(role);
             var words = new string[4 * variants];
             for (int variant = 0; variant < variants; variant++)
@@ -84,12 +102,12 @@ namespace EnglishTypingPractice
 
         internal static bool HasSkill(SnakeRole role)
         {
-            return role == SnakeRole.Fearless || role == SnakeRole.Hunter || role == SnakeRole.Bard;
+            return role == SnakeRole.Fearless || role == SnakeRole.Hunter || role == SnakeRole.Bard || role == SnakeRole.Stabilizer;
         }
 
         internal static string DrawCharge(Random random, string previous, SnakeRole role)
         {
-            var pool = role == SnakeRole.Fearless ? ChargeWords :
+            var pool = role == SnakeRole.Fearless ? ChargeWords : role == SnakeRole.Stabilizer ? StabilizerWords :
                 SpokenPhrases.Keys.Concat(ChargeWords.Where(word => word.Length >= 15 && word.Length <= 20));
             var choices = pool.Where(word => word != previous).ToArray();
             return choices[random.Next(choices.Length)];
@@ -99,6 +117,8 @@ namespace EnglishTypingPractice
         {
             if (word == null || !HasSkill(role))
                 return false;
+            if (role == SnakeRole.Stabilizer)
+                return word.Length >= StabilizerMinLength && word.Length <= StabilizerMaxLength && Contains(word);
             return role == SnakeRole.Fearless ? word.Length >= 11 && Contains(word) :
                 word.Length >= 15 && word.Length <= 20 && (Contains(word) || SpokenPhrases.ContainsKey(word));
         }
@@ -117,6 +137,9 @@ namespace EnglishTypingPractice
                 case SnakeRole.Fearless: return "无畏者";
                 case SnakeRole.Hunter: return "狩猎者";
                 case SnakeRole.Bard: return "吟唱者";
+                case SnakeRole.Navigator: return "领航者";
+                case SnakeRole.Collector: return "采集者";
+                case SnakeRole.Stabilizer: return "稳行者";
                 default: return "平凡者";
             }
         }

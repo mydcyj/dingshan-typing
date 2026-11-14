@@ -700,6 +700,9 @@
                 <ComboBoxItem Content="无畏者" />
                 <ComboBoxItem Content="狩猎者" />
                 <ComboBoxItem Content="吟唱者" />
+                <ComboBoxItem Content="领航者" />
+                <ComboBoxItem Content="采集者" />
+                <ComboBoxItem Content="稳行者" />
               </ComboBox>
             </DockPanel>
             <TextBlock x:Name="SnakeRoleGuide" Foreground="{StaticResource Muted}" FontSize="12"
@@ -779,8 +782,8 @@
                        FontSize="12" Margin="0,-3,0,9" />
             <TextBlock x:Name="SnakeFruitLegend" Foreground="{StaticResource Muted}" FontSize="12"
                        Margin="0,-4,0,9" Visibility="Collapsed">
-              <Run Foreground="{StaticResource Coral}" Text="■" /><Run Text=" 小果 +10　" />
-              <Run Foreground="#FFD48C" Text="■" /><Run Text=" 大果 +30" />
+              <Run Foreground="{StaticResource Coral}" Text="■" /><Run x:Name="SnakeSmallFruitLegend" Text=" 小果 +10　" />
+              <Run Foreground="#FFD48C" Text="■" /><Run x:Name="SnakeLargeFruitLegend" Text=" 大果 +30" />
             </TextBlock>
 
             <TextBlock x:Name="SnakeStatus" Text="输入 start 开始单人游戏。" Margin="0,6,0,0"
@@ -869,13 +872,16 @@
           <TextBlock Style="{StaticResource RuleText}"><Run Text="圈地战　" FontWeight="Bold" /><Run Text="走回自己的轨迹闭合圈地。对手蛇头被圈住就回出生点。每分钟提速 20%，5 分钟后占地最多者获胜。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="团战　" FontWeight="Bold" /><Run Text="仅限联机，房主选 2–4 队。可穿过己方球，碰到敌队球会捡起。带球回己方区域按 Shift 放下一颗，每带一颗球扣 10% 移速。空手按住 Shift 提速 25%。死亡后等 15 秒复活，8 分钟后按落地球数排名。" /></TextBlock>
 
-          <TextBlock Text="六个职业" Style="{StaticResource RuleHeading}" />
+          <TextBlock Text="九个职业" Style="{StaticResource RuleHeading}" />
           <TextBlock Style="{StaticResource RuleText}"><Run Text="平凡者　" FontWeight="Bold" /><Run Text="基础移速，使用 6–7 字母方向词。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="胆怯者　" FontWeight="Bold" /><Run Text="85% 移速，使用 5–6 字母方向词。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="时空者　" FontWeight="Bold" /><Run Text="每个可用方向有 6、8、10 字母词。经典和障碍赛分别额外前进 0、1、2 格，每次转向加 6 分。最长词可沿当前方向加速，直行加速不计分。圈地战和团战的额外位移为 0、2、4 格。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="无畏者　" FontWeight="Bold" /><Run Text="圈地战的基础移速为 100%，其余模式为 120%。打完技能词后冲锋 1 秒，穿过对手会使其僵直 3 秒。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="狩猎者　" FontWeight="Bold" /><Run Text="打完技能词后朝前射击，子弹速度为自身移速 3 倍，碰到对手蛇身即命中。" /></TextBlock>
           <TextBlock Style="{StaticResource RuleText}"><Run Text="吟唱者　" FontWeight="Bold" /><Run Text="打完技能词后，瞬间命中以蛇头为中心 5×5 格内的对手蛇头。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="领航者　" FontWeight="Bold" /><Run Text="方向词通常为 7–8 字母。完成 3 个常规方向词后，下个方向词缩短到 4 字母。圈地战改用 6–7 字母常规词和 5 字母短词。经典和障碍赛转向固定加 6 分。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="采集者　" FontWeight="Bold" /><Run Text="经典和障碍赛转向加 5 分，小果加 14 分，大果加 38 分。团战每携带一颗球扣 8% 移速。" /></TextBlock>
+          <TextBlock Style="{StaticResource RuleText}"><Run Text="稳行者　" FontWeight="Bold" /><Run Text="按 Tab 输入 9–11 字母的技能词，2.5 秒内以 70% 移速前进，期间可打词转向。经典技能加 5 分，障碍赛加 8 分。圈地战以 85% 移速稳行 1.5 秒，发动后冷却 40 秒。" /></TextBlock>
         </StackPanel>
       </ScrollViewer>
     </Border>

@@ -14,6 +14,14 @@ namespace EnglishTypingPractice
         internal const int MoveInterval = 350;
         internal const int SmallFruitPoints = 10;
         internal const int TimewalkerTurnPoints = 6;
+        internal const int NavigatorTurnPoints = 6;
+        internal const int CollectorTurnPoints = 5;
+        internal const int CollectorSmallFruitPoints = 14;
+        internal const int CollectorLargeFruitPoints = 38;
+        internal const double CollectorCarryPenalty = 0.08;
+        internal const int StabilizerDuration = 2500;
+        internal const double StabilizerSpeed = 0.7;
+        internal const int StabilizerTerritoryCooldown = 40000;
         internal const int ChargeDuration = 1000;
         internal const int StunDuration = 3000;
 
@@ -29,6 +37,8 @@ namespace EnglishTypingPractice
         private SnakeDirection spawnDirection;
         private double nextMoveAt;
         private long chargeUntil;
+        private long stabilizationUntil;
+        private long stabilizeReadyAt;
         private long stunUntil;
         private int chargeGroup;
         private SnakeMode mode;
@@ -98,8 +108,8 @@ namespace EnglishTypingPractice
             spawnX = x;
             spawnY = y;
             spawnDirection = direction;
+            chargeUntil = stunUntil = stabilizationUntil = stabilizeReadyAt = 0;
             nextMoveAt = Interval(0);
-            chargeUntil = stunUntil = 0;
             ChargeWord = SnakeWords.HasSkill(role) ? SnakeWords.DrawCharge(random, ChargeWord, role) : null;
             chargeGroup++;
             ResetBody(y * size + x, direction);
@@ -136,10 +146,13 @@ namespace EnglishTypingPractice
                 return false;
 
             bool balancedTimewalker = Role == SnakeRole.Timewalker && UsesTimewalkerBalance(mode);
-            if (!balancedTimewalker)
+            if (balancedTimewalker)
+                Score += direction != Direction ? TimewalkerTurnPoints : 0;
+            else if (mode == SnakeMode.Classic || mode == SnakeMode.Obstacles)
+                Score += Role == SnakeRole.Navigator ? NavigatorTurnPoints :
+                    Role == SnakeRole.Collector ? CollectorTurnPoints : words[index].Length;
+            else
                 Score += words[index].Length;
-            else if (direction != Direction)
-                Score += TimewalkerTurnPoints;
             LastWord = words[index];
             WordCount++;
             Direction = direction;
@@ -155,8 +168,9 @@ namespace EnglishTypingPractice
 
         internal bool TryCharge(string word, int group, long now)
         {
-            if (!IsRunning || !SnakeWords.HasSkill(Role) || IsStunned(now) || IsCharging(now) ||
-                group != chargeGroup || !string.Equals(word, ChargeWord, StringComparison.OrdinalIgnoreCase))
+            if (!IsRunning || !SnakeWords.HasSkill(Role) || IsStunned(now) || IsCharging(now) || IsStabilizing(now) ||
+                StabilizerCooldownRemaining(now) > 0 || group != chargeGroup ||
+                !string.Equals(word, ChargeWord, StringComparison.OrdinalIgnoreCase))
                 return false;
             if (Role == SnakeRole.Fearless)
             {
@@ -164,7 +178,18 @@ namespace EnglishTypingPractice
                 stunnedRivals.Clear();
                 nextMoveAt = now + Interval(now);
             }
-            Score += ChargeWord.Length;
+            if (Role == SnakeRole.Stabilizer)
+            {
+                ApplyStabilizationExpiry(now);
+                if (nextMoveAt > now)
+                    nextMoveAt = now + (nextMoveAt - now) / StabilizerSpeedFor(mode);
+                stabilizationUntil = now + StabilizerDurationFor(mode);
+                if (mode == SnakeMode.Territory)
+                    stabilizeReadyAt = now + StabilizerTerritoryCooldown;
+                Score += StabilizerSkillPointsFor(mode);
+            }
+            else
+                Score += ChargeWord.Length;
             LastWord = ChargeWord;
             WordCount++;
             SkillUses++;
@@ -174,6 +199,8 @@ namespace EnglishTypingPractice
         }
 
         internal bool IsCharging(long now) { return IsRunning && chargeUntil > now; }
+        internal bool IsStabilizing(long now) { return IsRunning && stabilizationUntil > now; }
+        internal int StabilizerCooldownRemaining(long now) { return IsRunning ? (int)Math.Max(0, stabilizeReadyAt - now) : 0; }
         internal bool IsStunned(long now) { return IsRunning && stunUntil > now; }
         internal int StunRemaining(long now) { return IsRunning ? (int)Math.Max(0, stunUntil - now) : 0; }
 
@@ -193,12 +220,30 @@ namespace EnglishTypingPractice
 
         internal bool MoveDue(long now)
         {
-            return IsRunning && !IsStunned(now) && now >= nextMoveAt;
+            return IsRunning && !IsStunned(now) && now >= MovementDeadline(now);
         }
 
         internal void ScheduleNext(long now)
         {
+            ApplyStabilizationExpiry(now);
             nextMoveAt += Interval(now);
+        }
+
+        private double MovementDeadline(long now)
+        {
+            // The stored deadline is measured at slow speed until the effect expires.
+            if (stabilizationUntil == 0 || now < stabilizationUntil || nextMoveAt <= stabilizationUntil ||
+                nextMoveAt == stunUntil)
+                return nextMoveAt;
+            return stabilizationUntil + (nextMoveAt - stabilizationUntil) * StabilizerSpeedFor(mode);
+        }
+
+        private void ApplyStabilizationExpiry(long now)
+        {
+            if (stabilizationUntil == 0 || now < stabilizationUntil)
+                return;
+            nextMoveAt = MovementDeadline(now);
+            stabilizationUntil = 0;
         }
 
         internal double Interval(long now)
@@ -207,7 +252,15 @@ namespace EnglishTypingPractice
                 return MoveInterval / (0.85 * speed * carrySpeed);
             if (Role == SnakeRole.Fearless)
                 return (IsCharging(now) ? 110 : MoveInterval / FearlessBaseSpeed(mode)) / (speed * carrySpeed);
-            return MoveInterval / (speed * carrySpeed);
+            return MoveInterval / (speed * carrySpeed * (IsStabilizing(now) ? StabilizerSpeedFor(mode) : 1));
+        }
+
+        internal static int StabilizerDurationFor(SnakeMode mode) { return mode == SnakeMode.Territory ? 1500 : StabilizerDuration; }
+        internal static double StabilizerSpeedFor(SnakeMode mode) { return mode == SnakeMode.Territory ? 0.85 : StabilizerSpeed; }
+
+        internal static int StabilizerSkillPointsFor(SnakeMode mode)
+        {
+            return mode == SnakeMode.Obstacles ? 8 : mode == SnakeMode.Classic ? 5 : 0;
         }
 
         internal static double FearlessBaseSpeed(SnakeMode mode)
@@ -229,7 +282,9 @@ namespace EnglishTypingPractice
 
         private void UpdateTeamSpeed(long now)
         {
-            double factor = carried == 0 && sprintHeld ? 1.25 : Math.Max(0.1, 1 - carried * 0.1);
+            ApplyStabilizationExpiry(now);
+            double penalty = Role == SnakeRole.Collector ? CollectorCarryPenalty : 0.1;
+            double factor = carried == 0 && sprintHeld ? 1.25 : Math.Max(0.1, 1 - carried * penalty);
             if (factor != carrySpeed && !IsStunned(now) && nextMoveAt > now)
                 nextMoveAt = now + (nextMoveAt - now) * carrySpeed / factor;
             carrySpeed = factor;
@@ -242,6 +297,7 @@ namespace EnglishTypingPractice
                 double newSpeed = Math.Pow(1.2, now / 60000);
                 if (speed != newSpeed)
                 {
+                    ApplyStabilizationExpiry(now);
                     if (!IsStunned(now))
                         nextMoveAt = now + (nextMoveAt - now) * speed / newSpeed;
                     speed = newSpeed;
@@ -261,8 +317,11 @@ namespace EnglishTypingPractice
 
         internal bool UpdateSoloClock(long now)
         {
+            bool stabilizationExpired = stabilizationUntil != 0 && now >= stabilizationUntil;
+            if (stabilizationExpired)
+                ApplyStabilizationExpiry(now);
             if (!UpdateClock(now))
-                return false;
+                return stabilizationExpired;
             if (IsRunning && !Bounds.Contains(Fruit, Size))
                 PlaceFruit();
             return true;
@@ -339,6 +398,8 @@ namespace EnglishTypingPractice
             }
             body.AddFirst(next);
             occupied.Add(next);
+            if (Role == SnakeRole.Collector && fruitPoints > 0 && (mode == SnakeMode.Classic || mode == SnakeMode.Obstacles))
+                fruitPoints = fruitPoints == SmallFruitPoints ? CollectorSmallFruitPoints : CollectorLargeFruitPoints;
             Score += fruitPoints;
         }
 
@@ -362,7 +423,7 @@ namespace EnglishTypingPractice
         internal void Respawn(long now, int? head = null)
         {
             Respawns++;
-            chargeUntil = stunUntil = 0;
+            chargeUntil = stunUntil = stabilizationUntil = 0;
             nextMoveAt = now + Interval(now);
             ResetBody(head ?? (spawnY * Size + spawnX), spawnDirection);
         }
@@ -377,7 +438,7 @@ namespace EnglishTypingPractice
         private void DrawWords()
         {
             WordGroup++;
-            words = SnakeWords.Draw(random, Role, words);
+            words = SnakeWords.Draw(random, Role, words, WordCount, mode);
         }
 
         private void PlaceFruit()

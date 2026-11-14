@@ -35,6 +35,8 @@ namespace EnglishTypingPractice
         public int Carrying { get; set; }
         public int RespawnRemaining { get; set; }
         public bool Charging { get; set; }
+        public bool Stabilizing { get; set; }
+        public int StabilizerCooldownRemaining { get; set; }
         public int StunRemaining { get; set; }
         public string Typing { get; set; }
         public bool TypingSkill { get; set; }
@@ -682,6 +684,8 @@ namespace EnglishTypingPractice
                     RespawnRemaining = teams != null && player.Connected && Phase == MatchPhase.Playing
                         ? (int)Math.Max(0, player.RespawnAt - now) : 0,
                     Charging = snake != null && snake.IsCharging(now),
+                    Stabilizing = snake != null && snake.IsStabilizing(now),
+                    StabilizerCooldownRemaining = snake == null ? 0 : snake.StabilizerCooldownRemaining(now),
                     StunRemaining = snake == null ? 0 : snake.StunRemaining(now),
                     Typing = preview == null ? "" : preview.Text,
                     TypingSkill = preview != null && preview.Skill,

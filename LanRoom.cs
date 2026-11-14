@@ -34,7 +34,7 @@ namespace EnglishTypingPractice
     internal static class LanWire
     {
         internal const int Port = 48631;
-        internal const string Version = "TypingSnake/8";
+        internal const string Version = "TypingSnake/9";
         internal const int StateLimit = 65536;
         internal const int MusicLimit = 64 * 1024 * 1024;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
@@ -668,6 +668,11 @@ namespace EnglishTypingPractice
                     return false;
                 if (!SnakeTypingPreview.IsValidText(player.Typing, player.TypingSkill) ||
                     (player.TypingSkill && !SnakeWords.HasSkill(player.Role)))
+                    return false;
+                if (player.Stabilizing && (player.Role != SnakeRole.Stabilizer || player.Result != SnakeResult.Running))
+                    return false;
+                if (player.StabilizerCooldownRemaining < 0 || player.StabilizerCooldownRemaining > SnakeGame.StabilizerTerritoryCooldown ||
+                    (player.StabilizerCooldownRemaining > 0 && (!territory || player.Role != SnakeRole.Stabilizer || player.Result != SnakeResult.Running)))
                     return false;
                 if (player.WordCount < 0 || (player.WordCount == 0 ? player.LastWord != null :
                     !SnakeWords.Contains(player.LastWord) && !SnakeWords.IsSkillWord(player.LastWord, SnakeRole.Hunter)))
