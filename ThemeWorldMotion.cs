@@ -61,6 +61,12 @@ namespace EnglishTypingPractice
         {
             if (theme == UiTheme.ArtDeco)
                 return;
+            if (theme >= UiTheme.Ukiyoe)
+            {
+                header.Width = Math.Min(640, e.NewSize.Width * .56);
+                header.Opacity = 1;
+                return;
+            }
             header.Width = Math.Min(440, e.NewSize.Width);
             header.Opacity = e.NewSize.Width < 500 ? .23 : .92;
         }
@@ -185,11 +191,20 @@ namespace EnglishTypingPractice
                     moveVignette = hero ? BuildDecoHeader() : BuildDecoBackground();
                 else if (theme == UiTheme.Atompunk)
                     moveVignette = BuildAtomicStation();
+                else if (theme == UiTheme.Ukiyoe)
+                    moveVignette = BuildWoodblockCoast();
+                else if (theme == UiTheme.Pixel)
+                {
+                    RenderOptions.SetEdgeMode(this, EdgeMode.Aliased);
+                    moveVignette = BuildPixelIslands();
+                }
+                else if (theme == UiTheme.Solarpunk)
+                    moveVignette = BuildSolarGarden();
                 Advance(0);
             }
 
             private double SceneWidth { get { return hero && theme != UiTheme.ArtDeco ? 440 : 1100; } }
-            private double SceneHeight { get { return hero ? (theme == UiTheme.ArtDeco ? 200 : 150) : 700; } }
+            private double SceneHeight { get { return hero ? (theme == UiTheme.ArtDeco ? 200 : theme >= UiTheme.Ukiyoe ? 180 : 150) : 700; } }
             private double CarrierWidth { get { return hero ? 168 : 240; } }
             private double RescueWidth { get { return hero ? 138 : 180; } }
 
@@ -235,6 +250,226 @@ namespace EnglishTypingPractice
                     dc.DrawDrawing(decoCrest);
                     dc.Pop();
                 }
+            }
+
+            private DrawingGroup LandscapeSurface(string color)
+            {
+                AddSceneDrawing(scenery, null, dc => dc.DrawRectangle(Paint(color), null, new Rect(0, 0, SceneWidth, SceneHeight)));
+                if (hero) return scenery;
+                var landscape = SceneVignette(0, 340, 2.5);
+                landscape.Opacity = .36;
+                return landscape;
+            }
+
+            private void FadeLandscapeEdge(DrawingGroup landscape, string color)
+            {
+                if (hero)
+                    AddSceneDrawing(landscape, null, dc => dc.DrawRectangle(Tone(color, "00" + color, 0), null, new Rect(0, 0, 46, 180)));
+            }
+
+            private Action<double> BuildWoodblockCoast()
+            {
+                var landscape = LandscapeSurface("EFE3C6");
+                var blue = Paint("183C55");
+                var sea = Paint("4E8191");
+                var pale = Paint("F7EED8");
+                var contour = Stroke(blue, 1.2);
+                AddSceneDrawing(landscape, null, dc =>
+                {
+                    dc.DrawEllipse(Paint("AE4533"), null, new Point(335, 50), 29, 29);
+                    dc.DrawGeometry(Paint("879C95"), null, Shape("M174,123 L254,66 320,122 Z"));
+                    dc.DrawGeometry(blue, null, Shape("M214,127 L307,47 379,127 Z"));
+                    dc.DrawGeometry(pale, null, Shape("M281,70 L307,47 329,73 313,69 308,78 300,69 292,77 Z"));
+                    dc.DrawGeometry(sea, contour, Shape("M0,128 Q47,106 94,117 T184,122 Q220,107 256,118 Q329,111 440,123 V180 H0 Z"));
+                    dc.DrawGeometry(null, Stroke(pale, 1), Shape("M205,129 Q267,111 349,130 T470,130 M232,135 Q293,124 357,137 T465,135"));
+                    for (int i = 0; i < 80; i++)
+                    {
+                        double x = (i * 37) % 438, y = (i * 23) % 175;
+                        dc.DrawLine(Stroke(Paint("1B6D6654"), .45), new Point(x, y), new Point(x + 2 + i % 3, y + .4));
+                    }
+                });
+                var clouds = new TranslateTransform();
+                AddSceneDrawing(landscape, clouds, dc =>
+                {
+                    dc.DrawGeometry(pale, Stroke(Paint("B6B6A0"), .6), Shape("M40,43 H89 C101,43 100,35 110,35 H141 C157,35 158,43 150,47 H117 C107,47 107,53 97,53 H45 C32,53 31,45 40,43 Z M235,21 H277 C290,21 293,28 283,31 H260 C254,31 256,38 246,38 H217 C204,38 208,31 219,31 H229 C241,31 225,23 235,21 Z"));
+                    dc.DrawGeometry(null, contour, Shape("M187,39 Q193,34 199,39 Q205,34 211,39 M215,48 Q220,44 225,48 Q230,44 235,48"));
+                });
+                var wave = new TranslateTransform();
+                AddSceneDrawing(landscape, wave, dc =>
+                {
+                    dc.DrawGeometry(blue, contour, Shape("M-9,176 C35,160 40,117 50,83 C59,44 99,24 133,40 C153,49 162,68 158,88 C151,74 142,66 127,67 C148,90 157,112 174,127 C204,156 245,147 273,128 C242,168 202,181 162,169 C123,158 100,123 97,91 C81,111 88,138 63,164 L45,184 Z"));
+                    dc.DrawGeometry(sea, null, Shape("M-5,180 C38,160 51,141 59,110 C69,75 86,60 109,53 C90,69 88,89 96,112 C108,142 137,166 164,177 L170,186 Z"));
+                    dc.DrawGeometry(pale, null, Shape("M49,84 C55,48 91,28 122,36 C143,39 162,57 161,77 L153,65 152,77 144,60 144,74 135,57 132,68 123,55 117,63 107,53 100,63 91,59 83,73 73,70 67,84 59,83 52,99 Z"));
+                    dc.DrawGeometry(pale, Stroke(blue, .7), Shape("M77,59 Q73,41 87,37 Q94,35 95,40 Q85,38 84,47 L88,49 Q92,40 105,35 Q118,30 118,37 Q107,37 105,44 Q122,36 137,43 Q151,50 147,57 Q144,47 133,48 Q149,55 156,68 Q160,77 154,81 Q152,70 143,67 Q147,80 141,83 Q139,71 129,65 Q132,76 126,78 Q123,65 116,62 Q118,70 111,72 L105,60 Q95,58 88,68 Z"));
+                    dc.DrawGeometry(null, Stroke(pale, 1.3), Shape("M18,166 C45,151 50,119 60,96 M35,168 C64,142 62,100 89,81 M51,172 C72,145 74,113 86,104 M103,115 C120,161 161,181 200,165 M111,111 C132,151 163,161 186,158 M125,108 Q143,133 167,141"));
+                    dc.DrawGeometry(blue, contour, Shape("M220,184 C256,168 270,155 290,138 C325,107 345,107 371,123 C389,133 398,158 442,155 V184 Z"));
+                    dc.DrawGeometry(pale, null, Shape("M270,157 Q316,101 352,115 Q371,118 379,131 L367,127 364,135 354,126 344,134 336,123 325,132 320,127 Q291,142 270,157 Z"));
+                    dc.DrawGeometry(null, Stroke(sea, 2), Shape("M278,178 Q326,136 349,150 Q375,166 441,173 M304,178 Q326,151 347,159 Q374,177 420,178"));
+                    for (int i = 0; i < 20; i++)
+                    {
+                        double x = 61 + (i * 13) % 74, y = 84 + (i * 19) % 57;
+                        dc.DrawGeometry(null, Stroke(pale, .55), Shape("M" + x + "," + y + " q-3,-5 1,-7 q4,-1 3,3"));
+                    }
+                });
+                var foam = new TranslateTransform();
+                AddSceneDrawing(landscape, foam, dc =>
+                {
+                    foreach (Point p in new[] { new Point(76,31), new Point(113,21), new Point(148,36), new Point(176,78), new Point(198,102), new Point(61,49), new Point(173,52) })
+                        dc.DrawEllipse(pale, Stroke(blue, .6), p, 1.4, 2);
+                });
+                FadeLandscapeEdge(landscape, "EFE3C6");
+                return t => { wave.X = Math.Sin(t * .5) * 2; wave.Y = Math.Sin(t * .7) * 1.4; clouds.X = Math.Sin(t * .12) * 10; foam.Y = Math.Sin(t * .8) * 2.3; };
+            }
+
+            private Action<double> BuildPixelIslands()
+            {
+                var landscape = LandscapeSurface("171B35");
+                var dusk = Paint("343B67");
+                var plum = Paint("635A86");
+                var gold = Paint("F0BB91");
+                var mint = Paint("8CCAB3");
+                var grass = Paint("456D6F");
+                var stone = Paint("3D3755");
+                AddSceneDrawing(landscape, null, dc =>
+                {
+                    dc.DrawRectangle(dusk, null, new Rect(0, 56, 440, 124));
+                    dc.DrawRectangle(Paint("70668D"), null, new Rect(0, 83, 440, 97));
+                    for (int i = 0; i < 55; i++)
+                    {
+                        double x = i * 8;
+                        dc.DrawRectangle(dusk, null, new Rect(x, 54 + (i % 2) * 4, 4, 4));
+                        dc.DrawRectangle(plum, null, new Rect(x, 80 + (i % 2) * 4, 4, 4));
+                    }
+                    dc.DrawGeometry(gold, null, Shape("M340,25 H365 V29 H373 V37 H377 V57 H373 V65 H365 V69 H340 V65 H332 V57 H328 V37 H332 V29 H340 Z"));
+                    dc.DrawGeometry(dusk, null, Shape("M335,31 H341 V37 H335 Z M355,51 H367 V57 H355 Z M346,59 H354 V65 H346 Z"));
+                    dc.DrawGeometry(Paint("4C4A75"), null, Shape("M0,121 H32 V109 H48 V101 H72 V89 H88 V101 H104 V113 H144 V105 H164 V93 H180 V105 H192 V121 H232 V113 H252 V101 H280 V113 H300 V97 H316 V89 H332 V109 H356 V117 H388 V97 H404 V113 H440 V180 H0 Z"));
+                    dc.DrawGeometry(dusk, null, Shape("M0,141 H40 V129 H72 V137 H112 V125 H144 V141 H176 V133 H216 V145 H256 V129 H288 V137 H320 V121 H352 V129 H392 V141 H440 V180 H0 Z"));
+                    dc.DrawGeometry(stone, null, Shape("M148,137 H392 V145 H384 V153 H360 V161 H332 V169 H312 V177 H228 V169 H204 V161 H184 V153 H156 V145 H148 Z M45,103 H129 V111 H117 V119 H105 V127 H77 V119 H61 V111 H45 Z"));
+                    dc.DrawGeometry(grass, null, Shape("M148,129 H176 V121 H216 V125 H352 V121 H384 V129 H392 V139 H148 Z M45,99 H77 V95 H109 V99 H129 V105 H45 Z"));
+                    dc.DrawGeometry(mint, null, Shape("M152,129 H192 V125 H216 V129 H248 V133 H152 Z M324,125 H356 V129 H380 V133 H324 Z M49,99 H73 V103 H49 Z"));
+                    dc.DrawGeometry(Paint("66506C"), null, Shape("M172,145 H196 V149 H188 V153 H172 Z M212,157 H232 V165 H224 V169 H212 Z M336,145 H360 V149 H348 V157 H336 Z"));
+                    dc.DrawGeometry(Paint("253849"), null, Shape("M198,121 V83 H186 V71 H194 V63 H190 V55 H206 V47 H222 V55 H230 V63 H234 V75 H222 V87 H210 V121 Z M341,124 V97 H329 V89 H333 V77 H341 V69 H357 V77 H365 V85 H361 V97 H353 V124 Z"));
+                    dc.DrawGeometry(grass, null, Shape("M190,63 H202 V55 H218 V59 H226 V71 H218 V79 H202 V75 H190 Z M333,81 H345 V73 H353 V81 H361 V89 H341 V93 H333 Z"));
+                    dc.DrawGeometry(mint, null, Shape("M202,55 H214 V59 H202 Z M194,63 H206 V67 H194 Z M345,77 H353 V81 H345 Z"));
+                    dc.DrawRectangle(Paint("BB8F87"), null, new Rect(268, 89, 48, 40));
+                    dc.DrawGeometry(stone, null, Shape("M256,89 H264 V81 H272 V73 H308 V81 H316 V89 H324 V93 H256 Z"));
+                    dc.DrawGeometry(gold, null, Shape("M276,99 H284 V109 H276 Z M300,99 H308 V109 H300 Z M288,111 H296 V129 H288 Z"));
+                    dc.DrawRectangle(Paint("171B35"), null, new Rect(276, 103, 8, 2));
+                    dc.DrawRectangle(Paint("171B35"), null, new Rect(300, 103, 8, 2));
+                    dc.DrawGeometry(Paint("9D7790"), null, Shape("M268,95 H278 V99 H268 Z M308,115 H316 V119 H308 Z M278,121 H286 V125 H278 Z"));
+                    dc.DrawGeometry(gold, null, Shape("M164,123 H168 V113 H170 V123 H180 V119 H184 V125 H164 Z M316,127 H328 V123 H332 V129 H316 Z"));
+                    for (int i = 0; i < 16; i++) dc.DrawRectangle(gold, null, new Rect(21 + i * 26 % 388, 15 + i * 19 % 42, 2, 2));
+                });
+                var cloud = new TranslateTransform();
+                AddSceneDrawing(landscape, cloud, dc =>
+                {
+                    dc.DrawGeometry(Paint("A397CF"), null, Shape("M68,43 H80 V35 H104 V39 H124 V47 H140 V51 H68 Z M219,29 H235 V21 H255 V25 H271 V33 H283 V37 H219 Z M357,89 H373 V81 H401 V85 H417 V93 H357 Z"));
+                });
+                var falls = new TranslateTransform();
+                var water = new DrawingGroup { ClipGeometry = new RectangleGeometry(new Rect(252, 135, 12, 45)) };
+                landscape.Children.Add(water);
+                AddSceneDrawing(water, null, dc => dc.DrawRectangle(grass, null, new Rect(252, 135, 12, 45)));
+                AddSceneDrawing(water, falls, dc =>
+                {
+                    for (int i = -1; i < 6; i++) dc.DrawRectangle(mint, null, new Rect(i % 2 == 0 ? 252 : 260, 131 + i * 12, 4, 8));
+                });
+                // A block-stepped fade protects the crisp pixel edge.
+                if (hero) AddSceneDrawing(landscape, null, dc =>
+                {
+                    for (int i = 0; i < 8; i++)
+                    {
+                        dc.PushOpacity(1 - i / 8.0);
+                        dc.DrawRectangle(Paint("171B35"), null, new Rect(i * 4, 0, 4, 180));
+                        dc.Pop();
+                    }
+                });
+                return t => { cloud.X = Math.Round(Math.Sin(t * .12) * 12 / 2) * 2; falls.Y = Math.Floor(t * 4) % 6 * 2; };
+            }
+
+            private Action<double> BuildSolarGarden()
+            {
+                var landscape = LandscapeSurface("EDF1D4");
+                var forest = Paint("245549");
+                var leaf = Paint("6E9F6C");
+                var cream = Paint("FFF4D2");
+                var sky = Paint("B9DBC6");
+                var glass = Paint("A2D2BE");
+                var edge = Stroke(forest, .8);
+                AddSceneDrawing(landscape, null, dc =>
+                {
+                    dc.DrawEllipse(Paint("E8BF62"), null, new Point(350, 43), 31, 31);
+                    dc.DrawGeometry(sky, null, Shape("M0,123 Q64,77 132,101 T277,89 Q358,61 440,92 V180 H0 Z"));
+                    dc.DrawGeometry(Paint("B7CDA0"), null, Shape("M0,151 Q82,106 172,135 T336,117 Q386,112 440,134 V180 H0 Z"));
+                    dc.DrawGeometry(Paint("A8C09B"), null, Shape("M123,123 V82 H153 V58 H186 V78 H205 V126 Z M370,130 V62 H394 V82 H417 V127 Z"));
+                    dc.DrawGeometry(cream, edge, Shape("M180,145 V62 Q204,51 226,62 V145 Z M224,146 V44 Q246,34 268,44 V143 Z M269,141 V75 Q292,65 313,75 V140 Z"));
+                    dc.DrawGeometry(Paint("D9D8B8"), null, Shape("M211,57 L225,62 V146 H212 Z M255,39 L268,44 V144 H255 Z M303,70 L313,75 V141 H303 Z"));
+                    for (int floor = 0; floor < 4; floor++)
+                    {
+                        double y = 63 + floor * 19;
+                        dc.DrawRectangle(glass, null, new Rect(232, y - 11, 28, 9));
+                        dc.DrawGeometry(leaf, edge, Shape("M218," + (y - 1) + " Q247," + (y + 7) + " 273," + (y - 1) + " V" + (y + 4) + " Q246," + (y + 12) + " 218," + (y + 4) + " Z"));
+                        dc.DrawRectangle(glass, null, new Rect(188, y + 8, 30, 9));
+                        dc.DrawLine(Stroke(forest, 2), new Point(176, y + 22), new Point(229, y + 22));
+                    }
+                    for (int i = 0; i < 3; i++)
+                    {
+                        double y = 88 + i * 18;
+                        dc.DrawRectangle(glass, null, new Rect(278, y, 27, 10));
+                        dc.DrawLine(Stroke(leaf, 4), new Point(264, y + 15), new Point(319, y + 15));
+                    }
+                    dc.DrawGeometry(leaf, null, Shape("M74,158 Q149,138 208,153 Q275,124 339,142 Q390,125 440,153 V180 H0 Z"));
+                    dc.DrawGeometry(cream, null, Shape("M108,180 Q185,149 235,164 Q326,130 440,151 V158 Q332,142 238,173 Q190,159 130,180 Z"));
+                    dc.DrawGeometry(glass, edge, Shape("M102,151 V128 C103,110 113,101 133,101 C153,101 164,112 165,128 V151 Z"));
+                    dc.DrawGeometry(null, Stroke(cream, 1.5), Shape("M104,127 H164 M133,102 V151 M120,104 Q110,127 119,151 M146,104 Q156,128 147,151 M102,141 H164"));
+                    dc.DrawLine(Stroke(forest, 2), new Point(0, 103), new Point(440, 103));
+                    dc.DrawGeometry(forest, null, Shape("M85,104 V149 H89 V104 Z M327,104 V146 H331 V104 Z"));
+                    dc.DrawGeometry(glass, edge, Shape("M345,152 L366,130 H397 L376,153 Z"));
+                    dc.DrawGeometry(null, Stroke(cream, .8), Shape("M355,142 H387 M362,135 H393 M360,151 L381,130 M369,151 L390,130"));
+                    dc.DrawGeometry(null, Stroke(forest, 2), Shape("M72,110 L75,44 M372,105 L375,40"));
+                });
+                var turbines = new[] { new RotateTransform(0, 75, 44), new RotateTransform(0, 375, 40) };
+                for (int i = 0; i < 2; i++)
+                {
+                    double x = i == 0 ? 75 : 375, y = i == 0 ? 44 : 40;
+                    AddSceneDrawing(landscape, turbines[i], dc =>
+                    {
+                        for (int blade = 0; blade < 3; blade++)
+                        {
+                            dc.PushTransform(new RotateTransform(blade * 120, x, y));
+                            dc.DrawGeometry(cream, edge, Shape("M" + x + "," + y + " l-2,-22 4,3 1,16 Z"));
+                            dc.Pop();
+                        }
+                        dc.DrawEllipse(forest, null, new Point(x, y), 2.3, 2.3);
+                    });
+                }
+                var tram = new TranslateTransform();
+                AddSceneDrawing(landscape, tram, dc =>
+                {
+                    dc.DrawRoundedRectangle(cream, edge, new Rect(0, 88, 34, 13), 5, 5);
+                    dc.DrawRoundedRectangle(forest, null, new Rect(5, 90, 24, 7), 2, 2);
+                    dc.DrawLine(Stroke(cream, 1), new Point(17, 90), new Point(17, 97));
+                    dc.DrawLine(edge, new Point(5, 102), new Point(29, 102));
+                });
+                var leaves = new TranslateTransform();
+                AddSceneDrawing(landscape, leaves, dc =>
+                {
+                    for (int i = 0; i < 24; i++)
+                    {
+                        double x = 184 + i % 6 * 25, y = 62 + i / 6 * 20;
+                        dc.DrawLine(Stroke(forest, .7), new Point(x, y), new Point(x - 1, y + 9));
+                        dc.DrawEllipse(forest, null, new Point(x, y), 4 + i % 3, 4);
+                        dc.DrawEllipse(leaf, null, new Point(x - 3, y - 3), 4, 3);
+                        dc.DrawEllipse(Paint("91B676"), null, new Point(x + 2, y - 2), 3, 3);
+                        if (i % 3 == 0)
+                            dc.DrawGeometry(null, Stroke(leaf, 2), Shape("M" + (x + 4) + "," + (y + 4) + " q2,8 -1,12"));
+                    }
+                    dc.DrawEllipse(forest, null, new Point(244, 33), 14, 7);
+                    dc.DrawEllipse(leaf, null, new Point(237, 30), 8, 5);
+                    dc.DrawEllipse(leaf, null, new Point(249, 29), 7, 5);
+                    dc.DrawGeometry(forest, null, Shape("M410,180 Q401,162 416,145 Q414,159 419,166 Q418,144 435,136 Q428,152 424,167 Q435,150 448,156 Q437,164 428,175 V180 Z M16,180 Q17,156 8,147 Q5,164 12,176 Q5,162 -5,162 V180 Z"));
+                });
+                FadeLandscapeEdge(landscape, "EDF1D4");
+                return t => { turbines[0].Angle = t * 16; turbines[1].Angle = t * 13; tram.X = LoopX(t * 9 + 117, 440, 34); leaves.X = Math.Sin(t * .8) * .8; };
             }
 
             private Action<double> BuildDesktop()

@@ -413,7 +413,10 @@ namespace EnglishTypingPractice
                 { UiTheme.Windows98, (RadioButton)window.FindName("ThemeWindows98") },
                 { UiTheme.CassetteFuturism, (RadioButton)window.FindName("ThemeCassetteFuturism") },
                 { UiTheme.ArtDeco, (RadioButton)window.FindName("ThemeArtDeco") },
-                { UiTheme.Atompunk, (RadioButton)window.FindName("ThemeAtompunk") }
+                { UiTheme.Atompunk, (RadioButton)window.FindName("ThemeAtompunk") },
+                { UiTheme.Ukiyoe, (RadioButton)window.FindName("ThemeUkiyoe") },
+                { UiTheme.Pixel, (RadioButton)window.FindName("ThemePixel") },
+                { UiTheme.Solarpunk, (RadioButton)window.FindName("ThemeSolarpunk") }
             };
             bool resume = false;
             Func<UiTheme> selected = () => options.First(item => item.Value.IsChecked == true).Key;

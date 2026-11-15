@@ -110,7 +110,7 @@ namespace EnglishTypingPractice
             SkillUses = 0;
             LastWord = null;
             WordCount = 0;
-            Turns = SkillHits = Deliveries = 0;
+            Turns = SkillHits = Deliveries = Respawns = 0;
             SurvivalMs = 0;
             spawnX = x;
             spawnY = y;
@@ -455,6 +455,8 @@ namespace EnglishTypingPractice
         private void RestartBody(long now, int head, SnakeDirection direction)
         {
             chargeUntil = stunUntil = stabilizationUntil = 0;
+            ChargeWord = SnakeWords.HasSkill(Role, mode) ? SnakeWords.DrawCharge(random, ChargeWord, Role) : null;
+            chargeGroup++;
             ResetBody(head, direction);
             nextMoveAt = now + Interval(now);
         }

@@ -149,6 +149,30 @@ namespace EnglishTypingPractice
                         sample += OrbitTone(t - .125, 280, 3300, .098) * .30 + OrbitTone(t - .229, 925, -1090, .070) * .25 +
                             Tone(t - .285, 1602, .054) * .14;
                     return sample;
+                case UiTheme.Ukiyoe:
+                    sample = Woodblock(t, 720) * .37;
+                    if (word)
+                        sample += Woodblock(t - .045, 960) * .25 + Pluck(t - .079, 587.3) * .27;
+                    if (complete)
+                        sample += Pluck(t - .13, 659.3) * .24 + Pluck(t - .21, 880) * .26 +
+                            Pluck(t - .30, 1174.7) * .21;
+                    return sample;
+                case UiTheme.Pixel:
+                    sample = Chip(t, 740, .017) * .19;
+                    if (word)
+                        sample += Chip(t - .030, 988, .029) * .22 + Chip(t - .074, 1480, .035) * .17;
+                    if (complete)
+                        sample += Chip(t - .13, 659, .045) * .23 + Chip(t - .20, 831, .04) * .23 +
+                            Chip(t - .27, 988, .045) * .20 + Chip(t - .33, 1318, .048) * .17;
+                    return sample;
+                case UiTheme.Solarpunk:
+                    sample = Bell(t, 659.3, .026) * .30 + Pluck(t, 329.6) * .20;
+                    if (word)
+                        sample += Pluck(t - .045, 493.9) * .25 + Bell(t - .081, 987.8, .055) * .20;
+                    if (complete)
+                        sample += Pluck(t - .125, 440) * .23 + Bell(t - .193, 659.3, .083) * .22 +
+                            Bell(t - .27, 880, .105) * .23;
+                    return sample;
                 default:
                     return 0;
             }
@@ -157,6 +181,19 @@ namespace EnglishTypingPractice
         private static double Envelope(double t, double decay)
         {
             return t < 0 ? 0 : Math.Min(1, t * 850) * Math.Exp(-t / decay);
+        }
+
+        internal static double Woodblock(double t, double frequency)
+        {
+            return Tone(t, frequency, .011) + Tone(t, frequency * 1.61, .007) * .4;
+        }
+
+        internal static double Chip(double t, double frequency, double decay)
+        {
+            if (t < 0) return 0;
+            double phase = 2 * Math.PI * frequency * t;
+            // Three odd harmonics retain the pulse character without an abrupt sample edge.
+            return (Math.Sin(phase) + Math.Sin(3 * phase) / 3 + Math.Sin(5 * phase) / 5) * Envelope(t, decay);
         }
 
         private static double Tone(double t, double frequency, double decay)

@@ -112,6 +112,13 @@ namespace EnglishTypingPractice
                 foreach (TextBlock line in lettering)
                     line.HorizontalAlignment = HorizontalAlignment.Center;
             }
+            else if (theme >= UiTheme.Ukiyoe)
+            {
+                hero.Background = Brush("Field");
+                foreach (Border layer in hero.Children.OfType<Border>())
+                    layer.Visibility = Visibility.Collapsed;
+                hero.SizeChanged += (sender, e) => ArrangeNewHero(e.NewSize.Width);
+            }
 
             // Settings is a gallery of miniature compositions, not a list of color swatches.
             var settingsPage = Find<ScrollViewer>("SettingsPage");
@@ -291,6 +298,25 @@ namespace EnglishTypingPractice
                         Place(sheet, 3, 0); Place(music, 3, 1);
                         Place(ranking, 4, 0, 2);
                         break;
+                    case UiTheme.Ukiyoe:
+                        Columns(desk, -1, 270);
+                        Place(hero, 0, 0, 2); Place(options, 1, 0, 2);
+                        Place(sheet, 2, 0, 1, 3); Place(actions, 2, 1); Rail(236, false);
+                        Place(statistics, 3, 1); Place(ranking, 4, 1); Place(music, 5, 0, 2);
+                        break;
+                    case UiTheme.Pixel:
+                        Columns(desk, -1, -1);
+                        Place(hero, 0, 0, 2); Place(statistics, 1, 0, 2);
+                        Place(actions, 2, 0, 2); Place(options, 3, 0, 2);
+                        Place(sheet, 4, 0, 2); Place(ranking, 5, 0); Place(music, 5, 1);
+                        actions.HorizontalAlignment = HorizontalAlignment.Center;
+                        break;
+                    case UiTheme.Solarpunk:
+                        Columns(desk, 280, -1);
+                        Place(hero, 0, 0, 2); Place(actions, 1, 0, 2);
+                        Place(options, 2, 0, 2); Place(statistics, 3, 0); Place(ranking, 4, 0);
+                        Place(sheet, 3, 1, 1, 2); Place(music, 5, 0, 2);
+                        break;
                     default:
                         Columns(desk, -1, 342);
                         Place(hero, 0, 0, 2); Place(options, 1, 0, 2);
@@ -318,10 +344,22 @@ namespace EnglishTypingPractice
                 foreach (Button button in actions.Children)
                     button.MinWidth = spacious ? 102 : 82;
             }
+            else if (theme >= UiTheme.Ukiyoe)
+                ArrangeNewHero(hero.ActualWidth > 0 ? hero.ActualWidth : window.Width - 60);
             // All navigation and live input remain horizontal and scrollable on small screens.
             ReflowSettings(spacious);
             ReflowSnake(spacious);
             ReflowSecondaryPages(spacious);
+        }
+
+        private void ArrangeNewHero(double width)
+        {
+            hero.MinHeight = width < 700 ? 152 : 188;
+            double inset = width < 700 ? 16 : 28;
+            brand.Margin = new Thickness(inset, 12, 0, 12);
+            brand.Width = Math.Max(170, width * .44 - inset);
+            ((TextBlock)brand.Children[1]).FontSize = width < 700 ? 29 : 42;
+            Find<TextBlock>("PracticeHint").FontSize = width < 700 ? 12 : 14;
         }
 
         private void Rail(double width, bool stagger)
@@ -383,12 +421,13 @@ namespace EnglishTypingPractice
         private void BuildThemeGallery()
         {
             var names = new[] { "现代", "极简", "赛博朋克", "蒸汽朋克", "蒸汽波", "构成主义", "P5 风格", "国风",
-                "Windows 98", "磁带未来主义", "装饰艺术 Art Deco", "原子朋克" };
+                "Windows 98", "磁带未来主义", "装饰艺术 Art Deco", "原子朋克", "浮世绘", "像素", "太阳朋克" };
             var themes = new[] { UiTheme.Modern, UiTheme.Minimal, UiTheme.Cyberpunk, UiTheme.Steampunk, UiTheme.Vaporwave,
                 UiTheme.Constructivist, UiTheme.Persona5, UiTheme.ChineseStyle, UiTheme.Windows98, UiTheme.CassetteFuturism,
-                UiTheme.ArtDeco, UiTheme.Atompunk };
+                UiTheme.ArtDeco, UiTheme.Atompunk, UiTheme.Ukiyoe, UiTheme.Pixel, UiTheme.Solarpunk };
             var descriptions = new[] { "坐标 · 几何 · 光轨", "留白 · 阅读 · 专注", "街区终端 · 飞行交通", "黄铜仪表 · 蒸汽机械", "梦境桌面 · 复古窗口", "斜向构图 · 红黑印版", "阶梯菜单 · 拼贴纸片", "山水册页 · 朱印题签",
-                "青绿桌面 · 经典窗口", "磁带转轴 · 模拟仪表", "黑金剧院 · 对称放射", "流线火箭 · 轨道星芒" };
+                "青绿桌面 · 经典窗口", "磁带转轴 · 模拟仪表", "黑金剧院 · 对称放射", "流线火箭 · 轨道星芒",
+                "木版山海 · 靛蓝朱印", "方格世界 · 街机音色", "空中花园 · 阳光绿城" };
             for (int i = 0; i < themes.Length; i++)
             {
                 var choice = Find<RadioButton>("Theme" + themes[i]);
@@ -409,7 +448,7 @@ namespace EnglishTypingPractice
             var layout = Find<Grid>("SnakeLayout");
             var play = Find<Grid>("SnakePlayArea");
             var controls = Find<DockPanel>("SnakeControls");
-            bool left = theme == UiTheme.Persona5 || theme == UiTheme.Constructivist || theme == UiTheme.Cyberpunk || theme == UiTheme.CassetteFuturism;
+            bool left = theme == UiTheme.Persona5 || theme == UiTheme.Constructivist || theme == UiTheme.Cyberpunk || theme == UiTheme.CassetteFuturism || theme == UiTheme.Ukiyoe;
             layout.ColumnDefinitions.Clear();
             double controlsWidth = spacious ? (theme == UiTheme.Persona5 ? 300 : 312) : 228;
             Columns(layout, left ? controlsWidth : -1, left ? -1 : controlsWidth);
@@ -530,6 +569,17 @@ namespace EnglishTypingPractice
                     border.CornerRadius = new CornerRadius(12, 24, 12, 24);
                     border.BorderThickness = new Thickness(1, 2, 1, 3);
                     break;
+                case UiTheme.Ukiyoe:
+                    border.BorderBrush = Brush("Text");
+                    border.BorderThickness = new Thickness(1, 3, 1, 1);
+                    break;
+                case UiTheme.Pixel:
+                    border.BorderThickness = new Thickness(3, 3, 5, 5);
+                    break;
+                case UiTheme.Solarpunk:
+                    border.CornerRadius = new CornerRadius(18, 4, 18, 4);
+                    border.BorderThickness = new Thickness(1, 1, 1, 3);
+                    break;
             }
         }
 
@@ -573,15 +623,39 @@ namespace EnglishTypingPractice
         protected override void OnRender(DrawingContext dc)
         {
             string[] backgrounds = { "#17111F", "#F1F2EF", "#241A14", "#101C24", "#F4C3EB", "#E4CFB3", "#171417", "#E6E1CE",
-                "#008080", "#172825", "#12100F", "#F9E8C8" };
+                "#008080", "#172825", "#12100F", "#F9E8C8", "#F5E9CE", "#151329", "#EDF4DA" };
             string[] accents = { "#56F4E5", "#266858", "#F0BF73", "#ECF664", "#61399B", "#A72722", "#DE102B", "#962F25",
-                "#C0C0C0", "#E4B971", "#D4AF63", "#A13F2F" };
+                "#C0C0C0", "#E4B971", "#D4AF63", "#A13F2F", "#284C67", "#FFD36B", "#286C4D" };
             Brush background = (Brush)new BrushConverter().ConvertFromString(backgrounds[(int)theme]);
             Brush accent = (Brush)new BrushConverter().ConvertFromString(accents[(int)theme]);
             var outline = new Pen(accent, 1);
             double w = Math.Max(1, ActualWidth), h = ActualHeight;
             dc.DrawRectangle(background, outline, new Rect(0, 0, w, h));
             if (w < 52 || h < 56) return;
+            if (theme == UiTheme.Ukiyoe)
+            {
+                dc.DrawEllipse(Brushes.IndianRed, null, new Point(w * .72, 20), 10, 10);
+                dc.DrawGeometry(accent, null, ThemePlate.Polygon(16, 52, w * .51, 18, w - 12, 52));
+                dc.DrawGeometry(background, null, ThemePlate.Polygon(w * .51, 18, w * .42, 29, w * .50, 27, w * .57, 31));
+                dc.DrawGeometry(accent, outline, Geometry.Parse("M0,53 Q20,25 38,48 Q49,57 63,47 L63,66 H0 Z"));
+                return;
+            }
+            if (theme == UiTheme.Pixel)
+            {
+                dc.DrawRectangle(accent, null, new Rect(w - 32, 10, 16, 16));
+                for (int i = 0; i < 6; i++)
+                    dc.DrawRectangle(i % 2 == 0 ? Brushes.MediumPurple : Brushes.CadetBlue, null,
+                        new Rect(6 + i * (w - 12) / 6, 36 - (i % 3) * 8, (w - 12) / 6, 27 + (i % 3) * 8));
+                return;
+            }
+            if (theme == UiTheme.Solarpunk)
+            {
+                dc.DrawEllipse(Brushes.Goldenrod, null, new Point(w - 29, 18), 11, 11);
+                dc.DrawRoundedRectangle(accent, null, new Rect(w * .2, 26, w * .6, 37), 12, 12);
+                dc.DrawRectangle(background, null, new Rect(w * .25, 42, w * .50, 4));
+                dc.DrawRectangle(background, null, new Rect(w * .25, 52, w * .50, 4));
+                return;
+            }
             if (theme == UiTheme.Windows98)
             {
                 dc.DrawRectangle(accent, null, new Rect(13, 10, w - 25, 42));

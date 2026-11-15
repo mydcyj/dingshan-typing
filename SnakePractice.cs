@@ -434,7 +434,7 @@ namespace EnglishTypingPractice
                 return;
             }
 
-            SubmitWord(game.Words, game.Role, game.Direction, false, word =>
+            SubmitWord(game.Words, game.Role, game.Direction, game.IsStunned(clock.ElapsedMilliseconds), game.TurnPending, word =>
             {
                 var before = game.Direction;
                 if (game.TryWord(word, game.WordGroup, clock.ElapsedMilliseconds))
@@ -551,6 +551,8 @@ namespace EnglishTypingPractice
                 return;
             }
 
+            if (moved && !game.TurnPending && command.Text.Length > 0)
+                OnCommandChanged(command, null);
             Render();
         }
 
@@ -705,6 +707,8 @@ namespace EnglishTypingPractice
                 return;
             }
             string word = chargeInput.Text;
+            if (online != null && soloMatch == null && lobby.InputPending)
+                return;
             if (tutorial.Active && !tutorial.AcceptsSkill)
                 return;
             RecordMistype(word, ReviewWords(true), ref reviewedSkillAttempt);
@@ -717,7 +721,7 @@ namespace EnglishTypingPractice
                     return;
                 chargeInput.Clear();
                 if (soloMatch == null)
-                    lobby.Turn(word, online.ChargeGroup, online.Round, charge: true);
+                    SendRoomWord(word, online.ChargeGroup, true);
                 else if (soloMatch.TryCharge(0, word, online.ChargeGroup, online.Round, clock.ElapsedMilliseconds))
                 {
                     tutorial.SkillAccepted(clock.ElapsedMilliseconds);
@@ -733,7 +737,7 @@ namespace EnglishTypingPractice
             }
         }
 
-        private void SubmitWord(string[] words, SnakeRole role, SnakeDirection direction, bool stunned, Action<string> submit)
+        private void SubmitWord(string[] words, SnakeRole role, SnakeDirection direction, bool stunned, bool turnPending, Action<string> submit)
         {
             string word = command.Text;
             if (tutorial.Active && !tutorial.AcceptsDirection)
@@ -745,15 +749,19 @@ namespace EnglishTypingPractice
                     RecordMistype(word, ReviewWords(false), ref reviewedDirectionAttempt);
                 return;
             }
-            command.Clear();
             int variants = SnakeWords.Variants(role);
             int target = index / variants;
             if (stunned)
                 status.Text = "僵直中，暂时无法操作。";
             else if (target == ((int)direction + 2) % 4)
                 status.Text = "禁止掉头。";
+            else if (turnPending)
+                status.Text = "单词已就绪，下一步自动转向。";
             else if (target != (int)direction || index % variants == 2)
+            {
+                command.Clear();
                 submit(word);
+            }
         }
 
         private void EnterRoom()
@@ -786,6 +794,8 @@ namespace EnglishTypingPractice
 
         private void HandleRoomCommand()
         {
+            if (soloMatch == null && lobby.InputPending)
+                return;
             if (online.Phase != MatchPhase.Playing)
             {
                 if (ownSlot == 0 && command.Text.Equals("start", StringComparison.OrdinalIgnoreCase))
@@ -807,17 +817,17 @@ namespace EnglishTypingPractice
                 string word = command.Text;
                 command.Clear();
                 if (soloMatch == null)
-                    lobby.Turn(word, online.WordGroup, online.Round);
+                    SendRoomWord(word, online.WordGroup);
                 else if (soloMatch.TryWord(0, word, online.WordGroup, online.Round, clock.ElapsedMilliseconds))
                     RefreshSoloMatch();
                 return;
             }
             if (own.Result != SnakeResult.Running)
                 return;
-            SubmitWord(online.Words, own.Role, own.Direction, own.StunRemaining > 0, word =>
+            SubmitWord(online.Words, own.Role, own.Direction, own.StunRemaining > 0, own.TurnPending, word =>
             {
                 if (soloMatch == null)
-                    lobby.Turn(word, online.WordGroup, online.Round);
+                    SendRoomWord(word, online.WordGroup);
                 else if (soloMatch.TryWord(0, word, online.WordGroup, online.Round, clock.ElapsedMilliseconds))
                 {
                     int index = Array.IndexOf(online.Words, online.Words.First(item => item.Equals(word, StringComparison.OrdinalIgnoreCase)));
@@ -835,6 +845,13 @@ namespace EnglishTypingPractice
             state.BotSlots = localBots.Slots.ToArray();
             state.BotDifficulty = localBots.Difficulty;
             ApplyRoomState(state, 0);
+        }
+
+        private void SendRoomWord(string word, int group, bool charge = false)
+        {
+            lobby.Turn(word, group, online.Round, charge);
+            if (lobby.InputPending)
+                status.Text = "指令已发送，正在同步词组。";
         }
 
         private bool StartTutorial(SnakeRole role)
@@ -963,10 +980,10 @@ namespace EnglishTypingPractice
             }
             else if (previous.WordGroup != state.WordGroup)
             {
-                status.Text = "";
+                status.Text = command.Text.Length == 0 ? "" : "词组已更新，已保留输入，请按当前单词调整。";
             }
-            if (previous != null && previous.ChargeGroup != state.ChargeGroup)
-                chargeInput.Clear();
+            if (previous != null && previous.ChargeGroup != state.ChargeGroup && chargeInput.Text.Length > 0)
+                status.Text = "技能词已更新，已保留输入，请按当前单词调整。";
             if (previousOwn != null && previous.Round == state.Round)
             {
                 if (own.StunRemaining > 0 && previousOwn.StunRemaining == 0)
@@ -1077,6 +1094,10 @@ namespace EnglishTypingPractice
                 }
             }
             recap.Visibility = state.Phase == MatchPhase.Finished ? Visibility.Visible : Visibility.Collapsed;
+            if (running && !own.TurnPending && command.Text.Length > 0)
+                HandleRoomCommand();
+            if (soloMatch == null && running && chargeInput.Text.Length > 0)
+                OnChargeChanged(chargeInput, null);
         }
 
         private static string FormatRecap(SnakeMode mode, SnakePlayerState player)

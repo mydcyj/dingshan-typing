@@ -1328,7 +1328,7 @@
             <Run Text="1. 先选模式和职业。单人直接输入 " /><Run Text="start" FontFamily="Consolas" FontWeight="Bold" /><Run Text="。联机时，房主建房，同一网络的朋友扫描加入，再由房主开局。" />
           </TextBlock>
           <TextBlock Style="{StaticResource RuleText}">
-            <Run Text="2. 蛇会一直前进。照着十字面板打完目标方向的英文词，蛇就会转向。× 表示禁止掉头。按空格清空当前输入框。" />
+            <Run Text="2. 蛇会一直前进。照着十字面板打完目标方向的英文词，蛇就会转向。连续打完下一词时，会保留输入并在下一步自动转向。× 表示禁止掉头。按空格清空输入，也可取消待发的转向词。" />
           </TextBlock>
           <TextBlock Style="{StaticResource RuleText}">
             <Run Text="3. 有技能的职业按 Tab 切换输入框。技能短语连写。蛇头气泡显示正在输入的字母，联机时也显示昵称。" />
@@ -1427,6 +1427,9 @@
           <RadioButton x:Name="ThemeCassetteFuturism" GroupName="Theme" Content="磁带未来主义" />
           <RadioButton x:Name="ThemeArtDeco" GroupName="Theme" Content="装饰艺术" />
           <RadioButton x:Name="ThemeAtompunk" GroupName="Theme" Content="原子朋克" />
+          <RadioButton x:Name="ThemeUkiyoe" GroupName="Theme" Content="浮世绘" />
+          <RadioButton x:Name="ThemePixel" GroupName="Theme" Content="像素" />
+          <RadioButton x:Name="ThemeSolarpunk" GroupName="Theme" Content="太阳朋克" />
           </UniformGrid>
         </StackPanel>
       </Border>

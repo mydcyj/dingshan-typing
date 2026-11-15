@@ -12,6 +12,10 @@ namespace EnglishTypingPractice
         private static readonly Geometry DecoSteps = MakeGeometry("M7,46 H22 V42 H33 V38 H43 M57,38 H67 V42 H78 V46 H93 " +
             "M16,51 H25 V47 H36 V43 H42 M58,43 H64 V47 H75 V51 H84");
         private static readonly Geometry DecoDiamond = MakeGeometry("M50,38 L55,45 50,52 45,45 Z");
+        private static readonly Geometry Crest = MakeGeometry("M6,51 C8,30 26,19 42,23 C59,27 63,40 54,46 " +
+            "C59,33 45,29 36,33 C46,35 49,43 43,47 C36,51 28,49 20,54 C45,48 65,54 92,43 L96,56 H6 Z");
+        private static readonly Geometry Foam = MakeGeometry("M11,39 C20,25 36,24 47,29 L41,29 44,35 37,32 38,38 31,35 28,42 23,38 17,45 Z");
+        private static readonly Geometry Leaf = MakeGeometry("M0,0 C-14,-1 -23,-11 -18,-25 C-2,-23 7,-11 0,0 Z");
 
         internal static readonly DependencyProperty ProgressProperty = DependencyProperty.Register(
             "Progress", typeof(double), typeof(TypingEffectVisuals),
@@ -52,6 +56,9 @@ namespace EnglishTypingPractice
                 case UiTheme.CassetteFuturism: DrawDeck(drawing, time); break;
                 case UiTheme.ArtDeco: DrawDeco(drawing, time); break;
                 case UiTheme.Atompunk: DrawOrbit(drawing, time); break;
+                case UiTheme.Ukiyoe: DrawPrint(drawing, time); break;
+                case UiTheme.Pixel: DrawPixels(drawing, time); break;
+                case UiTheme.Solarpunk: DrawLeaves(drawing, time); break;
                 default: DrawBrackets(drawing, time); break;
             }
             drawing.Pop();
@@ -256,6 +263,66 @@ namespace EnglishTypingPractice
                 new Point(50 - spread, 39));
             DrawPolygon(drawing, secondary, null, new Point(50 + spread, 33), new Point(41 + spread, 36),
                 new Point(50 + spread, 39));
+        }
+
+        private void DrawPrint(DrawingContext drawing, double time)
+        {
+            drawing.PushTransform(new TranslateTransform(-4 + time * 10, 0));
+            drawing.DrawGeometry(primary, null, Crest);
+            drawing.DrawGeometry(secondary, null, Foam);
+            for (int i = 0; i < 2 + level * 3; i++)
+            {
+                double lift = Math.Sin(time * Math.PI) * (10 + i * 2);
+                drawing.DrawEllipse(secondary, null, new Point(26 + i * 7 + time * 10, 22 - lift), 1.3, 2.5);
+            }
+            drawing.Pop();
+        }
+
+        private void DrawPixels(DrawingContext drawing, double time)
+        {
+            const double pixel = 4;
+            int radius = 2 + level + (int)(time * 4);
+            for (int side = 0; side < 4; side++)
+            {
+                double x = 48 + (side == 0 ? -radius : side == 1 ? radius : 0) * pixel;
+                double y = 32 + (side == 2 ? -radius : side == 3 ? radius : 0) * pixel;
+                drawing.DrawRectangle(primary, null, new Rect(x, y, pixel, pixel));
+                if (level > 0)
+                    drawing.DrawRectangle(secondary, null, new Rect(x + pixel, y + pixel, pixel, pixel));
+            }
+            drawing.DrawRectangle(secondary, null, new Rect(44, 24, 12, 20));
+            drawing.DrawRectangle(secondary, null, new Rect(40, 28, 20, 12));
+            drawing.DrawRectangle(primary, null, new Rect(48, 28, 4, 12));
+            if (level == 2)
+            {
+                for (int i = 0; i < 6; i++)
+                    drawing.DrawRectangle(i % 2 == 0 ? primary : secondary, null,
+                        new Rect(16 + i * 12, 52 - (int)(time * 8) * pixel, pixel, pixel));
+            }
+        }
+
+        private void DrawLeaves(DrawingContext drawing, double time)
+        {
+            var root = new Point(50, 55);
+            drawing.DrawLine(thin, root, new Point(50, 19));
+            double unfold = .55 + Math.Sin(time * Math.PI) * .45;
+            for (int i = 0; i < 2 + level * 2; i++)
+            {
+                drawing.PushTransform(new TranslateTransform(50, 49 - i * 5));
+                drawing.PushTransform(new ScaleTransform((i % 2 == 0 ? 1 : -1) * unfold, unfold));
+                drawing.DrawGeometry(i % 2 == 0 ? primary : secondary, null, Leaf);
+                drawing.Pop(); drawing.Pop();
+            }
+            if (level > 0)
+            {
+                drawing.DrawEllipse(secondary, null, new Point(50, 13), 4, 4);
+                for (int i = 0; i < 5; i++)
+                {
+                    double angle = i * Math.PI / 4;
+                    drawing.DrawLine(thin, new Point(50 + Math.Cos(angle) * 8, 13 - Math.Sin(angle) * 8),
+                        new Point(50 + Math.Cos(angle) * 11, 13 - Math.Sin(angle) * 11));
+                }
+            }
         }
 
         private static void DrawPolygon(DrawingContext drawing, Brush fill, Pen outline, params Point[] points)

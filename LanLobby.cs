@@ -222,6 +222,11 @@ namespace EnglishTypingPractice
             panel.Visibility = Visibility.Collapsed;
         }
 
+        internal bool InputPending
+        {
+            get { return client != null && (client.InputPending || client.Reconnecting || client.Disconnected || !ReferenceEquals(latest, client.State)); }
+        }
+
         internal void Turn(string word, int group, int round, bool charge = false)
         {
             if (host != null)

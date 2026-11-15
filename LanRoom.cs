@@ -630,6 +630,8 @@ namespace EnglishTypingPractice
         private volatile bool reconnecting;
         private volatile bool leaving;
         private LanRequest turn;
+        private LanRequest roleChange;
+        private int inputPending;
         private LanRequest drop;
         private SnakeTypingPreview preview;
         private LanRequest sprint;
@@ -643,6 +645,7 @@ namespace EnglishTypingPractice
         internal SnakeMatchState State { get { return state; } }
         internal bool Disconnected { get { return closed; } }
         internal bool Reconnecting { get { return reconnecting; } }
+        internal bool InputPending { get { return Volatile.Read(ref inputPending) != 0; } }
 
         internal async Task<string> Join(IPAddress address, string name, int port = LanWire.Port, SnakeRole role = SnakeRole.Standard)
         {
@@ -721,6 +724,8 @@ namespace EnglishTypingPractice
 
         internal void Turn(string word, int group, int round, bool charge = false)
         {
+            if (Interlocked.CompareExchange(ref inputPending, 1, 0) != 0)
+                return;
             Interlocked.Exchange(ref turn, new LanRequest { Kind = charge ? "charge" : "turn", Text = word, Group = group, Round = round });
         }
 
@@ -736,7 +741,7 @@ namespace EnglishTypingPractice
 
         internal void SetRole(SnakeRole role)
         {
-            Interlocked.Exchange(ref turn, new LanRequest { Kind = "role", Role = role });
+            Interlocked.Exchange(ref roleChange, new LanRequest { Kind = "role", Role = role });
         }
 
         internal void DropBall(int round)
@@ -803,7 +808,7 @@ namespace EnglishTypingPractice
                             LanWire.Write(stream, new LanRequest { Kind = "leave" });
                             break;
                         }
-                        var request = Interlocked.Exchange(ref turn, null) ?? Interlocked.Exchange(ref drop, null) ??
+                        var request = Interlocked.Exchange(ref turn, null) ?? Interlocked.Exchange(ref roleChange, null) ?? Interlocked.Exchange(ref drop, null) ??
                             Interlocked.Exchange(ref readiness, null) ?? new LanRequest { Kind = "poll" };
                         request.Preview = Interlocked.Exchange(ref preview, null);
                         var speed = Interlocked.Exchange(ref sprint, null);
@@ -817,6 +822,8 @@ namespace EnglishTypingPractice
                         if (reply == null || reply.Slot != Slot || !ValidState(reply.State, Slot))
                             break;
                         state = reply.State;
+                        if (request.Kind == "turn" || request.Kind == "charge")
+                            Interlocked.Exchange(ref inputPending, 0);
                         await Task.Delay(75).ConfigureAwait(false);
                         continue;
                     }
@@ -848,11 +855,13 @@ namespace EnglishTypingPractice
                     if (!string.IsNullOrEmpty(reply.Error) || reply.Slot != Slot || reply.MusicKey != musicKey)
                         break;
                     Interlocked.Exchange(ref turn, null);
+                    Interlocked.Exchange(ref roleChange, null);
                     Interlocked.Exchange(ref drop, null);
                     Interlocked.Exchange(ref readiness, null);
                     Interlocked.Exchange(ref preview, null);
                     Interlocked.Exchange(ref sprint, null);
                     state = reply.State;
+                    Interlocked.Exchange(ref inputPending, 0);
                     reconnecting = false;
                     return stream;
                 }
@@ -1021,6 +1030,7 @@ namespace EnglishTypingPractice
             lock (connectionLock)
             {
                 closed = true;
+                Interlocked.Exchange(ref inputPending, 0);
                 if (client != null)
                     client.Close();
             }

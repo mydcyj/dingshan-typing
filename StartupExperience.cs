@@ -77,6 +77,26 @@ namespace EnglishTypingPractice
                 title.TextAlignment = hint.TextAlignment = savedName.TextAlignment = TextAlignment.Center;
                 confirm.HorizontalAlignment = HorizontalAlignment.Center;
             }
+            else if (settings.Theme >= UiTheme.Ukiyoe)
+            {
+                Brush landscape = StartupThemeEffects.CreateNewBackdrop(settings.Theme);
+                ((Panel)overlay).Background = landscape;
+                foreach (UIElement ornament in ((Panel)panels).Children)
+                    ornament.Visibility = Visibility.Collapsed;
+                icon.Visibility = Visibility.Collapsed;
+                var caption = (TextBlock)((Panel)brand).Children[1];
+                caption.Foreground = (Brush)window.FindResource("Text");
+                caption.FontSize = settings.Theme == UiTheme.Pixel ? 32 : 40;
+                foreach (UIElement ornament in ((Panel)orbit).Children)
+                    if (ornament != orbitText) ornament.Visibility = Visibility.Collapsed;
+                orbitText.Foreground = (Brush)window.FindResource("Text");
+                var loginCard = (Border)form;
+                loginCard.Background = (Brush)window.FindResource("Field");
+                loginCard.BorderBrush = (Brush)window.FindResource("Accent");
+                loginCard.BorderThickness = new Thickness(settings.Theme == UiTheme.Pixel ? 3 : 1);
+                title.HorizontalAlignment = HorizontalAlignment.Center;
+                title.TextAlignment = hint.TextAlignment = savedName.TextAlignment = TextAlignment.Center;
+            }
             themeEffects = new StartupThemeEffects(window, settings.Theme);
             var startupLayers = (Grid)overlay;
             startupLayers.Children.Insert(startupLayers.Children.IndexOf(brand), themeEffects);
@@ -111,7 +131,10 @@ namespace EnglishTypingPractice
             overlay.Visibility = Visibility.Visible;
         }
 
-        private static bool Motion { get { return SystemParameters.ClientAreaAnimation; } }
+        private bool Motion
+        {
+            get { return SystemParameters.ClientAreaAnimation && (settings.Theme < UiTheme.Ukiyoe || !settings.SnakeLowEffects); }
+        }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
@@ -217,7 +240,7 @@ namespace EnglishTypingPractice
                 orbitText.Text = "准备就绪";
                 themeEffects.Play(true);
                 Animate(orbit, UIElement.OpacityProperty, 0, 1, 160);
-                if (settings.Theme != UiTheme.Minimal && settings.Theme != UiTheme.ArtDeco)
+                if (settings.Theme != UiTheme.Minimal && settings.Theme != UiTheme.ArtDeco && settings.Theme < UiTheme.Ukiyoe)
                     Animate(orbitRotation, RotateTransform.AngleProperty, -32, 106, 450);
                 Sweep(410);
                 After(480, () =>
@@ -247,7 +270,7 @@ namespace EnglishTypingPractice
 
         private void Sweep(int milliseconds)
         {
-            if (settings.Theme == UiTheme.ArtDeco)
+            if (settings.Theme == UiTheme.ArtDeco || settings.Theme >= UiTheme.Ukiyoe)
                 return;
             double offset = overlay.ActualHeight / 2 + scanBeam.ActualHeight;
             Animate(scan, TranslateTransform.YProperty, -offset, offset, milliseconds);

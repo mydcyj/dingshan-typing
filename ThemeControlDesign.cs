@@ -400,6 +400,20 @@ namespace EnglishTypingPractice
             }
             else if (Theme == UiTheme.Modern)
                 dc.DrawLine(new Pen(Accent, 1.5), new Point(left + 4, top + 3), new Point(left + Math.Min(17, w * .3), top + 3));
+            else if (Theme == UiTheme.Ukiyoe && !Field && w > 55)
+            {
+                dc.DrawLine(new Pen(edge, .7), new Point(left + 5, top + 4), new Point(right - 5, top + 4));
+                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(167, 60, 46)), null, new Rect(right - 7, bottom - 7, 3, 3));
+            }
+            else if (Theme == UiTheme.Pixel)
+            {
+                dc.DrawLine(new Pen(edge, 2), new Point(left + 5, top + 3), new Point(right - 5, top + 3));
+                dc.DrawLine(new Pen(Line, 3), new Point(left + 5, bottom - 2), new Point(right - 5, bottom - 2));
+            }
+            else if (Theme == UiTheme.Solarpunk && !Field && w > 55)
+            {
+                dc.DrawLine(new Pen(edge, .7), new Point(left + 8, bottom - 4), new Point(right - 10, bottom - 4));
+            }
             if (Focused)
                 dc.DrawRectangle(null, new Pen(Accent, 1) { DashStyle = DashStyles.Dot },
                     new Rect(5, 5, Math.Max(1, w - 12), Math.Max(1, h - 12)));
@@ -459,6 +473,15 @@ namespace EnglishTypingPractice
                 case UiTheme.Atompunk:
                     double radius = Math.Min(field ? 5 : 14, Math.Min(r.Height, r.Width) * .36);
                     return new RectangleGeometry(r, radius, radius);
+                case UiTheme.Ukiyoe:
+                    return Polygon(l + 2, t, right, t + 1, right - 1, b, l, b - 1);
+                case UiTheme.Pixel:
+                    double pixel = Math.Min(4, Math.Min(r.Width, r.Height) / 5);
+                    return Polygon(l + pixel, t, right - pixel, t, right - pixel, t + pixel,
+                        right, t + pixel, right, b - pixel, right - pixel, b - pixel, right - pixel, b,
+                        l + pixel, b, l + pixel, b - pixel, l, b - pixel, l, t + pixel, l + pixel, t + pixel);
+                case UiTheme.Solarpunk:
+                    return new RectangleGeometry(r, field ? 5 : 13, field ? 5 : 13);
                 default:
                     return Polygon(l, t, right - cut, t, right, t + cut, right, b, l, b);
             }
@@ -517,6 +540,9 @@ namespace EnglishTypingPractice
                 case UiTheme.CassetteFuturism: return new FontFamily("Bahnschrift SemiCondensed, SimHei, Microsoft YaHei UI");
                 case UiTheme.ArtDeco: return new FontFamily("Segoe UI, Microsoft YaHei UI");
                 case UiTheme.Atompunk: return new FontFamily("Trebuchet MS, DengXian, Microsoft YaHei UI");
+                case UiTheme.Ukiyoe: return new FontFamily("Yu Mincho, SimSun, Microsoft YaHei UI");
+                case UiTheme.Pixel: return new FontFamily("Consolas, SimSun, Microsoft YaHei UI");
+                case UiTheme.Solarpunk: return new FontFamily("Segoe UI, DengXian, Microsoft YaHei UI");
                 default: return new FontFamily("Bahnschrift, Microsoft YaHei UI");
             }
         }
@@ -536,6 +562,10 @@ namespace EnglishTypingPractice
                 case UiTheme.CassetteFuturism: return new FontFamily("Bahnschrift Condensed, SimHei, Microsoft YaHei UI");
                 case UiTheme.ArtDeco: return new FontFamily("Bahnschrift Light, DengXian, Microsoft YaHei UI");
                 case UiTheme.Atompunk: return new FontFamily("Trebuchet MS, DengXian, Microsoft YaHei UI");
+                case UiTheme.Ukiyoe: return new FontFamily("Yu Mincho, SimSun, Microsoft YaHei UI");
+                case UiTheme.Pixel: return new FontFamily(new Uri("pack://application:,,,/"),
+                    "/" + typeof(ThemeLettering).Assembly.GetName().Name + ";component/fonts/#Press Start 2P, SimHei, Microsoft YaHei UI");
+                case UiTheme.Solarpunk: return new FontFamily("Segoe UI Semibold, YouYuan, Microsoft YaHei UI");
                 default: return new FontFamily("Bahnschrift, Microsoft YaHei UI");
             }
         }
@@ -552,6 +582,7 @@ namespace EnglishTypingPractice
             if (theme == UiTheme.Persona5) return new FontFamily("Arial Narrow, Microsoft YaHei UI");
             if (theme == UiTheme.ChineseStyle) return new FontFamily("Times New Roman, KaiTi, SimSun");
             if (theme == UiTheme.CassetteFuturism) return new FontFamily("Consolas, SimHei, Microsoft YaHei UI");
+            if (theme == UiTheme.Pixel) return new FontFamily("Consolas, SimHei, Microsoft YaHei UI");
             return Family(theme);
         }
 
@@ -648,6 +679,19 @@ namespace EnglishTypingPractice
                 }
                 else if (theme == UiTheme.CassetteFuturism && title)
                     dc.DrawLine(new Pen(ink, .7), new Point(3, formatted.Height - 1), new Point(Math.Min(47, formatted.Width), formatted.Height - 1));
+                else if (theme == UiTheme.Ukiyoe && title)
+                {
+                    dc.PushOpacity(.16);
+                    dc.PushTransform(new TranslateTransform(.8, .8));
+                    dc.DrawGeometry(ink, new Pen(ink, .6), outline);
+                    dc.Pop(); dc.Pop();
+                }
+                else if (theme == UiTheme.Pixel && title)
+                {
+                    dc.PushTransform(new TranslateTransform(2, 2));
+                    dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(103, 73, 139)), null, outline);
+                    dc.Pop();
+                }
                 dc.DrawGeometry(ink, null, outline);
                 if (theme == UiTheme.Modern && title)
                     dc.DrawLine(new Pen(ink, .7), new Point(2, formatted.Height - 1), new Point(Math.Min(26, formatted.Width), formatted.Height - 1));

@@ -28,6 +28,7 @@ namespace EnglishTypingPractice
         public string Name { get; set; }
         public int Score { get; set; }
         public SnakeDirection Direction { get; set; }
+        public bool TurnPending { get; set; }
         public SnakeResult Result { get; set; }
         public int[] Body { get; set; }
         public SnakeRole Role { get; set; }
@@ -955,6 +956,7 @@ namespace EnglishTypingPractice
                     Score = territory != null ? territory.Score(slot) : power != null ? power.Contribution(slot) :
                         hotspot != null ? hotspot.Score(slot) : relay != null ? relay.Legs(relay.Team(slot)) : snake == null ? 0 : snake.Score,
                     Direction = snake == null ? SnakeDirection.North : snake.Direction,
+                    TurnPending = snake != null && snake.TurnPending,
                     Result = snake == null ? SnakeResult.Ready : snake.Result,
                     Role = Phase == MatchPhase.Playing && snake != null ? snake.Role : player.Role,
                     SkillUses = snake == null ? 0 : snake.SkillUses,

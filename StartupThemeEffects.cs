@@ -61,6 +61,29 @@ namespace EnglishTypingPractice
         private static readonly Geometry MountainNear = Geometry.Parse(
             "M-213,92 Q-193,93 -160,72 Q-142,53 -132,60 Q-121,72 -99,78 Q-76,100 -64,107 L-213,107 Z " +
             "M210,107 H84 Q102,97 121,79 Q141,72 168,55 Q184,64 210,78 Z");
+        private static readonly Brush PrintPaper = FrozenBrush(245, 233, 206);
+        private static readonly Brush PrintBlue = FrozenBrush(29, 53, 70);
+        private static readonly Brush PrintPale = FrozenBrush(130, 167, 172);
+        private static readonly Brush PrintRed = FrozenBrush(167, 60, 46);
+        private static readonly Brush PixelNight = FrozenBrush(21, 19, 41);
+        private static readonly Brush PixelHill = FrozenBrush(52, 43, 86);
+        private static readonly Brush PixelMint = FrozenBrush(126, 220, 177);
+        private static readonly Brush PixelGold = FrozenBrush(255, 211, 107);
+        private static readonly Brush SolarPaper = FrozenBrush(237, 244, 218);
+        private static readonly Brush SolarGreen = FrozenBrush(40, 108, 77);
+        private static readonly Brush SolarPale = FrozenBrush(180, 208, 159);
+        private static readonly Brush SolarGlass = FrozenBrush(190, 219, 201);
+        private static readonly Geometry PrintWave = Geometry.Parse(
+            "M-50,630 V445 C-16,367 69,343 134,360 C213,381 231,447 200,474 " +
+            "C222,408 161,385 112,402 C176,407 186,447 171,472 C127,512 69,520 44,573 " +
+            "C218,478 313,575 454,565 C691,550 820,458 1050,509 V650 H-50 Z");
+        private static readonly Geometry PrintFoam = Geometry.Parse(
+            "M-24,447 C19,376 78,365 136,382 C166,391 191,416 188,439 " +
+            "C172,414 157,409 144,411 L151,428 128,414 128,434 106,421 98,441 83,431 " +
+            "C59,432 51,448 45,461 L33,450 18,474 7,466 -8,487 Z");
+        private static readonly Geometry PrintMountain = Geometry.Parse("M548,472 L743,271 920,471 Z");
+        private static readonly Geometry PrintSnow = Geometry.Parse("M697,319 L743,271 789,324 771,316 758,332 744,316 725,332 714,322 Z");
+        private static readonly Geometry Leaf = Geometry.Parse("M0,0 C-29,-4 -42,-24 -34,-46 C-7,-43 10,-24 0,0 Z");
         private readonly UiTheme theme;
         private readonly Brush accent;
         private readonly Pen fine, bold;
@@ -117,6 +140,11 @@ namespace EnglishTypingPractice
         protected override void OnRender(DrawingContext drawing)
         {
             double t = clock.Elapsed.TotalSeconds;
+            if (theme >= UiTheme.Ukiyoe)
+            {
+                DrawNewScene(drawing, theme, t, ActualWidth, ActualHeight);
+                return;
+            }
             double scale = Math.Min(1, Math.Min(ActualWidth / 440, ActualHeight / 350));
             double arrive = Math.Min(1, t * 5);
             if (scale <= 0 || arrive <= 0)
@@ -151,6 +179,133 @@ namespace EnglishTypingPractice
             drawing.Pop();
             drawing.Pop();
             drawing.Pop();
+        }
+
+        internal static Brush CreateNewBackdrop(UiTheme theme)
+        {
+            var drawing = new DrawingGroup();
+            using (var dc = drawing.Open()) DrawNewScene(dc, theme, .45, 1000, 650);
+            drawing.Freeze();
+            var brush = new DrawingBrush(drawing) { Stretch = Stretch.Fill };
+            brush.Freeze();
+            return brush;
+        }
+
+        private static void DrawNewScene(DrawingContext dc, UiTheme theme, double t, double width, double height)
+        {
+            if (width <= 0 || height <= 0) return;
+            dc.PushClip(new RectangleGeometry(new Rect(0, 0, width, height)));
+            dc.PushTransform(new ScaleTransform(width / 1000, height / 650));
+            if (theme == UiTheme.Ukiyoe) DrawPrintScene(dc, t);
+            else if (theme == UiTheme.Pixel) DrawPixelScene(dc, t);
+            else DrawSolarScene(dc, t);
+            dc.Pop(); dc.Pop();
+        }
+
+        private static void DrawPrintScene(DrawingContext dc, double t)
+        {
+            dc.DrawRectangle(PrintPaper, null, new Rect(0, 0, 1000, 650));
+            var ink = new Pen(PrintBlue, 1.2);
+            dc.DrawRectangle(null, ink, new Rect(22, 22, 956, 606));
+            dc.DrawEllipse(PrintRed, null, new Point(792, 148), 54, 54);
+            dc.PushOpacity(.15);
+            for (int i = 0; i < 31; i++)
+                dc.DrawLine(ink, new Point(35 + i * 31, 30), new Point(35 + i * 31, 620));
+            dc.Pop();
+            dc.DrawGeometry(PrintPale, null, PrintMountain);
+            dc.DrawGeometry(PrintPaper, null, PrintSnow);
+            for (int row = 0; row < 3; row++)
+            {
+                double drift = Math.Sin(t * .7 + row) * 14;
+                dc.DrawRoundedRectangle(PrintPaper, null, new Rect(710 + drift - row * 95, 160 + row * 43, 210, 8), 4, 4);
+            }
+            dc.PushTransform(new TranslateTransform(Math.Sin(t * 1.4) * 5, 2 * Math.Sin(t)));
+            dc.DrawGeometry(PrintBlue, null, PrintWave);
+            dc.DrawGeometry(PrintPaper, null, PrintFoam);
+            for (int i = 0; i < 9; i++)
+            {
+                double x = 60 + i * 33;
+                dc.DrawEllipse(PrintPale, null, new Point(x, 497 + Math.Sin(i * .9 + t) * 20), 2, 5);
+            }
+            dc.Pop();
+            for (int line = 0; line < 5; line++)
+                dc.DrawLine(new Pen(PrintPale, 1), new Point(480 + line * 12, 592 + line * 7), new Point(927, 554 + line * 14));
+        }
+
+        private static void DrawPixelScene(DrawingContext dc, double t)
+        {
+            dc.DrawRectangle(PixelNight, null, new Rect(0, 0, 1000, 650));
+            for (int i = 0; i < 37; i++)
+            {
+                int x = (i * 137 + 29) % 980;
+                int y = (i * 73 + 31) % 190;
+                dc.PushOpacity(.3 + .5 * ((i + (int)(t * 3)) % 3) / 2.0);
+                dc.DrawRectangle(PixelGold, null, new Rect(x, y, 4, 4));
+                dc.Pop();
+            }
+            for (int i = 0; i < 20; i++)
+            {
+                int height = 36 + ((i * 41) % 85);
+                dc.DrawRectangle(PixelHill, null, new Rect(i * 52, 528 - height, 56, height));
+            }
+            dc.DrawRectangle(PixelMint, null, new Rect(0, 526, 1000, 6));
+            for (int i = 0; i < 25; i++)
+                dc.DrawRectangle(i % 2 == 0 ? PixelHill : PixelNight, null, new Rect(i * 40, 548, 36, 24));
+            // A typed-command snake sprite, built on a fixed pixel grid.
+            int hop = ((int)(t * 8) % 2) * 8;
+            for (int i = 0; i < 6; i++)
+                dc.DrawRectangle(PixelMint, null, new Rect(405 + i * 24, 472 + (i == 5 ? -hop : 0), 20, 20));
+            dc.DrawRectangle(PixelNight, null, new Rect(533, 476 - hop, 4, 4));
+            dc.DrawRectangle(PixelGold, null, new Rect(582, 472 - hop, 12, 20));
+            dc.DrawRectangle(PixelGold, null, new Rect(578, 476 - hop, 20, 12));
+            var edge = new Pen(PixelHill, 4);
+            dc.DrawRectangle(null, edge, new Rect(27, 25, 946, 598));
+        }
+
+        private static void DrawSolarScene(DrawingContext dc, double t)
+        {
+            dc.DrawRectangle(SolarPaper, null, new Rect(0, 0, 1000, 650));
+            dc.DrawEllipse(PixelGold, null, new Point(500, 120), 38, 38);
+            for (int i = 0; i < 12; i++)
+            {
+                double angle = i * Math.PI / 6;
+                dc.DrawLine(new Pen(PixelGold, 2), new Point(500 + Math.Cos(angle) * 48, 120 + Math.Sin(angle) * 48),
+                    new Point(500 + Math.Cos(angle) * 57, 120 + Math.Sin(angle) * 57));
+            }
+            for (int side = 0; side < 2; side++)
+            {
+                if (side == 1) dc.PushTransform(new ScaleTransform(-1, 1, 500, 325));
+                dc.DrawRoundedRectangle(SolarGlass, new Pen(SolarGreen, 1.4), new Rect(28, 345, 217, 268), 62, 62);
+                for (int deck = 0; deck < 4; deck++)
+                {
+                    double y = 384 + deck * 59;
+                    dc.DrawRoundedRectangle(SolarPale, null, new Rect(17, y, 236, 13), 6, 6);
+                    dc.DrawLine(new Pen(SolarGreen, 1), new Point(45, y + 31), new Point(229, y + 31));
+                    for (int plant = 0; plant < 5; plant++)
+                    {
+                        dc.PushTransform(new TranslateTransform(50 + plant * 39, y + 2));
+                        dc.PushTransform(new ScaleTransform(.46, .46));
+                        dc.PushTransform(new RotateTransform(Math.Sin(t + deck + plant) * 4));
+                        dc.DrawGeometry(SolarGreen, null, Leaf);
+                        dc.Pop(); dc.Pop(); dc.Pop();
+                    }
+                }
+                dc.DrawLine(new Pen(SolarGreen, 3), new Point(162, 344), new Point(162, 219));
+                dc.PushTransform(new TranslateTransform(162, 218));
+                dc.PushTransform(new RotateTransform(t * 32));
+                for (int blade = 0; blade < 3; blade++)
+                {
+                    dc.DrawRoundedRectangle(SolarGreen, null, new Rect(-2, -37, 4, 38), 2, 2);
+                    dc.PushTransform(new RotateTransform(120));
+                }
+                for (int pop = 0; pop < 5; pop++) dc.Pop();
+                if (side == 1) dc.Pop();
+            }
+            dc.DrawRoundedRectangle(SolarPale, null, new Rect(0, 608, 1000, 42), 0, 0);
+            dc.DrawLine(new Pen(SolarGreen, 1), new Point(253, 564), new Point(747, 564));
+            double cabin = 450 + Math.Sin(t * .55) * 100;
+            dc.DrawRoundedRectangle(SolarGlass, new Pen(SolarGreen, 1.4), new Rect(cabin, 538, 70, 24), 8, 8);
+            dc.DrawLine(new Pen(SolarGreen, 1), new Point(cabin + 35, 538), new Point(cabin + 35, 526));
         }
 
         private void DrawSteam(DrawingContext drawing, double t)
@@ -551,6 +706,18 @@ namespace EnglishTypingPractice
                     else if (theme == UiTheme.Atompunk)
                         sample = Glide(t, 235 * root, 1050, .155) * .26 + Glide(t - .142, 740 * root, -370, .080) * .19 +
                             Tone(t - .255, 1120 * root, .085) * .16 + Tone(t - .299, 1480 * root, .079) * .12;
+                    else if (theme == UiTheme.Ukiyoe)
+                        sample = ThemedTypingAudio.Woodblock(t, 640) * .23 +
+                            ThemedTypingAudio.Woodblock(t - .10, 850) * .20 +
+                            Zither(t - .18, 440 * root) * .18 + Zither(t - .29, 659.3 * root) * .15;
+                    else if (theme == UiTheme.Pixel)
+                        sample = ThemedTypingAudio.Chip(t, 523.25 * root, .038) * .17 +
+                            ThemedTypingAudio.Chip(t - .086, 659.25 * root, .042) * .17 +
+                            ThemedTypingAudio.Chip(t - .172, 783.99 * root, .05) * .17 +
+                            ThemedTypingAudio.Chip(t - .258, 1046.5 * root, .065) * .16;
+                    else if (theme == UiTheme.Solarpunk)
+                        sample = Zither(t, 329.6 * root) * .18 + SoftSynth(t - .074, 493.9 * root) * .12 +
+                            Zither(t - .16, 659.3 * root) * .17 + SoftSynth(t - .253, 987.8 * root) * .11;
                     else
                         sample = Tone(t, 230 * root, .10) * .19 + Tone(t - .075, 413 * root, .11) * .14 +
                             Tone(t - .19, 620 * root, .11) * .12;
