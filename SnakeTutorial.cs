@@ -86,7 +86,8 @@ namespace EnglishTypingPractice
             {
                 completeAfterMove = role == SnakeRole.Timewalker ? extraMoves > 0 :
                     role == SnakeRole.Navigator ? letters == SnakeWords.NavigatorShortLengthFor(SnakeMode.Classic) :
-                    (role == SnakeRole.Standard || role == SnakeRole.Timid) && turned;
+                    (role == SnakeRole.Standard || role == SnakeRole.Timid || role == SnakeRole.Echo ||
+                        role == SnakeRole.Cornerer) && turned;
                 SetMoving(true);
             }
         }
@@ -204,6 +205,8 @@ namespace EnglishTypingPractice
                 case SnakeRole.Timid: return "胆怯者练习　试试用 5–6 字母的词再转一次弯。";
                 case SnakeRole.Navigator: return "领航者练习　继续打词转向，直到出现并打完一个 4 字母短词。";
                 case SnakeRole.Collector: return "采集者练习　观察蛇吃下前方的小果，得分增加 14 分。";
+                case SnakeRole.Echo: return "回响者练习　打出一个可用的 7 字母方向词，观察词组每两次有效转向才更换。";
+                case SnakeRole.Cornerer: return "疾转者练习　打出另一个方向词，观察转向后更快迈出下一步；加速有 2 秒冷却。";
                 default: return SnakeWords.HasSkill(role)
                     ? SnakeWords.RoleName(role) + "练习　按 Tab 切换到技能框，照着提示打完技能词。"
                     : "平凡者练习　打出另一个可用方向词，完成一次连续转向。";

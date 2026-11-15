@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace EnglishTypingPractice
 {
     internal enum SnakeDirection { North, East, South, West }
-    internal enum SnakeResult { Ready, Running, Wall, Body, Won, Left, Rival, Survived, Obstacle, TimeUp, Skill }
+    internal enum SnakeResult { Ready, Running, Wall, Body, Won, Left, Rival, Survived, Obstacle, TimeUp, Skill, Pulse }
 
     internal sealed class SnakeGame
     {
@@ -46,6 +46,8 @@ namespace EnglishTypingPractice
         private double carrySpeed = 1;
         private bool sprintHeld;
         private int carried;
+        private int echoUses;
+        private long cornererReadyAt;
 
         internal int Size { get; private set; }
         internal int Score { get; private set; }
@@ -69,6 +71,9 @@ namespace EnglishTypingPractice
         internal SnakeDirection Opposite { get { return (SnakeDirection)(((int)Direction + 2) % 4); } }
         internal bool TurnPending { get { return Direction != movement || ExtraMoves > 0; } }
         internal bool IsRunning { get { return Result == SnakeResult.Running; } }
+        internal int EchoUsesRemaining { get { return Role == SnakeRole.Echo && IsRunning ? 2 - echoUses : 0; } }
+        internal int CornererCooldownRemaining(long now) { return Role == SnakeRole.Cornerer && IsRunning ? (int)Math.Min(2000, Math.Max(0, cornererReadyAt - now)) : 0; }
+        internal double NextMoveTime(long now) { return Math.Max(MovementDeadline(now), stunUntil); }
         internal LinkedList<int> Body { get { return body; } }
         internal HashSet<int> Obstacles { get; private set; }
         internal SnakeBounds Bounds { get; private set; }
@@ -127,6 +132,8 @@ namespace EnglishTypingPractice
             Direction = movement = direction;
             Result = SnakeResult.Running;
             ExtraMoves = 0;
+            echoUses = 0;
+            cornererReadyAt = 0;
             body.Clear();
             occupied.Clear();
             int offset = Offset(direction);
@@ -156,17 +163,30 @@ namespace EnglishTypingPractice
             if (balancedTimewalker)
                 Score += direction != Direction ? TimewalkerTurnPoints : 0;
             else if (mode == SnakeMode.Classic || mode == SnakeMode.Obstacles)
-                Score += Role == SnakeRole.Navigator ? NavigatorTurnPoints :
+                Score += Role == SnakeRole.Echo ? 6 : Role == SnakeRole.Navigator ? NavigatorTurnPoints :
                     Role == SnakeRole.Collector ? CollectorTurnPoints : words[index].Length;
             else
                 Score += words[index].Length;
             LastWord = words[index];
             WordCount++;
             if (direction != Direction)
+            {
                 Turns++;
+                if (Role == SnakeRole.Cornerer && now >= cornererReadyAt)
+                {
+                    nextMoveAt = now + Math.Max(0, nextMoveAt - now) / 2;
+                    cornererReadyAt = now + 2000;
+                }
+            }
             Direction = direction;
             ExtraMoves = variant * (balancedTimewalker ? 1 : 2);
-            DrawWords();
+            if (Role == SnakeRole.Echo && ++echoUses < 2)
+                WordGroup++;
+            else
+            {
+                echoUses = 0;
+                DrawWords();
+            }
             return true;
         }
 
@@ -264,6 +284,8 @@ namespace EnglishTypingPractice
         {
             if (Role == SnakeRole.Timid)
                 return MoveInterval / (0.85 * speed * carrySpeed);
+            if (Role == SnakeRole.Cornerer)
+                return MoveInterval / (0.95 * speed * carrySpeed);
             if (Role == SnakeRole.Fearless)
                 return (IsCharging(now) ? 110 : MoveInterval / FearlessBaseSpeed(mode)) / (speed * carrySpeed);
             return MoveInterval / (speed * carrySpeed * (IsStabilizing(now) ? StabilizerSpeedFor(mode) : 1));

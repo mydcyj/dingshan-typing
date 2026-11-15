@@ -491,6 +491,20 @@ namespace EnglishTypingPractice
                 }
                 return;
             }
+            if (state.Phase != MatchPhase.Lobby && state.Mode == SnakeMode.Pulse)
+            {
+                var players = state.Phase == MatchPhase.Finished ? state.Rankings : state.Players;
+                roster.Text = (state.Phase == MatchPhase.Finished
+                    ? (state.PulseWon ? "脉冲回廊共同通关" : "脉冲回廊挑战失败") + " · 合作记录"
+                    : state.Room + " · 第 " + state.PulseWave + "/12 波 · 复活储备 " + state.PulseLives) +
+                    "\n" + string.Join("\n", players.Select(player => PlayerLabel(player, slot) +
+                        " · 通过 " + player.PulseSurvived + " 波 · 死亡 " + player.PulseDeaths +
+                        " 次 · 转向 " + player.Turns + " 次" +
+                        (state.ReconnectingSlots.Contains(player.Slot) ? " · 重连中" :
+                            player.RespawnRemaining > 0 ? " · 等待复活" :
+                            player.Result == SnakeResult.Running || state.Phase == MatchPhase.Finished ? "" : " · 已出局")));
+                return;
+            }
             if (state.Phase != MatchPhase.Lobby && (state.Mode == SnakeMode.Race || state.Mode == SnakeMode.Power))
             {
                 var players = state.Phase == MatchPhase.Finished ? state.Rankings : state.Players;

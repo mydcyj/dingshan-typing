@@ -881,6 +881,7 @@ namespace EnglishTypingPractice
                     state.Mode == SnakeMode.Power ? state.Size != SnakePower.Size :
                     state.Mode == SnakeMode.Hotspot ? state.Size != SnakeHotspot.Size :
                     state.Mode == SnakeMode.Relay ? state.Size != SnakeRelay.Size :
+                    state.Mode == SnakeMode.Pulse ? state.Size != SnakePulse.Size :
                     state.Mode == SnakeMode.Teams ? state.Size != SnakeTeams.Size : state.Size < 32 ||
                     state.Size > 80 || (state.Size - 32) % 16 != 0) || !Enum.IsDefined(typeof(MatchPhase), state.Phase) ||
                 !Enum.IsDefined(typeof(SnakeMode), state.Mode) || !Enum.IsDefined(typeof(SnakeMode), state.NextMode) ||
@@ -922,6 +923,19 @@ namespace EnglishTypingPractice
             bool power = state.Mode == SnakeMode.Power && state.Phase != MatchPhase.Lobby;
             bool hotspot = state.Mode == SnakeMode.Hotspot && state.Phase != MatchPhase.Lobby;
             bool relay = state.Mode == SnakeMode.Relay && state.Phase != MatchPhase.Lobby;
+            bool pulse = state.Mode == SnakeMode.Pulse && state.Phase != MatchPhase.Lobby;
+            if (state.PulseCells == null || state.PulseCells.Length > 6 * SnakePulse.Size ||
+                state.PulseWave < (pulse ? 1 : 0) || state.PulseWave > (pulse ? SnakePulse.WaveCount : 0) ||
+                state.PulsePhase < 0 || state.PulsePhase > (pulse ? 2 : 0) ||
+                state.PulsePhaseRemaining < 0 || state.PulsePhaseRemaining > (pulse ? SnakePulse.WaveLength : 0) ||
+                state.PulseLives < 0 || state.PulseLives > (pulse ? 8 : 0) ||
+                (state.PulseWon && (!pulse || state.Phase != MatchPhase.Finished || state.Remaining != 0)) ||
+                (state.PulsePhase == 0 ? state.PulseCells.Length != 0 : state.PulseCells.Length == 0) ||
+                state.PulseCells.Distinct().Count() != state.PulseCells.Length ||
+                state.PulseCells.Any(cell => cell < 0 || cell >= cells))
+                return false;
+            if (pulse && state.PulsePhase != 0 && !ValidPulsePattern(state))
+                return false;
             if (state.HotspotTarget < -1 || state.HotspotTarget >= cells || state.HotspotUpcoming < -1 || state.HotspotUpcoming >= cells ||
                 (!hotspot && (state.HotspotTarget != -1 || state.HotspotUpcoming != -1)) ||
                 state.RelayTarget < -1 || state.RelayTarget >= cells || (!relay && state.RelayTarget != -1) ||
@@ -945,7 +959,8 @@ namespace EnglishTypingPractice
                     return false;
             if (state.Obstacles == null || state.Obstacles.Length > cells ||
                 state.Remaining < 0 || state.Remaining > (teams ? SnakeTeams.Duration : race ? SnakeRace.Duration :
-                    power ? SnakePower.Duration : territory ? SnakeTerritory.Duration : hotspot ? SnakeHotspot.Duration : relay ? SnakeRelay.Duration : 0) ||
+                    power ? SnakePower.Duration : territory ? SnakeTerritory.Duration : hotspot ? SnakeHotspot.Duration :
+                    relay ? SnakeRelay.Duration : pulse ? SnakePulse.Duration : 0) ||
                 (territory ? state.Land == null || state.Trails == null ||
                     state.Land.Length != cells || state.Trails.Length != cells
                     : state.Land != null || state.Trails != null))
@@ -959,6 +974,9 @@ namespace EnglishTypingPractice
                     return false;
             if (state.SmallFruits == null || state.SmallFruits.Length > 4 ||
                 state.LargeFruit < -1 || state.LargeFruit >= cells)
+                return false;
+            if (pulse && (state.SmallFruits.Length != 0 || state.LargeFruit != -1 || state.Obstacles.Length != 0 ||
+                state.SafeStart != 0 || state.SafeEnd != SnakePulse.Size || state.Shots.Length != 0 || state.Bursts.Length != 0))
                 return false;
             var fruitCells = new HashSet<int>();
             if (state.LargeFruit >= 0)
@@ -983,7 +1001,15 @@ namespace EnglishTypingPractice
                 if (player.Team < -1 || player.Team >= (relay ? 2 : state.TeamCount) || player.Carrying < 0 ||
                     player.Carrying > state.TeamBalls.Length || player.RespawnRemaining < 0 ||
                     player.RespawnRemaining > (teams ? SnakeTeams.RespawnDelay : power ? SnakePower.RespawnDelay :
-                        hotspot ? SnakeHotspot.RespawnDelay : relay ? SnakeRelay.RespawnDelay : 0))
+                        hotspot ? SnakeHotspot.RespawnDelay : relay ? SnakeRelay.RespawnDelay : pulse ? SnakePulse.RespawnDelay : 0))
+                    return false;
+                if (player.PulseSurvived < 0 || player.PulseSurvived > (pulse ? state.PulseWave : 0) ||
+                    player.PulseDeaths < 0 || player.PulseDeaths > (pulse ? 9 : 0) ||
+                    player.EchoUsesRemaining < 0 || player.EchoUsesRemaining > 2 ||
+                    (player.Role == SnakeRole.Echo && player.Result == SnakeResult.Running
+                        ? player.EchoUsesRemaining == 0 : player.EchoUsesRemaining != 0) ||
+                    player.CornererCooldownRemaining < 0 || player.CornererCooldownRemaining > 2000 ||
+                    ((player.Role != SnakeRole.Cornerer || player.Result != SnakeResult.Running) && player.CornererCooldownRemaining != 0))
                     return false;
                 if (!SnakeTypingPreview.IsValidText(player.Typing, player.TypingSkill) ||
                     (player.TypingSkill && !SnakeWords.HasSkill(player.Role, state.Mode)))
@@ -1023,6 +1049,33 @@ namespace EnglishTypingPractice
                 state.BotSlots.Distinct().Count() == state.BotSlots.Length &&
                 state.BotSlots.All(item => item != 0 && slots.Contains(item) && state.ReadySlots.Contains(item) && !state.ReconnectingSlots.Contains(item)) &&
                 state.ReconnectingSlots.All(item => item != 0 && slots.Contains(item));
+        }
+
+        private static bool ValidPulsePattern(SnakeMatchState state)
+        {
+            int count = 1 + (state.PulseWave - 1) / 4;
+            if (state.PulseCells.Length != 2 * count * SnakePulse.Size - count * count)
+                return false;
+            var rows = new int[SnakePulse.Size];
+            var columns = new int[SnakePulse.Size];
+            foreach (int cell in state.PulseCells)
+            {
+                rows[cell / SnakePulse.Size]++;
+                columns[cell % SnakePulse.Size]++;
+            }
+            foreach (var axis in new[] { rows, columns })
+            {
+                int lanes = 0, previous = -6;
+                for (int i = 0; i < axis.Length; i++)
+                    if (axis[i] == SnakePulse.Size)
+                    {
+                        if (i - previous < 6) return false;
+                        previous = i;
+                        lanes++;
+                    }
+                if (lanes != count) return false;
+            }
+            return true;
         }
 
         public void Dispose()

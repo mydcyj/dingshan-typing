@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace EnglishTypingPractice
 {
-    internal enum SnakeRole { Standard, Timewalker, Timid, Fearless, Hunter, Bard, Navigator, Collector, Stabilizer }
+    internal enum SnakeRole { Standard, Timewalker, Timid, Fearless, Hunter, Bard, Navigator, Collector, Stabilizer, Echo, Cornerer }
 
     internal static class SnakeWords
     {
@@ -82,7 +82,7 @@ namespace EnglishTypingPractice
                 length = completedWords % (NavigatorLongTurns + 1) == NavigatorLongTurns ? NavigatorShortLengthFor(mode) :
                     random.Next(NavigatorMinLengthFor(mode), NavigatorMaxLengthFor(mode) + 1);
             else
-                length = role == SnakeRole.Timid ? random.Next(5, 7) : role == SnakeRole.Timewalker ? 6 : 6 + random.Next(2);
+                length = role == SnakeRole.Echo ? 7 : role == SnakeRole.Timid ? random.Next(5, 7) : role == SnakeRole.Timewalker ? 6 : 6 + random.Next(2);
             int variants = Variants(role);
             var words = new string[4 * variants];
             for (int variant = 0; variant < variants; variant++)
@@ -107,7 +107,7 @@ namespace EnglishTypingPractice
 
         internal static bool HasSkill(SnakeRole role, SnakeMode mode)
         {
-            return HasSkill(role) && ((mode != SnakeMode.Race && mode != SnakeMode.Power && mode != SnakeMode.Relay) ||
+            return HasSkill(role) && ((mode != SnakeMode.Race && mode != SnakeMode.Power && mode != SnakeMode.Relay && mode != SnakeMode.Pulse) ||
                 (role != SnakeRole.Hunter && role != SnakeRole.Bard));
         }
 
@@ -146,6 +146,8 @@ namespace EnglishTypingPractice
                 case SnakeRole.Navigator: return "领航者";
                 case SnakeRole.Collector: return "采集者";
                 case SnakeRole.Stabilizer: return "稳行者";
+                case SnakeRole.Echo: return "回响者";
+                case SnakeRole.Cornerer: return "疾转者";
                 default: return "平凡者";
             }
         }

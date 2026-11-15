@@ -467,7 +467,7 @@ namespace EnglishTypingPractice
                     "请选择至少 1 个人机，或创建局域网房间。";
                 return;
             }
-            if (opponents > 0 || SelectedMode == SnakeMode.Race || SelectedMode == SnakeMode.Territory ||
+            if (opponents > 0 || SelectedMode == SnakeMode.Race || SelectedMode == SnakeMode.Territory || SelectedMode == SnakeMode.Pulse ||
                 SelectedRole == SnakeRole.Hunter || SelectedRole == SnakeRole.Bard)
             {
                 soloMatch = new SnakeMatch("你", SelectedRole, solo: opponents == 0, soloClassicSize: SelectedMapSize);
@@ -560,7 +560,7 @@ namespace EnglishTypingPractice
         {
             botCount.IsEnabled = botDifficulty.IsEnabled = !game.IsRunning;
             bool territory = SelectedMode == SnakeMode.Territory;
-            int size = SelectedMode == SnakeMode.Teams ? SnakeTeams.Size :
+            int size = SelectedMode == SnakeMode.Pulse ? SnakePulse.Size : SelectedMode == SnakeMode.Teams ? SnakeTeams.Size :
                 SelectedMode == SnakeMode.Race ? SnakeRace.Size : SelectedMode == SnakeMode.Power ? SnakePower.Size :
                 SelectedMode == SnakeMode.Hotspot ? SnakeHotspot.Size : SelectedMode == SnakeMode.Relay ? SnakeRelay.Size :
                 SelectedMode == SnakeMode.Classic && game.Result == SnakeResult.Ready ? SelectedMapSize : game.Size;
@@ -569,11 +569,13 @@ namespace EnglishTypingPractice
             var role = game.IsRunning ? game.Role : SelectedRole;
             ShowWords(game.IsRunning, game.Direction, game.Words, role);
             ShowRole(role, SelectedMode, game.IsRunning, game.IsCharging(clock.ElapsedMilliseconds),
-                game.IsStabilizing(clock.ElapsedMilliseconds), game.StabilizerCooldownRemaining(clock.ElapsedMilliseconds), 0, game.ChargeWord);
+                game.IsStabilizing(clock.ElapsedMilliseconds), game.StabilizerCooldownRemaining(clock.ElapsedMilliseconds), 0, game.ChargeWord,
+                game.EchoUsesRemaining, game.CornererCooldownRemaining(clock.ElapsedMilliseconds));
             fruitLegend.Visibility = Visibility.Collapsed;
             scoreLabel.Text = territory ? "占地格数" : "分数";
             string fruitScore = "吃果 +" + (role == SnakeRole.Collector ? SnakeGame.CollectorSmallFruitPoints : SnakeGame.SmallFruitPoints);
-            scoreGuide.Text = SelectedMode == SnakeMode.Hotspot ? "2–4 人 · 独占热点得分" :
+            scoreGuide.Text = SelectedMode == SnakeMode.Pulse ? "1–4 人合作 · 12 波 / 3 分钟 · 躲避通电线" :
+                SelectedMode == SnakeMode.Hotspot ? "2–4 人 · 独占热点得分" :
                 SelectedMode == SnakeMode.Relay ? "4 人 · 每队交接完成四棒" :
                 SelectedMode == SnakeMode.Race ? "单人计时 · 依次通过 6 个检查点 · 最佳 " + RaceBest(role) :
                 SelectedMode == SnakeMode.Power ? "2–4 人联机合作 · 在供电区内打词转向" :
@@ -589,10 +591,12 @@ namespace EnglishTypingPractice
             }, SelectedMode == SnakeMode.Obstacles ? game.Obstacles.ToArray() : null,
                 safeStart: game.Bounds.Start, safeEnd: size == game.Size ? game.Bounds.End : size);
             board.SetObjectives(-1, new PowerStation[0], -1, -1, -1);
+            board.SetPulse(new int[0], 0, 0);
             UpdateOverview(size);
             objectiveMapText.Visibility = Visibility.Collapsed;
             PublishTyping(false);
             score.Text = (territory ? 0 : game.Score).ToString(CultureInfo.CurrentCulture);
+            recap.Header = "本局复盘";
             recap.Visibility = game.Result == SnakeResult.Wall || game.Result == SnakeResult.Body ||
                 game.Result == SnakeResult.Obstacle || game.Result == SnakeResult.Won ? Visibility.Visible : Visibility.Collapsed;
             if (recap.Visibility == Visibility.Visible)
@@ -634,6 +638,8 @@ namespace EnglishTypingPractice
 
         private static string WordScoreGuide(SnakeRole role, SnakeMode mode)
         {
+            if (role == SnakeRole.Echo && (mode == SnakeMode.Classic || mode == SnakeMode.Obstacles))
+                return "转向固定 +6";
             if (role == SnakeRole.Navigator)
                 return "转向固定 +" + SnakeGame.NavigatorTurnPoints;
             if (role == SnakeRole.Collector)
@@ -644,7 +650,7 @@ namespace EnglishTypingPractice
         }
 
         private void ShowRole(SnakeRole role, SnakeMode mode, bool running, bool charging, bool stabilizing,
-            int stabilizerCooldown, int stun, string special)
+            int stabilizerCooldown, int stun, string special, int echoUses, int cornererCooldown)
         {
             rolePicker.IsEnabled = !running && (online == null || online.Phase != MatchPhase.Playing);
             modePicker.IsEnabled = rolePicker.IsEnabled && (online == null || ownSlot == 0);
@@ -679,6 +685,13 @@ namespace EnglishTypingPractice
                         SnakeGame.StabilizerDurationFor(mode) / 1000.0, SnakeGame.StabilizerSpeedFor(mode));
                     if (SnakeGame.StabilizerSkillPointsFor(mode) > 0)
                         guide += " · 技能 +" + SnakeGame.StabilizerSkillPointsFor(mode);
+                    break;
+                case SnakeRole.Echo:
+                    guide = "7 字母 · 每组词可转向两次" + (running ? " · 本组剩 " + echoUses + " 次" : "");
+                    break;
+                case SnakeRole.Cornerer:
+                    guide = "95% 移速 · 疾转缩短下一步等待" + (running ? cornererCooldown > 0
+                        ? " · 冷却 " + (cornererCooldown / 1000.0).ToString("0.0") + " 秒" : " · 疾转就绪" : " · 冷却 2 秒");
                     break;
                 default: guide = ""; break;
             }
@@ -1002,11 +1015,12 @@ namespace EnglishTypingPractice
             bool power = state.Mode == SnakeMode.Power;
             bool hotspot = state.Mode == SnakeMode.Hotspot;
             bool relay = state.Mode == SnakeMode.Relay;
+            bool pulse = state.Mode == SnakeMode.Pulse;
             bool handoff = relay && state.RelayHandoffWord != null && state.Phase == MatchPhase.Playing;
-            if ((state.Mode == SnakeMode.Teams || power || hotspot || relay) && state.Phase == MatchPhase.Playing && !running)
+            if ((state.Mode == SnakeMode.Teams || power || hotspot || relay || pulse) && state.Phase == MatchPhase.Playing && !running)
                 status.Text = own.RespawnRemaining > 0
-                    ? "复活倒计时 " + ((own.RespawnRemaining + 999) / 1000) + " 秒"
-                    : relay ? "等待队友完成这一棒。" : "正在寻找复活位置。";
+                    ? own.RespawnRemaining == 1 ? "正在寻找安全复活位置。" : "复活倒计时 " + ((own.RespawnRemaining + 999) / 1000) + " 秒"
+                    : pulse ? "复活机会已耗尽，继续为队友观战。" : relay ? "等待队友完成这一棒。" : "正在寻找复活位置。";
             command.IsReadOnly = state.Phase == MatchPhase.Playing ? !handoff && (!running || own.StunRemaining > 0) : slot != 0;
             if (handoff)
             {
@@ -1023,6 +1037,10 @@ namespace EnglishTypingPractice
                 status.Text = (state.PowerWon ? "四区供电成功。" : "供电未完成。") +
                     (soloMatch != null ? " 输入 start 再开一局。" :
                         slot == 0 ? " 点击「返回准备」再开一局。" : " 等待房主返回准备。");
+            if (pulse && state.Phase == MatchPhase.Finished)
+                status.Text = (state.PulseWon ? "全队撑过十二波，共同通关！" : "全队已无可用复活，本次挑战结束。") +
+                    (soloMatch != null ? " 输入 start 再开一局。" :
+                        slot == 0 ? " 点击「返回准备」再开一局。" : " 等待房主返回准备。");
             if (soloMatch != null)
                 botCount.IsEnabled = botDifficulty.IsEnabled = state.Phase != MatchPhase.Playing;
             if (restoreCommandFocus && !command.IsKeyboardFocused)
@@ -1030,9 +1048,11 @@ namespace EnglishTypingPractice
             ShowWords(running, own.Direction, state.Words, own.Role);
             ShowRole(state.Phase == MatchPhase.Playing ? own.Role : SelectedRole,
                 state.Phase == MatchPhase.Playing ? state.Mode : state.NextMode, running,
-                own.Charging, own.Stabilizing, own.StabilizerCooldownRemaining, own.StunRemaining, state.ChargeWord);
+                own.Charging, own.Stabilizing, own.StabilizerCooldownRemaining, own.StunRemaining, state.ChargeWord,
+                own.EchoUsesRemaining, own.CornererCooldownRemaining);
             bool teams = state.Mode == SnakeMode.Teams;
-            score.Text = relay ? (own.Team < 0 ? "0" : state.RelayTeams[own.Team].Legs.ToString()) + "/" + SnakeRelay.LegCount :
+            score.Text = pulse ? own.PulseSurvived + "/" + SnakePulse.WaveCount :
+                relay ? (own.Team < 0 ? "0" : state.RelayTeams[own.Team].Legs.ToString()) + "/" + SnakeRelay.LegCount :
                 race ? own.RaceProgress + "/" + SnakeRace.CheckpointCount : power ?
                 state.PowerStations.Sum(item => item.Charge) + "/" + state.PowerStations.Sum(item => item.Required) :
                 (teams && own.Team >= 0 ? state.TeamScores[own.Team] : own.Score).ToString(CultureInfo.CurrentCulture);
@@ -1040,12 +1060,14 @@ namespace EnglishTypingPractice
             int side = state.SafeEnd - state.SafeStart;
             boardSize.Text = side + " × " + side + " 格";
             bool territory = state.Mode == SnakeMode.Territory;
-            scoreLabel.Text = relay ? "本队棒数" : hotspot ? "热点积分" : race ? "检查点" : power ? "全队供电" : teams ? "本队小球" : territory ? "占地格数" : "分数";
-            fruitLegend.Visibility = territory || teams || race || power || relay || hotspot || soloMatch != null ? Visibility.Collapsed : Visibility.Visible;
+            scoreLabel.Text = pulse ? "个人通过波次" : relay ? "本队棒数" : hotspot ? "热点积分" : race ? "检查点" : power ? "全队供电" : teams ? "本队小球" : territory ? "占地格数" : "分数";
+            fruitLegend.Visibility = territory || teams || race || power || relay || hotspot || pulse || soloMatch != null ? Visibility.Collapsed : Visibility.Visible;
             smallFruitLegend.Text = " 小果 +" + (own.Role == SnakeRole.Collector ? SnakeGame.CollectorSmallFruitPoints : SnakeGame.SmallFruitPoints) + "　";
             largeFruitLegend.Text = " 大果 +" + (own.Role == SnakeRole.Collector ? SnakeGame.CollectorLargeFruitPoints : SnakeMatch.LargeFruitPoints);
             int seconds = (state.Remaining + 999) / 1000;
-            scoreGuide.Text = hotspot ? (state.Phase == MatchPhase.Lobby ? "独占热点时得分" : "剩余 " + seconds + " 秒 · 独占热点时得分") : relay ?
+            scoreGuide.Text = pulse ? (state.Phase == MatchPhase.Lobby ? "1–4 人合作 · 12 波 / 3 分钟" :
+                "剩余 " + seconds / 60 + ":" + (seconds % 60).ToString("00") + " · 第 " + state.PulseWave + "/12 波 · 共享复活 " + state.PulseLives + " 次") :
+                hotspot ? (state.Phase == MatchPhase.Lobby ? "独占热点时得分" : "剩余 " + seconds + " 秒 · 独占热点时得分") : relay ?
                 state.Phase == MatchPhase.Finished ? "接力结束" : state.Phase == MatchPhase.Lobby ? "四人 · 两队 · 四棒" :
                 "剩余 " + seconds + " 秒 · " + (handoff ? "轮到你接棒" : running ? "前往当前交接区" : "队友接力中") :
                 race ? (state.Phase == MatchPhase.Lobby ? "依次通过 6 个检查点" :
@@ -1067,12 +1089,17 @@ namespace EnglishTypingPractice
                 state.Trails, state.SafeStart, state.SafeEnd, state.Shots, state.Bursts,
                 state.TeamCount, state.TeamBalls, soloMatch == null || state.BotSlots.Length != 0);
             board.SetObjectives(state.RaceTarget, state.PowerStations, state.HotspotTarget, state.HotspotUpcoming, state.RelayTarget);
-            objectiveMapText.Text = hotspot ? (state.HotspotUpcoming >= 0 ? "黄框当前 · 珊瑚色下一处" : "黄框为当前热点") :
+            board.SetPulse(state.PulseCells, state.PulsePhase, state.PulsePhaseRemaining);
+            objectiveMapText.Text = pulse ? (state.Phase == MatchPhase.Finished ?
+                (state.PulseWon ? "共同通关 · 十二波完成" : "挑战结束 · 再来一局") :
+                (state.PulsePhase == 1 ? "预警" : state.PulsePhase == 2 ? "通电" : "间歇") + " " +
+                    (state.PulsePhaseRemaining / 1000.0).ToString("0.0") + " 秒\n黄虚线可穿过 · 红实线避开\n仅判蛇头 · 队友可穿过") :
+                hotspot ? (state.HotspotUpcoming >= 0 ? "黄框当前 · 珊瑚色下一处" : "黄框为当前热点") :
                 relay ? string.Join("\n", state.RelayTeams.Select((team, i) => "队伍 " + (i + 1) + " · " + team.Legs + "/4 棒")) :
                 race ? string.Join("\n", state.Players.Select(player => player.Name + " " + RaceResult(player))) :
                 power ? string.Join("\n", state.PowerStations.Select((station, index) => (index + 1) + " 号站 " + station.Charge + "/" + station.Required +
                     (station.Offline ? " · 停站" : station.Upcoming ? " · 即将停站" : ""))) : "";
-            objectiveMapText.Visibility = (race || power || hotspot || relay) && state.Phase != MatchPhase.Lobby ? Visibility.Visible : Visibility.Collapsed;
+            objectiveMapText.Visibility = (race || power || hotspot || relay || pulse) && state.Phase != MatchPhase.Lobby ? Visibility.Visible : Visibility.Collapsed;
             UpdateOverview(size);
             PublishTyping(false);
             UpdateMusic(state.Phase == MatchPhase.Playing && soloMatch != null);
@@ -1086,6 +1113,8 @@ namespace EnglishTypingPractice
                     status.Text = "刷新个人最佳 · " + RaceTime(own.RaceFinishMs);
                 }
                 recapText.Text = FormatRecap(state.Mode, own);
+                if (pulse)
+                    recapText.Text = string.Join("\n", state.Rankings.Select(player => player.Name + " · " + FormatRecap(state.Mode, player)));
                 if (relay && own.Team >= 0)
                 {
                     var team = state.RelayTeams[own.Team];
@@ -1093,6 +1122,7 @@ namespace EnglishTypingPractice
                         " · 罚时 " + team.PenaltyMs / 1000 + " 秒";
                 }
             }
+            recap.Header = pulse ? "合作记录" : "本局复盘";
             recap.Visibility = state.Phase == MatchPhase.Finished ? Visibility.Visible : Visibility.Collapsed;
             if (running && !own.TurnPending && command.Text.Length > 0)
                 HandleRoomCommand();
@@ -1102,6 +1132,8 @@ namespace EnglishTypingPractice
 
         private static string FormatRecap(SnakeMode mode, SnakePlayerState player)
         {
+            if (mode == SnakeMode.Pulse)
+                return "通过 " + player.PulseSurvived + "/12 波 · 出局 " + player.PulseDeaths + " 次 · 有效转向 " + player.Turns + " 次";
             if (mode == SnakeMode.Hotspot)
                 return "热点积分 " + player.Score + " · 复活 " + player.Respawns + " 次";
             if (mode == SnakeMode.Race)
@@ -1122,6 +1154,7 @@ namespace EnglishTypingPractice
                 case SnakeResult.Obstacle: result = "撞到障碍"; break;
                 case SnakeResult.Rival: result = "与其他玩家碰撞"; break;
                 case SnakeResult.Skill: result = "被对手技能命中"; break;
+                case SnakeResult.Pulse: result = "触及通电线"; break;
                 case SnakeResult.Survived: result = "最后存活"; break;
                 case SnakeResult.Won: result = "通关"; break;
                 default: result = "本局结束"; break;
@@ -1308,6 +1341,10 @@ namespace EnglishTypingPractice
         private static readonly Pen ShotTrail = MakePen(MakeBrush(255, 126, 57, 155), 2.5);
         private static readonly Brush BurstFill = MakeBrush(207, 129, 255, 55);
         private static readonly Pen BurstOutline = MakeBurstPen();
+        private static readonly Brush PulseWarningFill = MakeBrush(255, 194, 66, 48);
+        private static readonly Brush PulseActiveFill = MakeBrush(255, 58, 83, 115);
+        private static readonly Pen PulseWarningLine = MakePen(MakeBrush(255, 210, 87), 1.5);
+        private static readonly Pen PulseActiveLine = MakePen(MakeBrush(255, 97, 112), 2);
         private static readonly Brush[] TurnColors =
         {
             MakeBrush(93, 225, 252), MakeBrush(242, 144, 248), MakeBrush(237, 251, 172)
@@ -1348,6 +1385,17 @@ namespace EnglishTypingPractice
         private int raceTarget = -1;
         private int hotspotTarget = -1, hotspotUpcoming = -1, relayTarget = -1;
         private PowerStation[] powerStations = new PowerStation[0];
+        private int[] pulseCells = new int[0];
+        private int pulsePhase, pulsePhaseRemaining;
+
+        internal void SetPulse(int[] cells, int phase, int remaining)
+        {
+            pulseCells = cells ?? new int[0];
+            pulsePhase = phase;
+            pulsePhaseRemaining = remaining;
+            InvalidateVisual();
+            Minimap.InvalidateVisual();
+        }
 
         internal void SetObjectives(int target, PowerStation[] stations, int hotspot, int upcoming, int relay)
         {
@@ -2016,6 +2064,23 @@ namespace EnglishTypingPractice
 
         private void DrawObjectives(DrawingContext drawing, Rect world, double cell, bool overview)
         {
+            if (pulsePhase != 0)
+            {
+                bool warning = pulsePhase == 1;
+                var pen = warning ? PulseWarningLine : PulseActiveLine;
+                drawing.PushOpacity(warning && !overview && !LowEffects ? .85 + .1 * Math.Sin(pulsePhaseRemaining * .006) : 1);
+                foreach (int position in pulseCells)
+                {
+                    var tile = CellBounds(position, world, cell);
+                    drawing.DrawRectangle(warning ? PulseWarningFill : PulseActiveFill, null, tile);
+                    double inset = warning ? cell * .27 : 0;
+                    drawing.DrawLine(pen, new Point(tile.Left + inset, tile.Top + cell / 2),
+                        new Point(tile.Right - inset, tile.Top + cell / 2));
+                    drawing.DrawLine(pen, new Point(tile.Left + cell / 2, tile.Top + inset),
+                        new Point(tile.Left + cell / 2, tile.Bottom - inset));
+                }
+                drawing.Pop();
+            }
             if (raceTarget >= 0)
             {
                 var gate = CellBounds(raceTarget, world, cell);

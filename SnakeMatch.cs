@@ -56,6 +56,10 @@ namespace EnglishTypingPractice
         public int RaceFinishMs { get; set; }
         public int RaceCheckpointMs { get; set; }
         public int PowerContribution { get; set; }
+        public int EchoUsesRemaining { get; set; }
+        public int CornererCooldownRemaining { get; set; }
+        public int PulseSurvived { get; set; }
+        public int PulseDeaths { get; set; }
     }
 
     internal sealed class SnakeMatchState
@@ -95,6 +99,12 @@ namespace EnglishTypingPractice
         public bool RaceUniformRole { get; set; }
         public PowerStation[] PowerStations { get; set; }
         public bool PowerWon { get; set; }
+        public int PulseWave { get; set; }
+        public int PulsePhase { get; set; }
+        public int PulsePhaseRemaining { get; set; }
+        public int[] PulseCells { get; set; }
+        public int PulseLives { get; set; }
+        public bool PulseWon { get; set; }
         public int HotspotTarget { get; set; }
         public int HotspotUpcoming { get; set; }
         public int RelayTarget { get; set; }
@@ -141,6 +151,7 @@ namespace EnglishTypingPractice
         private SnakeTeams teams;
         private SnakeRace race;
         private SnakePower power;
+        private SnakePulse pulse;
         private SnakeHotspot hotspot;
         private SnakeRelay relay;
         private int relayWinner = -1;
@@ -225,6 +236,7 @@ namespace EnglishTypingPractice
             territory = null;
             race = null;
             power = null;
+            pulse = null;
             hotspot = null;
             relay = null;
             relayWinner = -1;
@@ -276,6 +288,8 @@ namespace EnglishTypingPractice
                     Finish();
                 }
             }
+            else if (pulse != null)
+                FinishPulseIfDecided();
             else if (race != null || power != null)
                 FinishNewModeIfDecided();
             else if (territory != null)
@@ -297,11 +311,12 @@ namespace EnglishTypingPractice
             endedAt = 0;
             participants = Count;
             mode = nextMode;
-            size = mode == SnakeMode.Race ? SnakeRace.Size : mode == SnakeMode.Power ? SnakePower.Size :
+            size = mode == SnakeMode.Pulse ? SnakePulse.Size : mode == SnakeMode.Race ? SnakeRace.Size : mode == SnakeMode.Power ? SnakePower.Size :
                 mode == SnakeMode.Hotspot ? SnakeHotspot.Size : mode == SnakeMode.Relay ? SnakeRelay.Size : mode == SnakeMode.Teams ? SnakeTeams.Size :
                 solo && mode == SnakeMode.Classic ? soloClassicSize : SnakeGame.BoardSize(participants);
             race = mode == SnakeMode.Race ? new SnakeRace(solo ? SnakeRace.SoloSeed : random.Next(1, int.MaxValue)) : null;
             power = mode == SnakeMode.Power ? new SnakePower(participants, random) : null;
+            pulse = mode == SnakeMode.Pulse ? new SnakePulse(participants, random) : null;
             hotspot = mode == SnakeMode.Hotspot ? new SnakeHotspot(random) : null;
             int relaySeed = mode == SnakeMode.Relay ? random.Next(1, int.MaxValue) : 0;
             relay = mode == SnakeMode.Relay ? new SnakeRelay(Enumerable.Range(0, players.Length)
@@ -355,6 +370,11 @@ namespace EnglishTypingPractice
                     player.Snake.Start(size, size / 2, size / 2, SnakeDirection.North, player.Role, mode);
                 else
                     player.Snake.Start(size, xs[seat], ys[seat], directions[seat], player.Role, mode);
+                if (pulse != null)
+                {
+                    int safeHead = pulse.SafeSpawn(player.Snake);
+                    player.Snake.Start(size, safeHead % size, safeHead / size, player.Snake.SpawnDirection, player.Role, mode);
+                }
                 seat++;
             }
             obstacles = race != null ? race.Obstacles : power != null ? power.Obstacles : relay != null ? relay.Obstacles : mode == SnakeMode.Obstacles
@@ -365,7 +385,7 @@ namespace EnglishTypingPractice
             territory = mode == SnakeMode.Territory ? new SnakeTerritory(size) : null;
             if (teams != null)
                 teams.PlaceInitial(ActivePlayers().SelectMany(player => player.Snake.Body));
-            else if (territory == null && race == null && power == null && relay == null)
+            else if (territory == null && race == null && power == null && relay == null && pulse == null)
                 FillFruits();
             else if (territory != null)
                 for (int slot = 0; slot < players.Length; slot++)
@@ -376,6 +396,8 @@ namespace EnglishTypingPractice
 
         internal bool TryWord(int slot, string word, int group, int roundNumber, long elapsed)
         {
+            if (pulse != null && Phase == MatchPhase.Playing)
+                Step(elapsed);
             if (Phase != MatchPhase.Playing || roundNumber != round || HasEnded(elapsed))
                 return false;
             var player = players[slot];
@@ -414,6 +436,8 @@ namespace EnglishTypingPractice
 
         internal bool TryCharge(int slot, string word, int group, int roundNumber, long elapsed)
         {
+            if (pulse != null && Phase == MatchPhase.Playing)
+                Step(elapsed);
             if (Phase != MatchPhase.Playing || roundNumber != round || HasEnded(elapsed))
                 return false;
             if (elapsed / 60000 != now / 60000)
@@ -472,11 +496,17 @@ namespace EnglishTypingPractice
         {
             return territory != null && elapsed >= SnakeTerritory.Duration || teams != null && elapsed >= SnakeTeams.Duration ||
                 race != null && elapsed >= SnakeRace.Duration || power != null && elapsed >= SnakePower.Duration ||
-                hotspot != null && elapsed >= SnakeHotspot.Duration || relay != null && elapsed >= SnakeRelay.Duration;
+                hotspot != null && elapsed >= SnakeHotspot.Duration || relay != null && elapsed >= SnakeRelay.Duration ||
+                pulse != null && elapsed >= SnakePulse.Duration;
         }
 
         internal void Step(long elapsed)
         {
+            if (pulse != null)
+            {
+                if (Phase == MatchPhase.Playing) StepPulse(elapsed);
+                return;
+            }
             now = elapsed;
             if (Phase != MatchPhase.Playing)
                 return;
@@ -557,6 +587,83 @@ namespace EnglishTypingPractice
                     snake.ScheduleNext(now);
                 snake.FinishBurst();
             }
+        }
+
+        private void StepPulse(long elapsed)
+        {
+            long target = Math.Max(now, Math.Min(elapsed, SnakePulse.Duration));
+            while (Phase == MatchPhase.Playing)
+            {
+                long eventAt = Math.Min(target, pulse.NextBoundary);
+                foreach (var player in ActivePlayers())
+                    eventAt = Math.Min(eventAt, Math.Max(now, (long)Math.Ceiling(player.Snake.NextMoveTime(now))));
+                foreach (var player in players)
+                    if (player != null && player.Connected && player.RespawnAt > now)
+                        eventAt = Math.Min(eventAt, player.RespawnAt);
+                now = eventAt;
+                foreach (var player in ActivePlayers()) player.Snake.RecordActiveTime(now);
+                pulse.Advance(now, Enumerable.Range(0, players.Length).Where(slot =>
+                    players[slot] != null && players[slot].Snake.IsRunning),
+                    ActivePlayers().Select(player => player.Snake.Body.First.Value).ToArray());
+                if (now >= SnakePulse.Duration)
+                {
+                    pulse.Won = true;
+                    foreach (var player in ActivePlayers()) player.Snake.End(SnakeResult.Won);
+                    Finish();
+                    return;
+                }
+                // Activation checks stationary heads before any movement can escape the line.
+                foreach (var player in ActivePlayers().ToArray())
+                    if (pulse.IsDangerous(player.Snake.Body.First.Value))
+                    {
+                        player.Snake.End(SnakeResult.Pulse);
+                        QueuePulseRespawn(player);
+                    }
+                foreach (var player in players)
+                    if (player != null && player.Connected && player.RespawnAt > 0 && player.RespawnAt <= now)
+                    {
+                        int head = pulse.SafeSpawn(player.Snake);
+                        if (head < 0) continue;
+                        player.Snake.Respawn(now, head);
+                        player.RespawnAt = 0;
+                        player.Preview = null;
+                    }
+                var due = ActivePlayers().Select(player => player.Snake).Where(snake => snake.MoveDue(now)).ToArray();
+                int substeps = due.Length == 0 ? 0 : due.Max(snake => snake.ExtraMoves) + 1;
+                for (int step = 0; step < substeps; step++)
+                    foreach (var snake in due.Where(snake => snake.IsRunning && snake.ExtraMoves >= step))
+                    {
+                        int next = snake.NextCell();
+                        if (!snake.CanStep(next, false))
+                            QueuePulseRespawn(players[Slot(snake)]);
+                        else if (pulse.IsDangerous(next))
+                        {
+                            snake.End(SnakeResult.Pulse);
+                            QueuePulseRespawn(players[Slot(snake)]);
+                        }
+                        else
+                            snake.MoveTo(next, 0);
+                    }
+                foreach (var snake in due)
+                {
+                    if (snake.IsRunning) snake.ScheduleNext(now);
+                    snake.FinishBurst();
+                }
+                FinishPulseIfDecided();
+                if (now >= target) return;
+            }
+        }
+
+        private void QueuePulseRespawn(Player player)
+        {
+            player.Preview = null;
+            player.RespawnAt = pulse.TakeLife(Slot(player.Snake)) ? now + SnakePulse.RespawnDelay : 0;
+        }
+
+        private void FinishPulseIfDecided()
+        {
+            if (!ActivePlayers().Any() && !players.Any(player => player != null && player.Connected && player.RespawnAt > 0))
+                Finish();
         }
 
         private void Move(SnakeGame[] due)
@@ -871,8 +978,8 @@ namespace EnglishTypingPractice
         {
             var own = players[slot].Snake;
             string handoff = relay != null && Phase == MatchPhase.Playing ? relay.HandoffWord(slot) : null;
-            long modeClock = Phase == MatchPhase.Finished && (relay != null || hotspot != null) ? endedAt : now;
-            int displaySize = Phase != MatchPhase.Lobby ? size : nextMode == SnakeMode.Race ? SnakeRace.Size :
+            long modeClock = Phase == MatchPhase.Finished && (relay != null || hotspot != null || pulse != null) ? endedAt : now;
+            int displaySize = Phase != MatchPhase.Lobby ? size : nextMode == SnakeMode.Pulse ? SnakePulse.Size : nextMode == SnakeMode.Race ? SnakeRace.Size :
                 nextMode == SnakeMode.Power ? SnakePower.Size : nextMode == SnakeMode.Hotspot ? SnakeHotspot.Size :
                 nextMode == SnakeMode.Relay ? SnakeRelay.Size : nextMode == SnakeMode.Teams ? SnakeTeams.Size : SnakeGame.BoardSize(Count);
             return new SnakeMatchState
@@ -888,7 +995,7 @@ namespace EnglishTypingPractice
                 Remaining = (int)Math.Max(0, (teams != null ? SnakeTeams.Duration :
                     territory != null ? SnakeTerritory.Duration : race != null ? SnakeRace.Duration :
                     power != null ? SnakePower.Duration : hotspot != null ? SnakeHotspot.Duration :
-                    relay != null ? SnakeRelay.Duration : 0) - modeClock),
+                    relay != null ? SnakeRelay.Duration : pulse != null ? SnakePulse.Duration : 0) - modeClock),
                 SafeStart = Phase == MatchPhase.Lobby ? 0 : bounds.Start,
                 SafeEnd = Phase == MatchPhase.Lobby ? displaySize : bounds.End,
                 TeamCount = teams == null ? 0 : teams.Count,
@@ -912,6 +1019,12 @@ namespace EnglishTypingPractice
                 RaceUniformRole = uniformRaceRole,
                 PowerStations = power == null ? new PowerStation[0] : power.Snapshot(Math.Min(now, SnakePower.Duration)),
                 PowerWon = power != null && power.IsComplete,
+                PulseWave = pulse == null ? 0 : pulse.Wave,
+                PulsePhase = pulse == null ? 0 : pulse.Phase,
+                PulsePhaseRemaining = pulse == null ? 0 : pulse.PhaseRemaining(modeClock),
+                PulseCells = pulse == null ? new int[0] : pulse.Cells,
+                PulseLives = pulse == null ? 0 : pulse.Lives,
+                PulseWon = pulse != null && pulse.Won,
                 HotspotTarget = hotspot == null || Phase != MatchPhase.Playing ? -1 : hotspot.Target(now),
                 HotspotUpcoming = hotspot == null || Phase != MatchPhase.Playing ? -1 : hotspot.Upcoming(now),
                 RelayTarget = relay == null || Phase != MatchPhase.Playing ? -1 : relay.Target(slot),
@@ -953,7 +1066,7 @@ namespace EnglishTypingPractice
                 {
                     Slot = slot,
                     Name = numberedNames.TryGetValue(player, out name) ? name : player.Name,
-                    Score = territory != null ? territory.Score(slot) : power != null ? power.Contribution(slot) :
+                    Score = pulse != null ? pulse.Survived(slot) : territory != null ? territory.Score(slot) : power != null ? power.Contribution(slot) :
                         hotspot != null ? hotspot.Score(slot) : relay != null ? relay.Legs(relay.Team(slot)) : snake == null ? 0 : snake.Score,
                     Direction = snake == null ? SnakeDirection.North : snake.Direction,
                     TurnPending = snake != null && snake.TurnPending,
@@ -963,8 +1076,8 @@ namespace EnglishTypingPractice
                     Respawns = snake == null ? 0 : snake.Respawns,
                     Team = relay != null ? relay.Team(slot) : teams == null || snake == null ? -1 : teams.Team(slot),
                     Carrying = teams == null || snake == null ? 0 : teams.Carrying(slot),
-                    RespawnRemaining = (teams != null || power != null || hotspot != null || relay != null) && player.Connected && Phase == MatchPhase.Playing
-                        ? (int)Math.Max(0, player.RespawnAt - now) : 0,
+                    RespawnRemaining = (teams != null || power != null || hotspot != null || relay != null || pulse != null) && player.Connected && Phase == MatchPhase.Playing
+                        ? (int)Math.Max(pulse != null && player.RespawnAt > 0 ? 1 : 0, player.RespawnAt - now) : 0,
                     Charging = snake != null && snake.IsCharging(now),
                     Stabilizing = snake != null && snake.IsStabilizing(now),
                     StabilizerCooldownRemaining = snake == null ? 0 : snake.StabilizerCooldownRemaining(now),
@@ -984,6 +1097,10 @@ namespace EnglishTypingPractice
                     RaceFinishMs = race == null ? -1 : race.FinishMs(slot),
                     RaceCheckpointMs = race == null ? 0 : race.LastCheckpointMs(slot),
                     PowerContribution = power == null ? 0 : power.Contribution(slot),
+                    EchoUsesRemaining = snake == null ? 0 : snake.EchoUsesRemaining,
+                    CornererCooldownRemaining = snake == null ? 0 : snake.CornererCooldownRemaining(now),
+                    PulseSurvived = pulse == null ? 0 : pulse.Survived(slot),
+                    PulseDeaths = pulse == null ? 0 : pulse.Deaths(slot),
                     Body = snake != null && (visibleSlot < 0 || slot == visibleSlot ||
                         (relay != null && visibleSlot < players.Length && relay.Team(slot) == relay.Team(visibleSlot))) &&
                         (snake.IsRunning || snake.Result == SnakeResult.Survived ||
@@ -999,7 +1116,9 @@ namespace EnglishTypingPractice
             endedAt = now;
             shots.Clear();
             var standings = PlayerStates(race == null && relay == null ? -1 : players.Length);
-            rankings = race != null ? race.Rank(standings).ToArray() : standings.Where(player => territory == null || player.Result != SnakeResult.Left)
+            rankings = pulse != null ? standings.OrderByDescending(player => player.PulseSurvived)
+                .ThenBy(player => player.PulseDeaths).ThenByDescending(player => player.Turns).ThenBy(player => player.Slot).ToArray() :
+                race != null ? race.Rank(standings).ToArray() : standings.Where(player => territory == null || player.Result != SnakeResult.Left)
                 .OrderByDescending(player => player.Score).ThenBy(player => player.Slot).ToArray();
         }
 

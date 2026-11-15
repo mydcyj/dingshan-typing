@@ -77,6 +77,7 @@ namespace EnglishTypingPractice
         private readonly int slot;
         private readonly Random random;
         private readonly HashSet<int> dangerous = new HashSet<int>();
+        private readonly HashSet<int> pulseCells = new HashSet<int>();
         private readonly List<ProjectedHead> projectedHeads = new List<ProjectedHead>(6);
         private int[] distance, queue;
         private bool[] blocked;
@@ -212,6 +213,8 @@ namespace EnglishTypingPractice
             if (territorial && legSteps + lead < leg && room > lead + 2 && straightRisk == 0)
                 return;
             double best = LineValue(head, heading, Math.Min(room, sight), state.Mode) + .7;
+            if (state.Mode == SnakeMode.Pulse && pulseCells.Contains(head))
+                best += pulseCells.Contains(Advance(head, heading, Math.Min(room, sight))) ? -60 : 30;
             if (hell && !territorial)
                 best += ContinuationValue(head, heading, room, 0, lead, state.Mode) - straightRisk;
             else
@@ -236,6 +239,8 @@ namespace EnglishTypingPractice
                 if (open <= extra)
                     continue;
                 double value = LineValue(pivot, direction, Math.Min(open, (hell && !territorial ? sight : Math.Max(lead, 3)) + extra), state.Mode);
+                if (state.Mode == SnakeMode.Pulse && pulseCells.Contains(head))
+                    value += pulseCells.Contains(Advance(pivot, direction, Math.Min(open, sight + extra))) ? -60 : 30;
                 if (hell)
                 {
                     int turnAt = untilMove + (int)(advance * interval);
@@ -347,6 +352,7 @@ namespace EnglishTypingPractice
                         .OrderBy(item => Manhattan(head, item.Cell)).FirstOrDefault();
                     return ball == null ? -1 : ball.Cell;
                 case SnakeMode.Territory: return -1;
+                case SnakeMode.Pulse: return PulseEscapeTarget(head);
                 default:
                     int nearest = -1, gap = int.MaxValue;
                     foreach (int fruit in state.SmallFruits.Concat(state.LargeFruit < 0 ? new int[0] :
@@ -361,6 +367,28 @@ namespace EnglishTypingPractice
                     }
                     return nearest;
             }
+        }
+
+        private int PulseEscapeTarget(int head)
+        {
+            if (!pulseCells.Contains(head))
+                return -1;
+            int target = -1, nearest = int.MaxValue;
+            for (int y = 3; y < size - 3; y++)
+                for (int x = 3; x < size - 3; x++)
+                {
+                    int cell = y * size + x;
+                    if (pulseCells.Contains(cell) || pulseCells.Contains(cell - 1) || pulseCells.Contains(cell + 1) ||
+                        pulseCells.Contains(cell - size) || pulseCells.Contains(cell + size) || dangerous.Contains(cell))
+                        continue;
+                    int gap = Manhattan(head, cell);
+                    if (gap < nearest)
+                    {
+                        nearest = gap;
+                        target = cell;
+                    }
+                }
+            return target;
         }
 
         private bool CanUseSkill(SnakeGame snake, SnakeMatchState state, SnakePlayerState own, SnakeBotDifficulty difficulty,
@@ -406,12 +434,22 @@ namespace EnglishTypingPractice
             start = state.SafeStart;
             end = state.SafeEnd;
             dangerous.Clear();
+            pulseCells.Clear();
+            if (state.Mode == SnakeMode.Pulse)
+            {
+                pulseCells.UnionWith(state.PulseCells);
+                // A head already on a warning line may travel along it while typing an escape turn.
+                // Once clear, plan around both warning and active lines before they become lethal.
+                if (state.PulsePhase == 2 || !pulseCells.Contains(snake.Body.First.Value))
+                    dangerous.UnionWith(pulseCells);
+            }
             if (state.Mode == SnakeMode.Territory)
                 return;
             foreach (int cell in snake.Body)
                 if (cell != snake.Body.First.Value && cell != snake.Body.Last.Value)
                     dangerous.Add(cell);
-            if (state.Mode != SnakeMode.Power && state.Mode != SnakeMode.Race && state.Mode != SnakeMode.Relay)
+            if (state.Mode != SnakeMode.Power && state.Mode != SnakeMode.Race && state.Mode != SnakeMode.Relay &&
+                state.Mode != SnakeMode.Pulse)
                 foreach (var player in state.Players)
                     if (player.Slot != slot && player.Result == SnakeResult.Running)
                         foreach (int cell in player.Body)
@@ -424,6 +462,7 @@ namespace EnglishTypingPractice
         {
             projectedHeads.Clear();
             if (state.Mode == SnakeMode.Power || state.Mode == SnakeMode.Race || state.Mode == SnakeMode.Relay ||
+                state.Mode == SnakeMode.Pulse ||
                 own.IsCharging(now))
                 return;
             foreach (var player in state.Players)
